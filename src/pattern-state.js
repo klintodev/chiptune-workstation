@@ -1,10 +1,19 @@
-export const PATTERN_STEP_COUNT = 16;
+export const DEFAULT_PATTERN_LENGTH = 16;
+export const SUPPORTED_PATTERN_LENGTHS = Object.freeze([4, 8, 16, 32]);
 export const MIN_PATTERN_NOTE = 36;
 export const MAX_PATTERN_NOTE = 112;
 
-function validateStepIndex(index) {
-  if (!Number.isInteger(index) || index < 0 || index >= PATTERN_STEP_COUNT) {
-    throw new RangeError(`Step index must be between 0 and ${PATTERN_STEP_COUNT - 1}.`);
+function validateLength(length) {
+  if (!SUPPORTED_PATTERN_LENGTHS.includes(length)) {
+    throw new RangeError(
+      `Pattern length must be one of: ${SUPPORTED_PATTERN_LENGTHS.join(", ")}.`,
+    );
+  }
+}
+
+function validateStepIndex(index, length) {
+  if (!Number.isInteger(index) || index < 0 || index >= length) {
+    throw new RangeError(`Step index must be between 0 and ${length - 1}.`);
   }
 }
 
@@ -17,10 +26,9 @@ function validateNote(note) {
 }
 
 function createInitialSteps(initialSteps) {
-  if (initialSteps === undefined) return Array(PATTERN_STEP_COUNT).fill(null);
-  if (!Array.isArray(initialSteps) || initialSteps.length !== PATTERN_STEP_COUNT) {
-    throw new RangeError(`A pattern must contain exactly ${PATTERN_STEP_COUNT} steps.`);
-  }
+  if (initialSteps === undefined) return Array(DEFAULT_PATTERN_LENGTH).fill(null);
+  if (!Array.isArray(initialSteps)) throw new TypeError("Pattern steps must be an array.");
+  validateLength(initialSteps.length);
 
   return initialSteps.map((note) => {
     if (note === null) return null;
@@ -34,7 +42,10 @@ export function createPatternState(initialSteps) {
   let steps = createInitialSteps(initialSteps);
 
   function getState() {
-    return Object.freeze({ steps: Object.freeze([...steps]) });
+    return Object.freeze({
+      length: steps.length,
+      steps: Object.freeze([...steps]),
+    });
   }
 
   function emitChange() {
@@ -42,22 +53,34 @@ export function createPatternState(initialSteps) {
   }
 
   function setStep(index, note) {
-    validateStepIndex(index);
+    validateStepIndex(index, steps.length);
     validateNote(note);
-    if (steps[index] === note) return;
+    if (steps[index] === note) return false;
     const nextSteps = [...steps];
     nextSteps[index] = note;
     steps = nextSteps;
     emitChange();
+    return true;
   }
 
   function clearStep(index) {
-    validateStepIndex(index);
-    if (steps[index] === null) return;
+    validateStepIndex(index, steps.length);
+    if (steps[index] === null) return false;
     const nextSteps = [...steps];
     nextSteps[index] = null;
     steps = nextSteps;
     emitChange();
+    return true;
+  }
+
+  function setLength(nextLength) {
+    validateLength(nextLength);
+    if (steps.length === nextLength) return false;
+    const nextSteps = steps.slice(0, nextLength);
+    while (nextSteps.length < nextLength) nextSteps.push(null);
+    steps = nextSteps;
+    emitChange();
+    return true;
   }
 
   return Object.freeze({
@@ -65,6 +88,7 @@ export function createPatternState(initialSteps) {
     clearStep,
     getState,
     removeEventListener: events.removeEventListener.bind(events),
+    setLength,
     setStep,
   });
 }

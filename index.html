@@ -43,8 +43,9 @@
 
       <section class="sequencer-section" aria-labelledby="sequencer-title">
         <div class="sequencer-heading">
-          <div><p class="eyebrow">Pattern</p><h2 id="sequencer-title">16-step editor</h2><p>Choose a note, then place or replace it on any step.</p></div>
+          <div><p class="eyebrow">Pattern</p><h2 id="sequencer-title">Pattern editor</h2><p>Choose a note, then place it on a step. Shortening permanently removes later steps.</p></div>
           <div class="pattern-note-picker">
+            <label>Length<select id="pattern-length"><option value="4">4 steps</option><option value="8">8 steps</option><option value="16" selected>16 steps</option><option value="32">32 steps</option></select></label>
             <label>Pitch<select id="pattern-pitch"><option value="0">C</option><option value="1">C&#9839;</option><option value="2">D</option><option value="3">D&#9839;</option><option value="4">E</option><option value="5">F</option><option value="6">F&#9839;</option><option value="7">G</option><option value="8">G&#9839;</option><option value="9">A</option><option value="10">A&#9839;</option><option value="11">B</option></select></label>
             <label>Octave<select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
             <p>Selected <output id="selected-pattern-note">C4</output></p>

@@ -1,4 +1,4 @@
-import { MAX_PATTERN_NOTE, MIN_PATTERN_NOTE, PATTERN_STEP_COUNT } from "./pattern-state.js";
+import { MAX_PATTERN_NOTE, MIN_PATTERN_NOTE } from "./pattern-state.js";
 
 export function createPatternEditor({
   patternState,
@@ -39,13 +39,15 @@ export function createPatternEditor({
   }
 
   function setPlayhead(stepIndex, nextPlaybackStatus) {
-    if (!Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= PATTERN_STEP_COUNT) {
-      throw new RangeError(`Playhead step must be between 0 and ${PATTERN_STEP_COUNT - 1}.`);
+    const { length } = patternState.getState();
+    if (!Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= length) {
+      throw new RangeError(`Playhead step must be between 0 and ${length - 1}.`);
     }
     playheadStepIndex = stepIndex;
     playbackStatus = nextPlaybackStatus;
     render();
   }
+
   function createStep(index) {
     const container = document.createElement("div");
     const setButton = document.createElement("button");
@@ -78,10 +80,19 @@ export function createPatternEditor({
     stepElements.push({ clearButton, container, setButton, value });
   }
 
+  function syncStepElements(length) {
+    while (stepElements.length < length) createStep(stepElements.length);
+    while (stepElements.length > length) stepElements.pop().container.remove();
+    if (selectedStepIndex !== null && selectedStepIndex >= length) selectedStepIndex = null;
+    if (playheadStepIndex >= length) playheadStepIndex = 0;
+    grid.setAttribute("aria-label", `${length}-step pattern`);
+  }
+
   function render() {
     constrainPitchSelection();
     const selectedNoteName = getNoteName(getSelectedNote());
     const { steps } = patternState.getState();
+    syncStepElements(steps.length);
     selectedNoteOutput.value = selectedNoteName;
 
     steps.forEach((note, index) => {
@@ -90,7 +101,10 @@ export function createPatternEditor({
       elements.container.classList.toggle("has-note", hasNote);
       elements.container.classList.toggle("selected", index === selectedStepIndex);
       elements.container.classList.toggle("playhead", index === playheadStepIndex);
-      elements.container.classList.toggle("playhead-playing", index === playheadStepIndex && playbackStatus === "playing");
+      elements.container.classList.toggle(
+        "playhead-playing",
+        index === playheadStepIndex && playbackStatus === "playing",
+      );
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
       elements.value.textContent = hasNote ? getNoteName(note) : "Rest";
       elements.clearButton.disabled = !hasNote;
@@ -108,7 +122,6 @@ export function createPatternEditor({
     render();
   }
 
-  for (let index = 0; index < PATTERN_STEP_COUNT; index += 1) createStep(index);
   pitchSelect.addEventListener("change", handleSelectionChange);
   octaveSelect.addEventListener("change", handleSelectionChange);
   patternState.addEventListener("change", render);
