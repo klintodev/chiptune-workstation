@@ -232,7 +232,7 @@ As a user, I want tempo changes to take effect while the loop plays so that I ca
 
 Requirements:
 
-- A tempo change re-anchors future scheduling from a defined musical boundary.
+- A tempo change re-anchors future scheduling at the first step that has not entered the scheduling window.
 - Notes already inside the scheduling window are not triggered again.
 - The next unscheduled steps use the new step duration.
 - A tempo change does not skip a step or create two active schedulers.

@@ -486,6 +486,22 @@ footer {
   gap: 8px;
 }
 
+.tempo-control {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+}
+
+.tempo-control input {
+  grid-column: 1 / -1;
+  accent-color: var(--acid);
+}
+
+.tempo-control output {
+  color: var(--acid);
+  font-weight: 900;
+}
 .pattern-transport button {
   min-height: 44px;
   padding: 8px 14px;
@@ -515,7 +531,7 @@ footer {
   opacity: 0.42;
 }
 
-.pattern-transport output {
+.pattern-transport > output {
   grid-column: 1 / -1;
   color: var(--muted);
   font-size: 0.72rem;
@@ -615,7 +631,7 @@ footer {
     grid-template-columns: 1fr;
   }
 
-  .pattern-transport output {
+  .pattern-transport > output {
     grid-column: auto;
   }
 

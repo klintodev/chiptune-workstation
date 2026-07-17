@@ -49,6 +49,7 @@
             <label>Octave<select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
             <p>Selected <output id="selected-pattern-note">C4</output></p>
             <div class="pattern-transport" aria-label="Pattern transport">
+              <label class="tempo-control">Tempo <output id="tempo-value" for="tempo">120 BPM</output><input id="tempo" type="range" min="40" max="240" step="1" value="120" /></label>
               <button id="transport-play" type="button" disabled>Play</button>
               <button id="transport-pause" type="button" disabled>Pause</button>
               <button id="transport-stop" type="button" disabled>Stop</button>

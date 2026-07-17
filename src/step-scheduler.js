@@ -40,7 +40,8 @@ export function createStepScheduler({
   }
 
   const events = new EventTarget();
-  const stepDurationSeconds = getSixteenthNoteDuration(bpm);
+  let currentBpm = bpm;
+  let currentStepDurationSeconds = getSixteenthNoteDuration(currentBpm);
   let nextSessionId = 1;
   let nextVoiceId = 1;
   let retainedStepIndex = 0;
@@ -55,6 +56,7 @@ export function createStepScheduler({
 
   function getState() {
     return Object.freeze({
+      bpm: currentBpm,
       status,
       retainedStepIndex,
       sessionId: session?.id ?? null,
@@ -86,30 +88,50 @@ export function createStepScheduler({
     }
   }
 
+  function pruneTempoSegments(activeSession, now) {
+    while (
+      activeSession.tempoSegments.length > 1 &&
+      activeSession.tempoSegments[1].anchorTime <= now
+    ) {
+      activeSession.tempoSegments.shift();
+    }
+  }
+
+  function getTempoSegmentAtTime(activeSession, audioTime) {
+    let selected = activeSession.tempoSegments[0];
+    for (const segment of activeSession.tempoSegments) {
+      if (segment.anchorTime > audioTime) break;
+      selected = segment;
+    }
+    return selected;
+  }
+
   function getNextStepAtTime(activeSession, audioTime) {
-    if (audioTime <= activeSession.anchorTime) return activeSession.anchorStepIndex;
+    const segment = getTempoSegmentAtTime(activeSession, audioTime);
+    if (audioTime <= segment.anchorTime) return segment.anchorStepIndex;
     const elapsedSteps = Math.ceil(
-      (audioTime - activeSession.anchorTime) / stepDurationSeconds,
+      (audioTime - segment.anchorTime) / segment.stepDurationSeconds,
     );
-    return (activeSession.anchorStepIndex + elapsedSteps) % activeSession.stepCount;
+    return (segment.anchorStepIndex + elapsedSteps) % activeSession.stepCount;
   }
 
   function getPlayheadStep(audioTime) {
     const activeSession = session;
     if (status !== "playing" || !activeSession) return retainedStepIndex;
     const resolvedAudioTime = audioTime ?? getAudioTime();
-    if (resolvedAudioTime <= activeSession.anchorTime) return activeSession.anchorStepIndex;
+    const segment = getTempoSegmentAtTime(activeSession, resolvedAudioTime);
+    if (resolvedAudioTime <= segment.anchorTime) return segment.anchorStepIndex;
     const elapsedSteps = Math.floor(
-      (resolvedAudioTime - activeSession.anchorTime) / stepDurationSeconds,
+      (resolvedAudioTime - segment.anchorTime) / segment.stepDurationSeconds,
     );
-    return (activeSession.anchorStepIndex + elapsedSteps) % activeSession.stepCount;
+    return (segment.anchorStepIndex + elapsedSteps) % activeSession.stepCount;
   }
 
   function scheduleStep(activeSession, stepIndex, startTime) {
     const note = getPatternState().steps[stepIndex];
     if (note === null) return;
     const config = getInstrumentConfig();
-    const duration = stepDurationSeconds * gateRatio;
+    const duration = activeSession.stepDurationSeconds * gateRatio;
     const voice = voiceEngine.trigger({
       type: config.voiceType,
       frequency: midiNoteToFrequency(note),
@@ -146,21 +168,22 @@ export function createStepScheduler({
     try {
       const now = getAudioTime();
       pruneFinishedVoices(activeSession, now);
+      pruneTempoSegments(activeSession, now);
 
       if (activeSession.nextStepTime < now) {
         const missedSteps = Math.ceil(
-          (now - activeSession.nextStepTime) / stepDurationSeconds,
+          (now - activeSession.nextStepTime) / activeSession.stepDurationSeconds,
         );
         activeSession.nextStepIndex =
           (activeSession.nextStepIndex + missedSteps) % activeSession.stepCount;
-        activeSession.nextStepTime += missedSteps * stepDurationSeconds;
+        activeSession.nextStepTime += missedSteps * activeSession.stepDurationSeconds;
       }
 
       const horizon = now + lookAheadSeconds;
       while (activeSession.nextStepTime <= horizon) {
         scheduleStep(activeSession, activeSession.nextStepIndex, activeSession.nextStepTime);
         activeSession.nextStepIndex = (activeSession.nextStepIndex + 1) % activeSession.stepCount;
-        activeSession.nextStepTime += stepDurationSeconds;
+        activeSession.nextStepTime += activeSession.stepDurationSeconds;
       }
     } catch (error) {
       failSession(activeSession, error);
@@ -182,6 +205,12 @@ export function createStepScheduler({
       nextStepIndex: retainedStepIndex,
       nextStepTime: anchorTime,
       stepCount: steps.length,
+      stepDurationSeconds: currentStepDurationSeconds,
+      tempoSegments: [{
+        anchorStepIndex: retainedStepIndex,
+        anchorTime,
+        stepDurationSeconds: currentStepDurationSeconds,
+      }],
       timer: null,
       voices: new Map(),
     };
@@ -208,6 +237,30 @@ export function createStepScheduler({
     return true;
   }
 
+  function setBpm(nextBpm) {
+    const nextStepDurationSeconds = getSixteenthNoteDuration(nextBpm);
+    if (nextBpm === currentBpm) return false;
+    currentBpm = nextBpm;
+    currentStepDurationSeconds = nextStepDurationSeconds;
+
+    if (session) {
+      session.stepDurationSeconds = nextStepDurationSeconds;
+      const segment = {
+        anchorStepIndex: session.nextStepIndex,
+        anchorTime: session.nextStepTime,
+        stepDurationSeconds: nextStepDurationSeconds,
+      };
+      const lastSegment = session.tempoSegments.at(-1);
+      if (lastSegment.anchorTime === segment.anchorTime) {
+        session.tempoSegments[session.tempoSegments.length - 1] = segment;
+      } else {
+        session.tempoSegments.push(segment);
+      }
+    }
+
+    emitState();
+    return true;
+  }
   function stop() {
     if (status === "stopped") return false;
     if (session) endSession(session, getAudioTime());
@@ -224,6 +277,7 @@ export function createStepScheduler({
     pause,
     play,
     removeEventListener: events.removeEventListener.bind(events),
+    setBpm,
     stop,
   });
 }

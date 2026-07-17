@@ -8,7 +8,7 @@ import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS 
 import { createVoiceEngine } from "./voice-engine.js";
 
 const selectors = {
-  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternGrid: "#pattern-grid", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
+  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternGrid: "#pattern-grid", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", tempo: "#tempo", tempoValue: "#tempo-value", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 elements.actionLabel = document.querySelector("#audio-action span");
@@ -158,8 +158,10 @@ function stopPlayheadDisplay() {
 }
 
 function renderPatternTransport() {
-  const { status } = stepScheduler.getState();
+  const { bpm, status } = stepScheduler.getState();
   const playing = status === "playing";
+  elements.tempo.value = String(bpm);
+  elements.tempoValue.value = `${bpm} BPM`;
   elements.transportPlay.disabled = !audioEngine.isReady() || playing;
   elements.transportPlay.textContent = status === "paused" ? "Resume" : "Play";
   elements.transportPause.disabled = !playing;
@@ -213,6 +215,7 @@ elements.transportPlay.addEventListener("click", () => {
 });
 elements.transportPause.addEventListener("click", stepScheduler.pause);
 elements.transportStop.addEventListener("click", stepScheduler.stop);
+elements.tempo.addEventListener("input", () => stepScheduler.setBpm(Number(elements.tempo.value)));
 elements.stopSound.addEventListener("click", stopAllSound);
 elements.voiceType.addEventListener("change", () => { instrumentState.setVoiceType(elements.voiceType.value); elements.voiceType.blur(); });
 elements.octaveDown.addEventListener("click", () => instrumentState.setOctaveOffset(instrumentState.getState().octaveOffset - 1));
