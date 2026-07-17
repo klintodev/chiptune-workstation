@@ -1,0 +1,62 @@
+.voice-lab {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-top: 0;
+  background: var(--panel);
+}
+
+.voice-lab > div {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  padding: clamp(24px, 4vw, 48px);
+}
+
+.voice-lab > div:first-child {
+  border-right: 1px solid var(--line);
+}
+
+.voice-lab p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.voice-controls label {
+  display: grid;
+  gap: 6px;
+}
+
+.voice-controls select,
+.voice-controls button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--black);
+  font: inherit;
+}
+
+.voice-controls button:not(:disabled) {
+  cursor: pointer;
+}
+
+.voice-controls button:hover:not(:disabled) {
+  border-color: var(--acid);
+}
+
+#active-voices {
+  color: var(--acid);
+}
+
+@media (max-width: 760px) {
+  .voice-lab {
+    grid-template-columns: 1fr;
+  }
+
+  .voice-lab > div:first-child {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}

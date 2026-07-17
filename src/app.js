@@ -1,12 +1,10 @@
-import {
-  audioEngine,
-  createAudioEngineError,
-  isAudioEngineError,
-} from "./audio-engine.js";
+import { audioEngine, createAudioEngineError, isAudioEngineError } from "./audio-engine.js";
+import { createVoiceEngine, midiNoteToFrequency } from "./voice-engine.js";
 
 const elements = {
   action: document.querySelector("#audio-action"),
   actionLabel: document.querySelector("#audio-action span"),
+  activeVoices: document.querySelector("#active-voices"),
   audioState: document.querySelector("#audio-state"),
   audioTime: document.querySelector("#audio-time"),
   contextState: document.querySelector("#context-state"),
@@ -18,44 +16,32 @@ const elements = {
   statusDescription: document.querySelector("#status-description"),
   statusLight: document.querySelector("#status-light"),
   testSignal: document.querySelector("#test-signal"),
+  voiceHold: document.querySelector("#voice-hold"),
+  voiceSchedule: document.querySelector("#voice-schedule"),
+  voiceTrigger: document.querySelector("#voice-trigger"),
+  voiceType: document.querySelector("#voice-type"),
 };
 
+const voiceEngine = createVoiceEngine({
+  getAudioTime: audioEngine.getCurrentTime,
+  getOutputNode: audioEngine.getInputNode,
+});
+
 const stateContent = {
-  idle: {
-    title: "Not started",
-    action: "Enable audio",
-    description:
-      "Browsers require a deliberate gesture before they allow sound. Nothing will play until you enable audio.",
-  },
-  running: {
-    title: "Ready",
-    action: "Audio enabled",
-    description:
-      "The audio clock is running. Future instruments will connect through the shared master signal path.",
-  },
-  suspended: {
-    title: "Paused by browser",
-    action: "Resume audio",
-    description:
-      "The browser suspended the audio context. Resume it here without reloading or creating a second context.",
-  },
-  closed: {
-    title: "Closed",
-    action: "Reload to restart",
-    description: "This audio session has closed. Reload the page to start a new one.",
-  },
+  idle: { title: "Not started", action: "Enable audio", description: "Browsers require a deliberate gesture before they allow sound. Nothing will play until you enable audio." },
+  running: { title: "Ready", action: "Audio enabled", description: "The audio clock is running. Future instruments will connect through the shared master signal path." },
+  suspended: { title: "Paused by browser", action: "Resume audio", description: "The browser suspended the audio context. Resume it here without reloading or creating a second context." },
+  closed: { title: "Closed", action: "Reload to restart", description: "This audio session has closed. Reload the page to start a new one." },
 };
 
 let errorState = null;
 let timeFrame = null;
+let heldVoice = null;
 
 function startTimeDisplay() {
   if (timeFrame !== null) return;
   const update = () => {
-    if (!audioEngine.isReady()) {
-      timeFrame = null;
-      return;
-    }
+    if (!audioEngine.isReady()) { timeFrame = null; return; }
     elements.audioTime.textContent = `${audioEngine.getCurrentTime().toFixed(2)} s`;
     timeFrame = requestAnimationFrame(update);
   };
@@ -70,13 +56,7 @@ function stopTimeDisplay() {
 
 function render() {
   const state = audioEngine.getState();
-  const content = errorState
-    ? {
-        title: "Needs attention",
-        action: errorState.code === "closed" ? "Reload to restart" : "Try again",
-        description: errorState.message,
-      }
-    : (stateContent[state] ?? stateContent.idle);
+  const content = errorState ? { title: "Needs attention", action: "Try again", description: errorState.message } : (stateContent[state] ?? stateContent.idle);
   const ready = audioEngine.isReady();
   const sampleRate = audioEngine.getSampleRate();
 
@@ -93,55 +73,58 @@ function render() {
   elements.muteToggle.disabled = !ready;
   elements.muteToggle.setAttribute("aria-pressed", String(audioEngine.getIsMuted()));
   elements.muteLabel.textContent = audioEngine.getIsMuted() ? "Unmute output" : "Mute output";
+  elements.voiceType.disabled = !ready;
+  elements.voiceHold.disabled = !ready;
+  elements.voiceTrigger.disabled = !ready;
+  elements.voiceSchedule.disabled = !ready;
+  elements.activeVoices.textContent = String(voiceEngine.getActiveVoiceCount());
 
   if (ready) startTimeDisplay();
-  else {
-    stopTimeDisplay();
-    elements.audioTime.textContent = "—";
-  }
+  else { stopTimeDisplay(); elements.audioTime.textContent = "—"; }
+}
+
+function selectedVoice() {
+  return { type: elements.voiceType.value, frequency: midiNoteToFrequency(60) };
+}
+
+function stopHeldVoice() {
+  heldVoice?.stop();
+  heldVoice = null;
 }
 
 elements.action.addEventListener("click", async () => {
   errorState = null;
   elements.action.disabled = true;
   elements.actionLabel.textContent = "Starting…";
-
-  try {
-    await audioEngine.enable();
-  } catch (error) {
+  try { await audioEngine.enable(); }
+  catch (error) {
     console.error("Audio engine failed to enable.", error);
-    errorState = isAudioEngineError(error)
-      ? error
-      : createAudioEngineError("unexpected", "An unexpected audio error occurred.", error);
+    errorState = isAudioEngineError(error) ? error : createAudioEngineError("unexpected", "An unexpected audio error occurred.", error);
   }
   render();
 });
 
-elements.testSignal.addEventListener("click", () => {
-  try {
-    audioEngine.playDiagnosticTone();
-  } catch (error) {
-    console.error("Diagnostic signal failed.", error);
-    errorState = error;
-    render();
-  }
+elements.testSignal.addEventListener("click", () => audioEngine.playDiagnosticTone());
+elements.muteToggle.addEventListener("click", () => audioEngine.toggleMuted());
+elements.voiceTrigger.addEventListener("click", () => voiceEngine.trigger({ ...selectedVoice(), duration: 0.2 }));
+elements.voiceSchedule.addEventListener("click", () => voiceEngine.trigger({ ...selectedVoice(), startTime: audioEngine.getCurrentTime() + 0.5, duration: 0.2 }));
+elements.voiceHold.addEventListener("pointerdown", (event) => {
+  event.currentTarget.setPointerCapture(event.pointerId);
+  if (!heldVoice) heldVoice = voiceEngine.trigger(selectedVoice());
+});
+elements.voiceHold.addEventListener("pointerup", stopHeldVoice);
+elements.voiceHold.addEventListener("pointercancel", stopHeldVoice);
+elements.voiceHold.addEventListener("keydown", (event) => {
+  if ((event.key === " " || event.key === "Enter") && !event.repeat && !heldVoice) heldVoice = voiceEngine.trigger(selectedVoice());
+});
+elements.voiceHold.addEventListener("keyup", (event) => {
+  if (event.key === " " || event.key === "Enter") stopHeldVoice();
 });
 
-elements.muteToggle.addEventListener("click", () => {
-  try {
-    audioEngine.toggleMuted();
-  } catch (error) {
-    console.error("Master mute failed.", error);
-    errorState = error;
-    render();
-  }
-});
-
-audioEngine.addEventListener("statechange", () => {
-  if (audioEngine.getState() === "running") errorState = null;
-  render();
-});
+audioEngine.addEventListener("statechange", () => { if (audioEngine.getState() === "running") errorState = null; render(); });
 audioEngine.addEventListener("mutechange", render);
-window.addEventListener("pagehide", stopTimeDisplay);
+voiceEngine.addEventListener("voiceschange", render);
+window.addEventListener("blur", stopHeldVoice);
+window.addEventListener("pagehide", () => { stopHeldVoice(); voiceEngine.stopAll(); stopTimeDisplay(); });
 
 render();

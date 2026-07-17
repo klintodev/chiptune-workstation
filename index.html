@@ -3,12 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="A browser-based chiptune workstation built with the Web Audio API."
-    />
+    <meta name="description" content="A browser-based chiptune workstation built with the Web Audio API." />
     <title>Chiptune Workstation</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./epic2.css" />
   </head>
   <body>
     <main class="shell">
@@ -19,10 +17,7 @@
         </div>
         <div class="status-cluster" aria-live="polite">
           <span id="status-light" class="status-light" aria-hidden="true"></span>
-          <div>
-            <span class="status-label">Audio engine</span>
-            <strong id="audio-state">Not started</strong>
-          </div>
+          <div><span class="status-label">Audio engine</span><strong id="audio-state">Not started</strong></div>
         </div>
       </header>
 
@@ -32,37 +27,16 @@
           <div>
             <p class="eyebrow">System setup</p>
             <h2 id="setup-title">Start the audio engine</h2>
-            <p id="status-description" class="lede">
-              Browsers require a deliberate gesture before they allow sound. Nothing
-              will play until you enable audio.
-            </p>
+            <p id="status-description" class="lede">Browsers require a deliberate gesture before they allow sound. Nothing will play until you enable audio.</p>
           </div>
         </div>
-
         <div class="control-panel">
-          <button id="audio-action" class="primary-action" type="button">
-            <span>Enable audio</span>
-            <span aria-hidden="true">↗</span>
-          </button>
-
-          <div id="error-panel" class="error-panel" role="alert" hidden>
-            <strong>Audio could not start</strong>
-            <p id="error-message"></p>
-          </div>
-
+          <button id="audio-action" class="primary-action" type="button"><span>Enable audio</span><span aria-hidden="true">↗</span></button>
+          <div id="error-panel" class="error-panel" role="alert" hidden><strong>Audio could not start</strong><p id="error-message"></p></div>
           <div class="meters" aria-label="Audio engine information">
-            <div>
-              <span>Context</span>
-              <strong id="context-state">—</strong>
-            </div>
-            <div>
-              <span>Sample rate</span>
-              <strong id="sample-rate">—</strong>
-            </div>
-            <div>
-              <span>Audio time</span>
-              <strong id="audio-time">—</strong>
-            </div>
+            <div><span>Context</span><strong id="context-state">—</strong></div>
+            <div><span>Sample rate</span><strong id="sample-rate">—</strong></div>
+            <div><span>Audio time</span><strong id="audio-time">—</strong></div>
           </div>
         </div>
       </section>
@@ -71,35 +45,38 @@
         <div>
           <p class="eyebrow">Master signal path</p>
           <h2 id="signal-title">Output check</h2>
-          <p>
-            The diagnostic tone travels through the same master gain stage that every
-            future instrument will use.
-          </p>
+          <p>The diagnostic tone travels through the same master gain stage that every future instrument will use.</p>
         </div>
-
         <div class="signal-controls">
-          <button id="test-signal" class="secondary-action" type="button" disabled>
-            Play test signal
-          </button>
-          <button
-            id="mute-toggle"
-            class="mute-toggle"
-            type="button"
-            aria-pressed="false"
-            disabled
-          >
-            <span class="mute-icon" aria-hidden="true">◼</span>
-            <span id="mute-label">Mute output</span>
-          </button>
+          <button id="test-signal" class="secondary-action" type="button" disabled>Play test signal</button>
+          <button id="mute-toggle" class="mute-toggle" type="button" aria-pressed="false" disabled><span class="mute-icon" aria-hidden="true">◼</span><span id="mute-label">Mute output</span></button>
         </div>
       </section>
 
-      <footer>
-        <span>Epic 01 / Audio foundation</span>
-        <span>No audio is created before your gesture.</span>
-      </footer>
-    </main>
+      <section class="voice-lab" aria-labelledby="voice-title">
+        <div>
+          <p class="eyebrow">Epic 02 verification</p>
+          <h2 id="voice-title">Chip voice engine</h2>
+          <p>Temporary controls for verifying voices. A playable keyboard belongs to Epic 03.</p>
+        </div>
+        <div class="voice-controls">
+          <label>Voice
+            <select id="voice-type" disabled>
+              <option value="square">Square</option>
+              <option value="triangle">Triangle</option>
+              <option value="sawtooth">Sawtooth</option>
+              <option value="noise">Noise</option>
+            </select>
+          </label>
+          <button id="voice-hold" type="button" disabled>Press and hold</button>
+          <button id="voice-trigger" type="button" disabled>Play short note</button>
+          <button id="voice-schedule" type="button" disabled>Play in 0.5s</button>
+          <p>Active voices: <strong id="active-voices">0</strong></p>
+        </div>
+      </section>
 
+      <footer><span>Epic 02 / Chip voice engine</span><span>No audio is created before your gesture.</span></footer>
+    </main>
     <script type="module" src="./src/app.js"></script>
   </body>
 </html>
