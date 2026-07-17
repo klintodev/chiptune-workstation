@@ -61,9 +61,10 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
 
   function stop(id, requestedTime = getAudioTime()) {
     const voice = activeVoices.get(id);
-    if (!voice || voice.stopping) return false;
+    if (!voice) return false;
     const stopTime = Math.max(requestedTime, getAudioTime());
-    voice.stopping = true;
+    if (voice.stopTime !== null && stopTime >= voice.stopTime) return false;
+    voice.stopTime = stopTime;
     const attackProgress = Math.min(
       1,
       Math.max(0, (stopTime - voice.startTime) / voice.attackSeconds),
@@ -101,7 +102,7 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
     gain.gain.exponentialRampToValueAtTime(1, startTime + attackSeconds);
     source.connect(gain);
     gain.connect(output);
-    activeVoices.set(id, { source, gain, startTime, attackSeconds, releaseSeconds, stopping: false });
+    activeVoices.set(id, { source, gain, startTime, attackSeconds, releaseSeconds, stopTime: null });
     source.addEventListener("ended", () => {
       source.disconnect();
       gain.disconnect();

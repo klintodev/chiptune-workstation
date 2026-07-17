@@ -479,6 +479,25 @@ footer {
   color: var(--acid);
   font-weight: 900;
 }
+.pattern-play-button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--acid);
+  color: var(--acid);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.pattern-play-button:hover:not(:disabled) {
+  color: var(--black);
+  background: var(--acid);
+}
+
+.pattern-play-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
 
 .pattern-grid {
   display: grid;

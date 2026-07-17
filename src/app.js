@@ -3,11 +3,12 @@ import { createInputController } from "./input-controller.js";
 import { createInstrumentState } from "./instrument-state.js";
 import { createPatternEditor } from "./pattern-editor.js";
 import { createPatternState } from "./pattern-state.js";
+import { createStepScheduler } from "./step-scheduler.js";
 import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS } from "./keyboard-layout.js";
 import { createVoiceEngine } from "./voice-engine.js";
 
 const selectors = {
-  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternGrid: "#pattern-grid", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
+  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternGrid: "#pattern-grid", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", playPatternOnce: "#play-pattern-once", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 elements.actionLabel = document.querySelector("#audio-action span");
@@ -15,6 +16,12 @@ elements.actionLabel = document.querySelector("#audio-action span");
 const instrumentState = createInstrumentState();
 const patternState = createPatternState();
 const voiceEngine = createVoiceEngine({ getAudioTime: audioEngine.getCurrentTime, getOutputNode: audioEngine.getInputNode });
+const stepScheduler = createStepScheduler({
+  getAudioTime: audioEngine.getCurrentTime,
+  getInstrumentConfig: instrumentState.getState,
+  getPatternState: patternState.getState,
+  voiceEngine,
+});
 const keyButtons = new Map();
 let activeNotes = new Set();
 let patternEditor = null;
@@ -119,6 +126,11 @@ function renderInstrument() {
   renderKeys();
 }
 
+function renderPatternPlayback() {
+  const playing = stepScheduler.getIsPlaying();
+  elements.playPatternOnce.disabled = !audioEngine.isReady() || playing;
+  elements.playPatternOnce.textContent = playing ? "Playing one pass..." : "Play pattern once";
+}
 function render() {
   const state = audioEngine.getState();
   const content = errorState ? { title: "Needs attention", action: "Try again", description: errorState.message } : (stateContent[state] ?? stateContent.idle);
@@ -135,11 +147,13 @@ function render() {
   elements.action.disabled = state === "running" || state === "closed";
   elements.stopSound.disabled = !ready;
   renderInstrument();
+  renderPatternPlayback();
   if (ready) startTimeDisplay();
   else { stopTimeDisplay(); elements.audioTime.textContent = "\u2014"; }
 }
 
 function stopAllSound() {
+  stepScheduler.stop();
   inputController.stopAll();
   voiceEngine.stopAll();
 }
@@ -156,6 +170,11 @@ elements.action.addEventListener("click", async () => {
   render();
 });
 
+elements.playPatternOnce.addEventListener("click", () => {
+  try { stepScheduler.playOnce(); }
+  catch (error) { console.error("Pattern preview could not start.", error); }
+  renderPatternPlayback();
+});
 elements.stopSound.addEventListener("click", stopAllSound);
 elements.voiceType.addEventListener("change", () => { instrumentState.setVoiceType(elements.voiceType.value); elements.voiceType.blur(); });
 elements.octaveDown.addEventListener("click", () => instrumentState.setOctaveOffset(instrumentState.getState().octaveOffset - 1));
@@ -185,6 +204,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) stopA
 window.addEventListener("blur", stopAllSound);
 window.addEventListener("pagehide", () => { stopAllSound(); stopTimeDisplay(); });
 audioEngine.addEventListener("statechange", () => { if (audioEngine.getState() === "running") errorState = null; render(); });
+stepScheduler.addEventListener("statechange", renderPatternPlayback);
 
 voiceEngine.setVolume(instrumentState.getState().volume);
 render();
