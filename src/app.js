@@ -1,23 +1,28 @@
 import { audioEngine, createAudioEngineError, isAudioEngineError } from "./audio-engine.js";
 import { createInputController } from "./input-controller.js";
 import { createInstrumentState } from "./instrument-state.js";
+import { createPatternEditor } from "./pattern-editor.js";
+import { createPatternState } from "./pattern-state.js";
 import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS } from "./keyboard-layout.js";
 import { createVoiceEngine } from "./voice-engine.js";
 
 const selectors = {
-  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
+  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternGrid: "#pattern-grid", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 elements.actionLabel = document.querySelector("#audio-action span");
 
 const instrumentState = createInstrumentState();
+const patternState = createPatternState();
 const voiceEngine = createVoiceEngine({ getAudioTime: audioEngine.getCurrentTime, getOutputNode: audioEngine.getInputNode });
 const keyButtons = new Map();
 let activeNotes = new Set();
+let patternEditor = null;
 const inputController = createInputController({
   voiceEngine,
   getInstrumentConfig: instrumentState.getState,
   onActiveNotesChange: (notes) => { activeNotes = notes; renderKeys(); },
+  onNoteStart: (note) => patternEditor?.setSelectedNote(note),
 });
 
 const stateContent = {
@@ -34,6 +39,14 @@ function noteName(note) {
   const names = ["C", "C\u266F", "D", "D\u266F", "E", "F", "F\u266F", "G", "G\u266F", "A", "A\u266F", "B"];
   return `${names[((note % 12) + 12) % 12]}${Math.floor(note / 12) - 1}`;
 }
+patternEditor = createPatternEditor({
+  patternState,
+  grid: elements.patternGrid,
+  pitchSelect: elements.patternPitch,
+  octaveSelect: elements.patternOctave,
+  selectedNoteOutput: elements.selectedPatternNote,
+  getNoteName: noteName,
+});
 
 function createKeyButton(key, colour) {
   const button = document.createElement("button");

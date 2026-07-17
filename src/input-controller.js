@@ -13,7 +13,7 @@ function releaseControlFocus(target) {
   if (target instanceof HTMLInputElement && target.type === "range") target.blur();
 }
 
-export function createInputController({ voiceEngine, getInstrumentConfig, onActiveNotesChange }) {
+export function createInputController({ voiceEngine, getInstrumentConfig, onActiveNotesChange, onNoteStart }) {
   const voicesByOwner = new Map();
   const ownersByNote = new Map();
 
@@ -23,28 +23,31 @@ export function createInputController({ voiceEngine, getInstrumentConfig, onActi
 
   function createVoice(baseNote) {
     const config = getInstrumentConfig();
-    return voiceEngine.trigger({
+    const playedNote = baseNote + config.octaveOffset * 12;
+    const voice = voiceEngine.trigger({
       type: config.voiceType,
-      frequency: midiNoteToFrequency(baseNote + config.octaveOffset * 12),
+      frequency: midiNoteToFrequency(playedNote),
       attackSeconds: config.attackSeconds,
       releaseSeconds: config.releaseSeconds,
     });
+    return { playedNote, voice };
   }
 
   function start(owner, baseNote) {
     if (voicesByOwner.has(owner)) return false;
-    let voice;
+    let started;
     try {
-      voice = createVoice(baseNote);
+      started = createVoice(baseNote);
     } catch (error) {
       if (error?.code === "not-ready") return false;
       throw error;
     }
-    voicesByOwner.set(owner, { baseNote, voice });
+    voicesByOwner.set(owner, { baseNote, voice: started.voice });
     const owners = ownersByNote.get(baseNote) ?? new Set();
     owners.add(owner);
     ownersByNote.set(baseNote, owners);
     emitActiveNotes();
+    onNoteStart?.(started.playedNote);
     return true;
   }
 
@@ -67,7 +70,7 @@ export function createInputController({ voiceEngine, getInstrumentConfig, onActi
   function refreshActiveVoices() {
     for (const [owner, active] of voicesByOwner) {
       active.voice.stop();
-      voicesByOwner.set(owner, { baseNote: active.baseNote, voice: createVoice(active.baseNote) });
+      voicesByOwner.set(owner, { baseNote: active.baseNote, voice: createVoice(active.baseNote).voice });
     }
   }
 
