@@ -40,7 +40,6 @@ button {
 
 .masthead,
 .workspace,
-.signal-strip,
 footer {
   border: 1px solid var(--line);
 }
@@ -138,8 +137,7 @@ footer {
 }
 
 .workspace-copy,
-.control-panel,
-.signal-strip > div {
+.control-panel {
   padding: clamp(24px, 4vw, 48px);
 }
 
@@ -158,8 +156,7 @@ footer {
   font-weight: 900;
 }
 
-.lede,
-.signal-strip p {
+.lede {
   max-width: 58ch;
   margin-bottom: 0;
   color: var(--muted);
@@ -174,9 +171,7 @@ footer {
   background: var(--panel-raised);
 }
 
-.primary-action,
-.secondary-action,
-.mute-toggle {
+.primary-action {
   min-height: 54px;
   border: 1px solid var(--line);
   color: var(--ink);
@@ -200,9 +195,7 @@ footer {
   background: transparent;
 }
 
-.primary-action:disabled,
-.secondary-action:disabled,
-.mute-toggle:disabled {
+.primary-action:disabled {
   cursor: not-allowed;
   opacity: 0.42;
 }
@@ -239,46 +232,6 @@ footer {
   font-size: 0.78rem;
 }
 
-.signal-strip {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border-top: 0;
-  background: var(--black);
-}
-
-.signal-strip > div:first-child {
-  border-right: 1px solid var(--line);
-}
-
-.signal-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-content: center;
-  gap: 12px;
-}
-
-.secondary-action,
-.mute-toggle {
-  padding: 14px 16px;
-  background: var(--panel-raised);
-}
-
-.secondary-action:hover:not(:disabled),
-.mute-toggle:hover:not(:disabled) {
-  border-color: var(--acid);
-}
-
-.mute-toggle[aria-pressed="true"] {
-  border-color: var(--orange);
-  color: var(--black);
-  background: var(--orange);
-}
-
-.mute-icon {
-  margin-right: 8px;
-  font-size: 0.65rem;
-}
-
 footer {
   display: flex;
   justify-content: space-between;
@@ -300,8 +253,7 @@ footer {
   }
 
   .masthead,
-  .workspace,
-  .signal-strip {
+  .workspace {
     grid-template-columns: 1fr;
   }
 
@@ -310,14 +262,9 @@ footer {
     align-items: start;
   }
 
-  .workspace-copy,
-  .signal-strip > div:first-child {
+  .workspace-copy {
     border-right: 0;
     border-bottom: 1px solid var(--line);
-  }
-
-  .signal-controls {
-    grid-template-columns: 1fr;
   }
 
   footer {

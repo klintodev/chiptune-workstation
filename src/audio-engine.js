@@ -1,5 +1,4 @@
 const DEFAULT_MASTER_GAIN = 0.35;
-const GAIN_RAMP_SECONDS = 0.015;
 
 export function createAudioEngineError(code, message, cause) {
   const error = new Error(message, { cause });
@@ -16,7 +15,6 @@ export function createAudioEngine() {
   const events = new EventTarget();
   let context = null;
   let masterGain = null;
-  let muted = false;
   let initialization = null;
   let disposed = false;
 
@@ -105,26 +103,6 @@ export function createAudioEngine() {
     }
   }
 
-  function setMasterGain(value) {
-    const now = context.currentTime;
-    const parameter = masterGain.gain;
-    parameter.cancelScheduledValues(now);
-    parameter.setValueAtTime(parameter.value, now);
-    parameter.linearRampToValueAtTime(value, now + GAIN_RAMP_SECONDS);
-  }
-
-  function setMuted(nextMuted) {
-    requireReady();
-    muted = Boolean(nextMuted);
-    setMasterGain(muted ? 0 : DEFAULT_MASTER_GAIN);
-    events.dispatchEvent(new CustomEvent("mutechange", { detail: { muted } }));
-  }
-
-  function toggleMuted() {
-    setMuted(!muted);
-    return muted;
-  }
-
   function getInputNode() {
     requireReady();
     return masterGain;
@@ -140,31 +118,6 @@ export function createAudioEngine() {
     return context.currentTime;
   }
 
-  function playDiagnosticTone() {
-    requireReady();
-    const now = context.currentTime;
-    const duration = 0.16;
-    const oscillator = context.createOscillator();
-    const envelope = context.createGain();
-
-    oscillator.type = "square";
-    oscillator.frequency.setValueAtTime(440, now);
-    envelope.gain.setValueAtTime(0.0001, now);
-    envelope.gain.exponentialRampToValueAtTime(0.12, now + 0.008);
-    envelope.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    oscillator.connect(envelope);
-    envelope.connect(masterGain);
-    oscillator.start(now);
-    oscillator.stop(now + duration + 0.01);
-    oscillator.addEventListener(
-      "ended",
-      () => {
-        oscillator.disconnect();
-        envelope.disconnect();
-      },
-      { once: true },
-    );
-  }
 
   async function dispose() {
     if (disposed) return;
@@ -193,13 +146,9 @@ export function createAudioEngine() {
     dispose,
     getCurrentTime,
     getInputNode,
-    getIsMuted: () => muted,
     getSampleRate: () => context?.sampleRate ?? null,
     getState,
     isReady,
-    playDiagnosticTone,
-    setMuted,
-    toggleMuted,
   });
 }
 

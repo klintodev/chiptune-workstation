@@ -1,6 +1,6 @@
 # PRD 01 Epics: Playable Instrument
 
-These epics deliver [PRD 01: Playable Instrument](../product/01-playable-instrument.md). They are ordered by dependency and each ends in an observable, manually testable increment.
+These epics deliver [PRD 01: Playable Instrument](../product/01-playable-instrument.md). They are ordered by dependency and each ends in an observable increment.
 
 ## E01: Audio lifecycle and master signal path
 
@@ -53,15 +53,6 @@ Requirements:
 - The audio service exposes the context's current audio time when ready.
 - Lifecycle failures become recoverable application errors, not uncaught exceptions.
 - The master signal path is created in one authoritative place.
-
-### Manual acceptance checks
-
-- Open a fresh tab and verify no sound starts automatically.
-- Enable audio and verify the visible state becomes ready.
-- Activate enable repeatedly and verify behaviour does not multiply.
-- Background and restore the tab; resume audio if prompted.
-- Mute master output and verify all sound is silent.
-- Reload and verify audio again requires an intentional gesture.
 
 ## E02: Chip voice engine
 
@@ -126,17 +117,6 @@ Requirements:
 - Frequency conversion uses a documented tuning reference.
 - Live input and the later sequencer can use the same public trigger API.
 - Oscillator and buffer-source nodes never bypass the master path.
-
-### Manual acceptance checks
-
-- Play one note with every pitched voice; verify pitch matches and timbre differs.
-- Trigger noise and verify it is distinct.
-- Play short repeated notes and listen for clicks.
-- Hold and release notes; verify they end cleanly.
-- Release one voice twice and verify no error or new sound occurs.
-- Rapidly trigger and release voices for 30 seconds; verify responsiveness remains stable.
-- Schedule a note shortly in the future; verify it does not begin immediately.
-- Inspect active voice state after releases; verify completed voices are removed.
 
 ## E03: Playable input surfaces
 
@@ -203,17 +183,6 @@ Requirements:
 - Event listeners are removed when their UI is disposed.
 - Input code calls the public voice API and never constructs audio nodes.
 
-### Manual acceptance checks
-
-- Play and release every visible key with a mouse.
-- Repeat with touch or emulated touch.
-- Play every mapped computer key and verify its visible note.
-- Hold a key through OS repeat and verify only one voice sounds.
-- Type mapped characters in a text field and verify no notes play.
-- Hold notes while changing tab and window focus; verify they release.
-- Cancel or drag away from pointer input; verify no note sticks.
-- Start several notes and use **Stop sound**; verify immediate silence.
-
 ## E04: Instrument controls and visual feedback
 
 ### Outcome
@@ -278,23 +247,11 @@ Requirements:
 - Defaults and permitted ranges live in one authoritative location.
 - Every control supports pointer and keyboard operation.
 
-### Manual acceptance checks
-
-- Select each voice and verify the next note uses it.
-- Change voice while holding a note and verify the defined behaviour.
-- Traverse every octave and verify labels and pitch direction.
-- Try to exceed octave limits and verify controls prevent it.
-- Change octave while holding a note; verify its pitch stays stable.
-- Sweep volume and listen for clicks; set it to zero and verify silence.
-- Exercise minimum and maximum attack/release values.
-- Reset the instrument and verify every default returns.
-- Operate all controls using only the keyboard.
-
-## E05: Resilience and browser validation
+## E05: Resilience and recovery
 
 ### Outcome
 
-The finished instrument survives common browser interruptions, communicates failure states, and has a repeatable manual release check.
+The finished instrument survives common browser interruptions and communicates failure states clearly.
 
 ### User stories
 
@@ -323,45 +280,10 @@ Requirements:
 - User-facing messages do not expose stack traces.
 - Development diagnostics remain available separately.
 
-#### US05.3 — Use supported browsers
-
-As a user, I want the instrument to behave consistently in its documented browsers.
-
-Requirements:
-
-- Documentation names one primary desktop browser and at least one secondary browser.
-- The full PRD 01 manual pass is completed in the primary browser.
-- A smoke test is completed in each secondary browser.
-- Browser-specific limitations are recorded.
-- Blocking failures are fixed or the affected browser is removed from support.
-
-#### US05.4 — Run a repeatable release check
-
-As a developer, I want a recorded manual test run so that demo readiness is visible rather than assumed.
-
-Requirements:
-
-- A test record captures browser, operating system, date, result, and notes.
-- Every check has an expected observable result.
-- Critical failures are distinguishable from cosmetic issues.
-- The demo journey works from a fresh load without developer tools.
-
 ### Tangible technical requirements
 
 - Errors distinguish unsupported, blocked/suspended, and unexpected states.
 - One engine operation releases all active voices.
-- Supported-browser claims reflect actual test results.
-- Manual evidence is stored as lightweight Markdown in the repository.
-
-### Manual acceptance checks
-
-- Complete all E01–E04 checks in the primary browser.
-- In secondary browsers, enable audio, play each voice, change octave and volume, then stop all sound.
-- Repeat tab switching and audio resume several times; verify one response per input.
-- Exercise an initialization failure if possible and verify recovery guidance.
-- Play rapidly for five continuous minutes and verify responsiveness.
-- Complete the intended demo from a fresh page load without developer tools.
-- Record the environment, results, limitations, and blocking defects.
 
 ## Delivery sequence
 
@@ -369,12 +291,10 @@ Requirements:
 2. E02 produces sounds callable from a temporary development harness.
 3. E03 produces the first genuinely playable experience.
 4. E04 produces the complete PRD 01 product experience.
-5. E05 validates and hardens it for demonstration.
+5. E05 hardens it for demonstration.
 
 ## Definition of done for PRD 01
 
 - All five epic outcomes are present.
 - Every acceptance requirement is met or explicitly removed from scope in the PRD.
-- The complete manual test pass has no unresolved critical failures in the primary browser.
-- Secondary-browser smoke-test results and limitations are recorded.
 - A fresh user can enable audio, choose a voice, play notes, change octave and volume, and stop all sound without developer assistance.

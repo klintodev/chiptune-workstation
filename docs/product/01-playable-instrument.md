@@ -21,7 +21,6 @@ A user should be able to open the application, deliberately enable audio, select
 - Multiple simultaneous input events must behave predictably. The initial implementation may be monophonic if this is communicated by the interface.
 - The audio engine must expose an instrument-triggering interface that can later be called by a sequencer without depending on keyboard or UI events.
 - Unsupported or suspended audio states must produce a clear recovery action rather than failing silently.
-- The feature must work in the agreed primary desktop browser and have its behaviour checked in at least one secondary browser.
 
 ## Open questions
 

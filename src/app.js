@@ -5,7 +5,7 @@ import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS 
 import { createVoiceEngine } from "./voice-engine.js";
 
 const selectors = {
-  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", muteLabel: "#mute-label", muteToggle: "#mute-toggle", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", testSignal: "#test-signal", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
+  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 elements.actionLabel = document.querySelector("#audio-action span");
@@ -120,10 +120,6 @@ function render() {
   elements.errorPanel.hidden = !errorState;
   elements.errorMessage.textContent = errorState?.message ?? "";
   elements.action.disabled = state === "running" || state === "closed";
-  elements.testSignal.disabled = !ready;
-  elements.muteToggle.disabled = !ready;
-  elements.muteToggle.setAttribute("aria-pressed", String(audioEngine.getIsMuted()));
-  elements.muteLabel.textContent = audioEngine.getIsMuted() ? "Unmute output" : "Mute output";
   elements.stopSound.disabled = !ready;
   renderInstrument();
   if (ready) startTimeDisplay();
@@ -147,8 +143,6 @@ elements.action.addEventListener("click", async () => {
   render();
 });
 
-elements.testSignal.addEventListener("click", audioEngine.playDiagnosticTone);
-elements.muteToggle.addEventListener("click", audioEngine.toggleMuted);
 elements.stopSound.addEventListener("click", stopAllSound);
 elements.voiceType.addEventListener("change", () => { instrumentState.setVoiceType(elements.voiceType.value); elements.voiceType.blur(); });
 elements.octaveDown.addEventListener("click", () => instrumentState.setOctaveOffset(instrumentState.getState().octaveOffset - 1));
@@ -178,7 +172,6 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) stopA
 window.addEventListener("blur", stopAllSound);
 window.addEventListener("pagehide", () => { stopAllSound(); stopTimeDisplay(); });
 audioEngine.addEventListener("statechange", () => { if (audioEngine.getState() === "running") errorState = null; render(); });
-audioEngine.addEventListener("mutechange", render);
 
 voiceEngine.setVolume(instrumentState.getState().volume);
 render();
