@@ -61,6 +61,17 @@
             </div>
           </div>
         </div>
+        <div class="pattern-actions" aria-label="Pattern actions">
+          <button id="pattern-duplicate" type="button">Duplicate</button>
+          <div class="transpose-actions" aria-label="Transpose pattern">
+            <button id="transpose-octave-down" type="button" aria-label="Transpose down one octave">-12</button>
+            <button id="transpose-down" type="button" aria-label="Transpose down one semitone">-1</button>
+            <span>Transpose</span>
+            <button id="transpose-up" type="button" aria-label="Transpose up one semitone">+1</button>
+            <button id="transpose-octave-up" type="button" aria-label="Transpose up one octave">+12</button>
+          </div>
+          <button id="pattern-clear" class="pattern-clear-action" type="button">Clear pattern</button>
+        </div>
         <div id="pattern-grid" class="pattern-grid" aria-label="16-step pattern"></div>
       </section>
       <footer><span>No audio is created before your gesture.</span></footer>

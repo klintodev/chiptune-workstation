@@ -9,7 +9,7 @@ import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS 
 import { createVoiceEngine } from "./voice-engine.js";
 
 const selectors = {
-  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternAccent: "#pattern-accent", patternGate: "#pattern-gate", patternGrid: "#pattern-grid", patternLength: "#pattern-length", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", patternPreview: "#pattern-preview", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", tempo: "#tempo", tempoValue: "#tempo-value", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
+  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternAccent: "#pattern-accent", patternClear: "#pattern-clear", patternDuplicate: "#pattern-duplicate", patternGate: "#pattern-gate", patternGrid: "#pattern-grid", patternLength: "#pattern-length", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", patternPreview: "#pattern-preview", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", transposeDown: "#transpose-down", transposeOctaveDown: "#transpose-octave-down", transposeOctaveUp: "#transpose-octave-up", transposeUp: "#transpose-up", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", tempo: "#tempo", tempoValue: "#tempo-value", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 elements.actionLabel = document.querySelector("#audio-action span");
@@ -31,6 +31,7 @@ const stepScheduler = createStepScheduler({
 const keyButtons = new Map();
 let activeNotes = new Set();
 let patternEditor = null;
+let patternClearArmed = false;
 const inputController = createInputController({
   voiceEngine,
   getInstrumentConfig: instrumentState.getState,
@@ -64,6 +65,7 @@ patternEditor = createPatternEditor({
   selectedNoteOutput: elements.selectedPatternNote,
   getNoteName: noteName,
   previewNote: notePreview.play,
+  onEditAction: disarmPatternClear,
 });
 
 function createKeyButton(key, colour) {
@@ -171,6 +173,22 @@ function renderPatternLength() {
   elements.patternLength.value = String(patternState.getState().length);
 }
 
+function renderPatternActions() {
+  elements.patternDuplicate.disabled = !patternState.canDuplicate();
+  elements.transposeOctaveDown.disabled = !patternState.canTranspose(-12);
+  elements.transposeDown.disabled = !patternState.canTranspose(-1);
+  elements.transposeUp.disabled = !patternState.canTranspose(1);
+  elements.transposeOctaveUp.disabled = !patternState.canTranspose(12);
+  elements.patternClear.classList.toggle("armed", patternClearArmed);
+  elements.patternClear.textContent = patternClearArmed ? "Confirm clear" : "Clear pattern";
+}
+
+function disarmPatternClear() {
+  if (!patternClearArmed) return;
+  patternClearArmed = false;
+  renderPatternActions();
+}
+
 function renderPatternTransport() {
   const { bpm, status } = stepScheduler.getState();
   const playing = status === "playing";
@@ -200,6 +218,7 @@ function render() {
   elements.stopSound.disabled = !ready;
   renderInstrument();
   renderPatternLength();
+  renderPatternActions();
   renderPatternTransport();
   if (ready) startTimeDisplay();
   else { stopTimeDisplay(); elements.audioTime.textContent = "\u2014"; }
@@ -225,12 +244,40 @@ elements.action.addEventListener("click", async () => {
 });
 
 elements.patternLength.addEventListener("change", () => {
+  disarmPatternClear();
   stepScheduler.stop();
   patternState.setLength(Number(elements.patternLength.value));
   elements.patternLength.blur();
   renderPatternLength();
 });
 
+elements.patternDuplicate.addEventListener("click", () => {
+  disarmPatternClear();
+  if (!patternState.canDuplicate()) return;
+  stepScheduler.stop();
+  patternState.duplicate();
+});
+
+elements.patternClear.addEventListener("click", () => {
+  if (!patternClearArmed) {
+    patternClearArmed = true;
+    renderPatternActions();
+    return;
+  }
+  patternClearArmed = false;
+  patternState.clearPattern();
+  renderPatternActions();
+});
+
+function transposePattern(semitones) {
+  disarmPatternClear();
+  patternState.transpose(semitones);
+}
+
+elements.transposeOctaveDown.addEventListener("click", () => transposePattern(-12));
+elements.transposeDown.addEventListener("click", () => transposePattern(-1));
+elements.transposeUp.addEventListener("click", () => transposePattern(1));
+elements.transposeOctaveUp.addEventListener("click", () => transposePattern(12));
 elements.transportPlay.addEventListener("click", () => {
   try { stepScheduler.play(); }
   catch (error) { console.error("Pattern playback could not start.", error); }
@@ -276,6 +323,7 @@ window.addEventListener("blur", pauseForInterruption);
 window.addEventListener("pagehide", () => { pauseForInterruption(); stopTimeDisplay(); });
 audioEngine.addEventListener("statechange", () => { if (audioEngine.getState() === "running") errorState = null; render(); });
 stepScheduler.addEventListener("statechange", renderPatternTransport);
+patternState.addEventListener("change", () => { disarmPatternClear(); renderPatternLength(); renderPatternActions(); });
 
 voiceEngine.setVolume(instrumentState.getState().volume);
 render();

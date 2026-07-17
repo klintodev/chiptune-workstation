@@ -51,6 +51,7 @@ export function createPatternEditor({
   }
 
   function setSelectedNote(note) {
+    onEditAction?.();
     if (!Number.isInteger(note) || note < MIN_PATTERN_NOTE || note > MAX_PATTERN_NOTE) {
       throw new RangeError(`Selected note must be between ${MIN_PATTERN_NOTE} and ${MAX_PATTERN_NOTE}.`);
     }

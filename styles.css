@@ -546,6 +546,53 @@ footer {
   color: var(--muted);
   font-size: 0.72rem;
 }
+.pattern-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.pattern-actions button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--black);
+  cursor: pointer;
+  font: inherit;
+}
+
+.pattern-actions button:hover:not(:disabled) {
+  background: var(--panel-raised);
+}
+
+.pattern-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.transpose-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transpose-actions span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.pattern-actions .pattern-clear-action {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.pattern-actions .pattern-clear-action.armed {
+  color: var(--black);
+  background: var(--orange);
+}
 .pattern-grid {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));

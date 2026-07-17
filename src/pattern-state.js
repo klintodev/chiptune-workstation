@@ -128,14 +128,64 @@ export function createPatternState(initialSteps) {
     return true;
   }
 
+  function canDuplicate() {
+    return steps.length < SUPPORTED_PATTERN_LENGTHS.at(-1);
+  }
+
+  function duplicate() {
+    if (!canDuplicate()) return false;
+    const original = steps.map(cloneStep);
+    steps = [...original.map(cloneStep), ...original.map(cloneStep)];
+    emitChange();
+    return true;
+  }
+
+  function clearPattern() {
+    if (steps.every((step) => step === null)) return false;
+    steps = Array(steps.length).fill(null);
+    emitChange();
+    return true;
+  }
+
+  function validateSemitoneDelta(semitones) {
+    if (!Number.isInteger(semitones) || semitones === 0) {
+      throw new RangeError("Transpose amount must be a non-zero integer.");
+    }
+  }
+
+  function canTranspose(semitones) {
+    validateSemitoneDelta(semitones);
+    return steps.some((step) => step !== null) && steps.every(
+      (step) => step === null ||
+        (step.note + semitones >= MIN_PATTERN_NOTE && step.note + semitones <= MAX_PATTERN_NOTE),
+    );
+  }
+
+  function transpose(semitones) {
+    if (!canTranspose(semitones)) return false;
+    if (steps.every((step) => step === null)) return false;
+    steps = steps.map(
+      (step) => step === null
+        ? null
+        : createNoteStep(step.note + semitones, step.gate, step.accented),
+    );
+    emitChange();
+    return true;
+  }
+
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
+    canDuplicate,
+    canTranspose,
+    clearPattern,
     clearStep,
+    duplicate,
     getState,
     removeEventListener: events.removeEventListener.bind(events),
     setAccent,
     setGate,
     setLength,
     setStep,
+    transpose,
   });
 }
