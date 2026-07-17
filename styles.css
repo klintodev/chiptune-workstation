@@ -550,6 +550,7 @@ footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -616,6 +617,11 @@ footer {
 
 .pattern-step.selected .pattern-step-set span {
   color: var(--orange);
+}
+
+.pattern-step-set:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: -3px;
 }
 .pattern-step.playhead {
   box-shadow: inset 4px 0 0 var(--orange);

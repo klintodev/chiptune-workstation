@@ -3,6 +3,7 @@ import { createInputController } from "./input-controller.js";
 import { createInstrumentState } from "./instrument-state.js";
 import { createNotePreview } from "./note-preview.js";
 import { createPatternEditor } from "./pattern-editor.js";
+import { createPatternHistoryShortcut } from "./pattern-shortcuts.js";
 import { createPatternState } from "./pattern-state.js";
 import { createStepScheduler } from "./step-scheduler.js";
 import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS } from "./keyboard-layout.js";
@@ -256,11 +257,15 @@ elements.patternLength.addEventListener("change", () => {
 
 function restorePatternHistory(action, available) {
   disarmPatternClear();
-  if (!available()) return;
+  if (!available()) return false;
   stepScheduler.stop();
-  action();
+  return action();
 }
 
+const handlePatternHistoryShortcut = createPatternHistoryShortcut({
+  undo: () => restorePatternHistory(patternState.undo, () => patternState.getState().canUndo),
+  redo: () => restorePatternHistory(patternState.redo, () => patternState.getState().canRedo),
+});
 elements.patternUndo.addEventListener("click", () => restorePatternHistory(
   patternState.undo,
   () => patternState.getState().canUndo,
@@ -326,6 +331,7 @@ instrumentState.addEventListener("change", () => {
   previousInstrumentConfig = config;
   renderInstrument();
 });
+document.addEventListener("keydown", handlePatternHistoryShortcut, true);
 document.addEventListener("keydown", inputController.handleKeyDown);
 document.addEventListener("keyup", inputController.handleKeyUp);
 window.addEventListener("keyup", inputController.handleKeyUp);

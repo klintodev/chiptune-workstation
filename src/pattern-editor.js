@@ -4,6 +4,13 @@ import {
   MIN_PATTERN_NOTE,
 } from "./pattern-state.js";
 
+const GRID_NAVIGATION_KEYS = new Set([
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+]);
+
 export function createPatternEditor({
   patternState,
   grid,
@@ -72,18 +79,22 @@ export function createPatternEditor({
     render();
   }
 
-  function selectStep(index, assignRest) {
+  function selectStep(index, assignRest, shouldPreview = true) {
     onEditAction?.();
     selectedStepIndex = index;
     const step = patternState.getState().steps[index];
     if (step === null && assignRest) {
       patternState.setStep(index, getSelectedNote());
-      previewSelectedNote(getSelectedNote());
+      if (shouldPreview) previewSelectedNote(getSelectedNote());
     } else if (step !== null) {
       loadStepControls(step);
-      previewSelectedNote(step.note, step.accented);
+      if (shouldPreview) previewSelectedNote(step.note, step.accented);
     }
     render();
+  }
+
+  function focusStep(index) {
+    stepElements[index]?.setButton.focus();
   }
 
   function createStep(index) {
@@ -97,9 +108,11 @@ export function createPatternEditor({
     container.className = "pattern-step";
     setButton.className = "pattern-step-set";
     setButton.type = "button";
+    setButton.dataset.stepIndex = String(index);
     number.textContent = String(index + 1).padStart(2, "0");
     clearButton.className = "pattern-step-clear";
     clearButton.type = "button";
+    clearButton.dataset.stepIndex = String(index);
     clearButton.textContent = "Clear";
     clearButton.setAttribute("aria-label", `Clear step ${index + 1}`);
 
@@ -147,6 +160,7 @@ export function createPatternEditor({
         "playhead-playing",
         index === playheadStepIndex && playbackStatus === "playing",
       );
+      elements.setButton.tabIndex = index === (selectedStepIndex ?? 0) ? 0 : -1;
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
       elements.value.textContent = hasNote ? getNoteName(step.note) : "Rest";
       elements.detail.textContent = hasNote
@@ -158,6 +172,60 @@ export function createPatternEditor({
         `Step ${index + 1}, ${hasNote ? `${getNoteName(step.note)}, ${Math.round(step.gate * 100)}% gate${step.accented ? ", accented" : ""}` : "rest"}.${index === playheadStepIndex ? ` ${playbackStatus === "playing" ? "Playing now" : "Transport position"}.` : ""}`,
       );
     });
+  }
+
+  function getFocusedStepIndex(target) {
+    const index = Number(target?.dataset?.stepIndex);
+    return Number.isInteger(index) ? index : null;
+  }
+
+  function getColumnCount() {
+    const columns = getComputedStyle(grid).gridTemplateColumns
+      .split(" ")
+      .filter(Boolean).length;
+    return Math.max(1, columns);
+  }
+
+  function handleGridKeyDown(event) {
+    if (event.repeat) return;
+    const isNavigation = GRID_NAVIGATION_KEYS.has(event.key);
+    const isAssign = event.key === "Enter";
+    const isClear = event.key === "Delete" || event.key === "Backspace";
+    if (!isNavigation && !isAssign && !isClear) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const { length } = patternState.getState();
+    const currentIndex = selectedStepIndex ?? getFocusedStepIndex(event.target) ?? 0;
+
+    if (isNavigation) {
+      const columns = getColumnCount();
+      const delta = {
+        ArrowDown: columns,
+        ArrowLeft: -1,
+        ArrowRight: 1,
+        ArrowUp: -columns,
+      }[event.key];
+      const nextIndex = currentIndex + delta;
+      if (nextIndex < 0 || nextIndex >= length) return;
+      selectStep(nextIndex, false, false);
+      focusStep(nextIndex);
+      return;
+    }
+
+    selectedStepIndex = currentIndex;
+    onEditAction?.();
+    if (isAssign) {
+      const note = getSelectedNote();
+      patternState.setStep(currentIndex, note);
+      previewSelectedNote(note);
+    } else {
+      patternState.clearStep(currentIndex);
+      gateSelect.value = String(DEFAULT_PATTERN_GATE);
+      accentInput.checked = false;
+    }
+    render();
+    focusStep(currentIndex);
   }
 
   function handleNoteSelectionChange(event) {
@@ -200,6 +268,7 @@ export function createPatternEditor({
   gateSelect.addEventListener("change", handleGateChange);
   accentInput.addEventListener("change", handleAccentChange);
   previewInput.addEventListener("change", handlePreviewChange);
+  grid.addEventListener("keydown", handleGridKeyDown);
   patternState.addEventListener("change", render);
   render();
 
@@ -209,6 +278,7 @@ export function createPatternEditor({
     gateSelect.removeEventListener("change", handleGateChange);
     accentInput.removeEventListener("change", handleAccentChange);
     previewInput.removeEventListener("change", handlePreviewChange);
+    grid.removeEventListener("keydown", handleGridKeyDown);
     patternState.removeEventListener("change", render);
   }
 
