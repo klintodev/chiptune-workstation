@@ -17,36 +17,36 @@
       <section class="workspace" aria-labelledby="setup-title">
         <div class="workspace-copy"><span class="step-number">01</span><div><p class="eyebrow">System setup</p><h2 id="setup-title">Start the audio engine</h2><p id="status-description" class="lede">Browsers require a deliberate gesture before they allow sound. Nothing will play until you enable audio.</p></div></div>
         <div class="control-panel">
-          <button id="audio-action" class="primary-action" type="button"><span>Enable audio</span><span aria-hidden="true">â†—</span></button>
+          <button id="audio-action" class="primary-action" type="button"><span>Enable audio</span><span aria-hidden="true">&nearr;</span></button>
           <div id="error-panel" class="error-panel" role="alert" hidden><strong>Audio could not start</strong><p id="error-message"></p></div>
-          <div class="meters" aria-label="Audio engine information"><div><span>Context</span><strong id="context-state">â€”</strong></div><div><span>Sample rate</span><strong id="sample-rate">â€”</strong></div><div><span>Audio time</span><strong id="audio-time">â€”</strong></div></div>
+          <div class="meters" aria-label="Audio engine information"><div><span>Context</span><strong id="context-state">&mdash;</strong></div><div><span>Sample rate</span><strong id="sample-rate">&mdash;</strong></div><div><span>Audio time</span><strong id="audio-time">&mdash;</strong></div></div>
         </div>
       </section>
 
       <section class="signal-strip" aria-labelledby="signal-title">
-        <div><p class="eyebrow">Master signal path</p><h2 id="signal-title">Output check</h2><p>The diagnostic tone travels through the same master gain stage that every future instrument will use.</p></div>
-        <div class="signal-controls"><button id="test-signal" class="secondary-action" type="button" disabled>Play test signal</button><button id="mute-toggle" class="mute-toggle" type="button" aria-pressed="false" disabled><span class="mute-icon" aria-hidden="true">â—¼</span><span id="mute-label">Mute output</span></button></div>
+        <div><p class="eyebrow">Master signal path</p><h2 id="signal-title">Output check</h2><p>The diagnostic tone travels through the same master gain stage that every instrument uses.</p></div>
+        <div class="signal-controls"><button id="test-signal" class="secondary-action" type="button" disabled>Play test signal</button><button id="mute-toggle" class="mute-toggle" type="button" aria-pressed="false" disabled><span class="mute-icon" aria-hidden="true">&#9632;</span><span id="mute-label">Mute output</span></button></div>
       </section>
 
-      <section class="voice-lab" aria-labelledby="voice-title">
-        <div><p class="eyebrow">Epic 02 verification</p><h2 id="voice-title">Chip voice engine</h2><p>Temporary controls for verifying voices. A playable keyboard belongs to Epic 03.</p></div>
+      <section class="voice-lab" aria-labelledby="instrument-title">
+        <div><p class="eyebrow">Instrument</p><h2 id="instrument-title">Controls</h2><p>Changes affect new notes. Notes already playing retain the settings they started with.</p></div>
         <div class="voice-controls">
-          <label>Voice<select id="voice-type" disabled><option value="square">Square</option><option value="triangle">Triangle</option><option value="sawtooth">Sawtooth</option><option value="noise">Noise</option></select></label>
-          <button id="voice-hold" type="button" disabled>Press and hold</button><button id="voice-trigger" type="button" disabled>Play short note</button><button id="voice-schedule" type="button" disabled>Play in 0.5s</button>
-          <p>Active voices: <strong id="active-voices">0</strong></p>
+          <label>Voice<select id="voice-type"><option value="square">Square</option><option value="triangle">Triangle</option><option value="sawtooth">Sawtooth</option><option value="noise">Noise</option></select></label>
+          <div class="octave-control"><button id="octave-down" type="button" aria-label="Octave down">&minus;</button><span>Octave <strong id="octave-value">0</strong></span><button id="octave-up" type="button" aria-label="Octave up">+</button></div>
+          <label>Volume <output id="volume-value" for="volume">35%</output><input id="volume" type="range" min="0" max="100" step="1" value="35" /></label>
+          <label>Attack <output id="attack-value" for="attack">8 ms</output><input id="attack" type="range" min="1" max="2000" step="1" value="8" /></label>
+          <label>Release <output id="release-value" for="release">30 ms</output><input id="release" type="range" min="10" max="3000" step="10" value="30" /></label>
+          <button id="reset-instrument" type="button">Reset instrument</button>
         </div>
       </section>
 
       <section class="keyboard-section" aria-labelledby="keyboard-title">
-        <div class="keyboard-heading">
-          <div><p class="eyebrow">Epic 03</p><h2 id="keyboard-title">Playable keyboard</h2><p>Numbers and home row play black keys. QWERTY and ZXCV rows play white keys.</p></div>
-          <button id="stop-sound" class="panic-button" type="button" disabled>Stop sound</button>
-        </div>
+        <div class="keyboard-heading"><div><p class="eyebrow">Play</p><h2 id="keyboard-title">Keyboard</h2><p>Numbers and home row play black keys. QWERTY and ZXCV rows play white keys.</p></div><button id="stop-sound" class="panic-button" type="button" disabled>Stop sound</button></div>
         <div class="keyboard-manual" aria-label="Upper keyboard register"><div id="upper-black-keys" class="key-row black-row"></div><div id="upper-white-keys" class="key-row white-row"></div></div>
         <div class="keyboard-manual" aria-label="Lower keyboard register"><div id="lower-black-keys" class="key-row black-row"></div><div id="lower-white-keys" class="key-row white-row"></div></div>
       </section>
 
-      <footer><span>Epic 03 / Playable input surfaces</span><span>No audio is created before your gesture.</span></footer>
+      <footer><span>No audio is created before your gesture.</span></footer>
     </main>
     <script type="module" src="./src/app.js"></script>
   </body>

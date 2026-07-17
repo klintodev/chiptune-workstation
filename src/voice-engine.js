@@ -1,9 +1,8 @@
 const VOICE_TYPES = new Set(["square", "triangle", "sawtooth", "noise"]);
 const MIN_FREQUENCY = 20;
 const MAX_FREQUENCY = 20_000;
-const ATTACK_SECONDS = 0.008;
-const RELEASE_SECONDS = 0.03;
 const SILENCE = 0.0001;
+const VOLUME_RAMP_SECONDS = 0.015;
 
 export function midiNoteToFrequency(note) {
   return 440 * 2 ** ((note - 69) / 12);
@@ -14,9 +13,32 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
   const activeVoices = new Map();
   let nextId = 1;
   let noiseBuffer = null;
+  let instrumentOutput = null;
+  let volume = 0.35;
 
   function emitChange() {
     events.dispatchEvent(new CustomEvent("voiceschange", { detail: { count: activeVoices.size } }));
+  }
+
+  function getInstrumentOutput() {
+    if (instrumentOutput) return instrumentOutput;
+    const masterOutput = getOutputNode();
+    instrumentOutput = masterOutput.context.createGain();
+    instrumentOutput.gain.setValueAtTime(volume, masterOutput.context.currentTime);
+    instrumentOutput.connect(masterOutput);
+    return instrumentOutput;
+  }
+
+  function setVolume(nextVolume) {
+    if (!Number.isFinite(nextVolume) || nextVolume < 0 || nextVolume > 1) {
+      throw new RangeError("Volume must be between 0 and 1.");
+    }
+    volume = nextVolume;
+    if (!instrumentOutput) return;
+    const now = instrumentOutput.context.currentTime;
+    instrumentOutput.gain.cancelScheduledValues(now);
+    instrumentOutput.gain.setValueAtTime(instrumentOutput.gain.value, now);
+    instrumentOutput.gain.linearRampToValueAtTime(volume, now + VOLUME_RAMP_SECONDS);
   }
 
   function createSource(context, type, frequency) {
@@ -26,7 +48,6 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
       source.frequency.value = frequency;
       return source;
     }
-
     if (noiseBuffer?.sampleRate !== context.sampleRate) {
       noiseBuffer = context.createBuffer(1, context.sampleRate, context.sampleRate);
       const samples = noiseBuffer.getChannelData(0);
@@ -41,36 +62,46 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
   function stop(id, requestedTime = getAudioTime()) {
     const voice = activeVoices.get(id);
     if (!voice || voice.stopping) return false;
-
     const stopTime = Math.max(requestedTime, getAudioTime());
     voice.stopping = true;
-    if (voice.gain.gain.cancelAndHoldAtTime) voice.gain.gain.cancelAndHoldAtTime(stopTime);
-    else {
-      voice.gain.gain.cancelScheduledValues(stopTime);
-      voice.gain.gain.setValueAtTime(Math.max(voice.gain.gain.value, SILENCE), stopTime);
-    }
-    voice.gain.gain.exponentialRampToValueAtTime(SILENCE, stopTime + RELEASE_SECONDS);
-    voice.source.stop(stopTime + RELEASE_SECONDS + 0.01);
+    const attackProgress = Math.min(
+      1,
+      Math.max(0, (stopTime - voice.startTime) / voice.attackSeconds),
+    );
+    const heldGain = SILENCE * (1 / SILENCE) ** attackProgress;
+    voice.gain.gain.cancelScheduledValues(stopTime);
+    voice.gain.gain.setValueAtTime(heldGain, stopTime);
+    voice.gain.gain.exponentialRampToValueAtTime(SILENCE, stopTime + voice.releaseSeconds);
+    voice.source.stop(stopTime + voice.releaseSeconds + 0.01);
     return true;
   }
 
-  function trigger({ type = "square", frequency = midiNoteToFrequency(60), startTime = getAudioTime(), duration } = {}) {
+  function trigger({
+    type = "square",
+    frequency = midiNoteToFrequency(60),
+    startTime = getAudioTime(),
+    duration,
+    attackSeconds = 0.008,
+    releaseSeconds = 0.03,
+  } = {}) {
     if (!VOICE_TYPES.has(type)) throw new RangeError(`Unsupported voice type: ${type}`);
     if (!Number.isFinite(startTime) || startTime < getAudioTime()) throw new RangeError("Start time must use the current or future audio clock.");
     if (type !== "noise" && (!Number.isFinite(frequency) || frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY)) throw new RangeError(`Frequency must be between ${MIN_FREQUENCY} and ${MAX_FREQUENCY} Hz.`);
     if (duration !== undefined && (!Number.isFinite(duration) || duration <= 0)) throw new RangeError("Duration must be greater than zero.");
+    if (!Number.isFinite(attackSeconds) || attackSeconds < 0.001 || attackSeconds > 2) throw new RangeError("Attack must be between 0.001 and 2 seconds.");
+    if (!Number.isFinite(releaseSeconds) || releaseSeconds < 0.01 || releaseSeconds > 3) throw new RangeError("Release must be between 0.01 and 3 seconds.");
 
-    const output = getOutputNode();
+    const output = getInstrumentOutput();
     const context = output.context;
     const source = createSource(context, type, frequency);
     const gain = context.createGain();
     const id = nextId++;
 
     gain.gain.setValueAtTime(SILENCE, startTime);
-    gain.gain.exponentialRampToValueAtTime(1, startTime + ATTACK_SECONDS);
+    gain.gain.exponentialRampToValueAtTime(1, startTime + attackSeconds);
     source.connect(gain);
     gain.connect(output);
-    activeVoices.set(id, { source, gain, stopping: false });
+    activeVoices.set(id, { source, gain, startTime, attackSeconds, releaseSeconds, stopping: false });
     source.addEventListener("ended", () => {
       source.disconnect();
       gain.disconnect();
@@ -91,6 +122,7 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
     addEventListener: events.addEventListener.bind(events),
     getActiveVoiceCount: () => activeVoices.size,
     removeEventListener: events.removeEventListener.bind(events),
+    setVolume,
     stopAll,
     trigger,
   });
