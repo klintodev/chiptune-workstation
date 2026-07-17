@@ -1,7 +1,6 @@
 import { midiNoteToFrequency } from "./voice-engine.js";
 
 export const DEFAULT_BPM = 120;
-export const DEFAULT_GATE_RATIO = 0.8;
 export const DEFAULT_LOOK_AHEAD_SECONDS = 0.1;
 export const DEFAULT_SCHEDULER_INTERVAL_MS = 25;
 export const DEFAULT_START_LEAD_SECONDS = 0.05;
@@ -19,16 +18,12 @@ export function createStepScheduler({
   getPatternState,
   voiceEngine,
   bpm = DEFAULT_BPM,
-  gateRatio = DEFAULT_GATE_RATIO,
   lookAheadSeconds = DEFAULT_LOOK_AHEAD_SECONDS,
   schedulerIntervalMs = DEFAULT_SCHEDULER_INTERVAL_MS,
   startLeadSeconds = DEFAULT_START_LEAD_SECONDS,
   setIntervalFn = (callback, interval) => globalThis.setInterval(callback, interval),
   clearIntervalFn = (timer) => globalThis.clearInterval(timer),
 }) {
-  if (!Number.isFinite(gateRatio) || gateRatio <= 0 || gateRatio > 1) {
-    throw new RangeError("Gate ratio must be greater than zero and no more than one.");
-  }
   if (!Number.isFinite(lookAheadSeconds) || lookAheadSeconds <= 0 || lookAheadSeconds > 0.5) {
     throw new RangeError("Look-ahead must be greater than zero and no more than 0.5 seconds.");
   }
@@ -128,15 +123,16 @@ export function createStepScheduler({
   }
 
   function scheduleStep(activeSession, stepIndex, startTime) {
-    const note = getPatternState().steps[stepIndex];
-    if (note === null) return;
+    const step = getPatternState().steps[stepIndex];
+    if (step === null) return;
     const config = getInstrumentConfig();
-    const duration = activeSession.stepDurationSeconds * gateRatio;
+    const duration = activeSession.stepDurationSeconds * step.gate;
     const voice = voiceEngine.trigger({
       type: config.voiceType,
-      frequency: midiNoteToFrequency(note),
+      frequency: midiNoteToFrequency(step.note),
       startTime,
       duration,
+      intensity: step.accented ? 1 : 0.7,
       attackSeconds: config.attackSeconds,
       releaseSeconds: config.releaseSeconds,
     });

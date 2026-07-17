@@ -69,7 +69,7 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
       1,
       Math.max(0, (stopTime - voice.startTime) / voice.attackSeconds),
     );
-    const heldGain = SILENCE * (1 / SILENCE) ** attackProgress;
+    const heldGain = SILENCE * (voice.peakGain / SILENCE) ** attackProgress;
     voice.gain.gain.cancelScheduledValues(stopTime);
     voice.gain.gain.setValueAtTime(heldGain, stopTime);
     voice.gain.gain.exponentialRampToValueAtTime(SILENCE, stopTime + voice.releaseSeconds);
@@ -82,6 +82,7 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
     frequency = midiNoteToFrequency(60),
     startTime = getAudioTime(),
     duration,
+    intensity = 1,
     attackSeconds = 0.008,
     releaseSeconds = 0.03,
   } = {}) {
@@ -89,6 +90,7 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
     if (!Number.isFinite(startTime) || startTime < getAudioTime()) throw new RangeError("Start time must use the current or future audio clock.");
     if (type !== "noise" && (!Number.isFinite(frequency) || frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY)) throw new RangeError(`Frequency must be between ${MIN_FREQUENCY} and ${MAX_FREQUENCY} Hz.`);
     if (duration !== undefined && (!Number.isFinite(duration) || duration <= 0)) throw new RangeError("Duration must be greater than zero.");
+    if (!Number.isFinite(intensity) || intensity <= 0 || intensity > 1) throw new RangeError("Intensity must be greater than zero and no more than one.");
     if (!Number.isFinite(attackSeconds) || attackSeconds < 0.001 || attackSeconds > 2) throw new RangeError("Attack must be between 0.001 and 2 seconds.");
     if (!Number.isFinite(releaseSeconds) || releaseSeconds < 0.01 || releaseSeconds > 3) throw new RangeError("Release must be between 0.01 and 3 seconds.");
 
@@ -99,10 +101,10 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
     const id = nextId++;
 
     gain.gain.setValueAtTime(SILENCE, startTime);
-    gain.gain.exponentialRampToValueAtTime(1, startTime + attackSeconds);
+    gain.gain.exponentialRampToValueAtTime(intensity, startTime + attackSeconds);
     source.connect(gain);
     gain.connect(output);
-    activeVoices.set(id, { source, gain, startTime, attackSeconds, releaseSeconds, stopTime: null });
+    activeVoices.set(id, { source, gain, startTime, attackSeconds, releaseSeconds, peakGain: intensity, stopTime: null });
     source.addEventListener("ended", () => {
       source.disconnect();
       gain.disconnect();

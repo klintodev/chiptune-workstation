@@ -1,12 +1,21 @@
-import { MAX_PATTERN_NOTE, MIN_PATTERN_NOTE } from "./pattern-state.js";
+import {
+  DEFAULT_PATTERN_GATE,
+  MAX_PATTERN_NOTE,
+  MIN_PATTERN_NOTE,
+} from "./pattern-state.js";
 
 export function createPatternEditor({
   patternState,
   grid,
   pitchSelect,
   octaveSelect,
+  gateSelect,
+  accentInput,
+  previewInput,
   selectedNoteOutput,
   getNoteName,
+  previewNote,
+  onEditAction,
 }) {
   const stepElements = [];
   let selectedStepIndex = null;
@@ -28,6 +37,19 @@ export function createPatternEditor({
     }
   }
 
+  function loadStepControls(step) {
+    if (step === null) return;
+    pitchSelect.value = String(step.note % 12);
+    octaveSelect.value = String(Math.floor(step.note / 12) - 1);
+    gateSelect.value = String(step.gate);
+    accentInput.checked = step.accented;
+    constrainPitchSelection();
+  }
+
+  function previewSelectedNote(note, accented = accentInput.checked) {
+    if (previewInput.checked) previewNote?.(note, accented);
+  }
+
   function setSelectedNote(note) {
     if (!Number.isInteger(note) || note < MIN_PATTERN_NOTE || note > MAX_PATTERN_NOTE) {
       throw new RangeError(`Selected note must be between ${MIN_PATTERN_NOTE} and ${MAX_PATTERN_NOTE}.`);
@@ -35,6 +57,7 @@ export function createPatternEditor({
     pitchSelect.value = String(note % 12);
     octaveSelect.value = String(Math.floor(note / 12) - 1);
     if (selectedStepIndex !== null) patternState.setStep(selectedStepIndex, note);
+    previewSelectedNote(note);
     render();
   }
 
@@ -48,11 +71,26 @@ export function createPatternEditor({
     render();
   }
 
+  function selectStep(index, assignRest) {
+    onEditAction?.();
+    selectedStepIndex = index;
+    const step = patternState.getState().steps[index];
+    if (step === null && assignRest) {
+      patternState.setStep(index, getSelectedNote());
+      previewSelectedNote(getSelectedNote());
+    } else if (step !== null) {
+      loadStepControls(step);
+      previewSelectedNote(step.note, step.accented);
+    }
+    render();
+  }
+
   function createStep(index) {
     const container = document.createElement("div");
     const setButton = document.createElement("button");
     const number = document.createElement("span");
     const value = document.createElement("strong");
+    const detail = document.createElement("small");
     const clearButton = document.createElement("button");
 
     container.className = "pattern-step";
@@ -64,20 +102,22 @@ export function createPatternEditor({
     clearButton.textContent = "Clear";
     clearButton.setAttribute("aria-label", `Clear step ${index + 1}`);
 
-    setButton.append(number, value);
+    setButton.append(number, value, detail);
     setButton.addEventListener("click", () => {
-      selectedStepIndex = index;
-      patternState.setStep(index, getSelectedNote());
-      render();
+      const step = patternState.getState().steps[index];
+      selectStep(index, step === null);
     });
     clearButton.addEventListener("click", () => {
+      onEditAction?.();
       selectedStepIndex = index;
       patternState.clearStep(index);
+      gateSelect.value = String(DEFAULT_PATTERN_GATE);
+      accentInput.checked = false;
       render();
     });
     container.append(setButton, clearButton);
     grid.append(container);
-    stepElements.push({ clearButton, container, setButton, value });
+    stepElements.push({ clearButton, container, detail, setButton, value });
   }
 
   function syncStepElements(length) {
@@ -95,10 +135,11 @@ export function createPatternEditor({
     syncStepElements(steps.length);
     selectedNoteOutput.value = selectedNoteName;
 
-    steps.forEach((note, index) => {
+    steps.forEach((step, index) => {
       const elements = stepElements[index];
-      const hasNote = note !== null;
+      const hasNote = step !== null;
       elements.container.classList.toggle("has-note", hasNote);
+      elements.container.classList.toggle("accented", step?.accented ?? false);
       elements.container.classList.toggle("selected", index === selectedStepIndex);
       elements.container.classList.toggle("playhead", index === playheadStepIndex);
       elements.container.classList.toggle(
@@ -106,30 +147,67 @@ export function createPatternEditor({
         index === playheadStepIndex && playbackStatus === "playing",
       );
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
-      elements.value.textContent = hasNote ? getNoteName(note) : "Rest";
+      elements.value.textContent = hasNote ? getNoteName(step.note) : "Rest";
+      elements.detail.textContent = hasNote
+        ? `${Math.round(step.gate * 100)}%${step.accented ? " / Accent" : ""}`
+        : "";
       elements.clearButton.disabled = !hasNote;
       elements.setButton.setAttribute(
         "aria-label",
-        `Step ${index + 1}, ${hasNote ? getNoteName(note) : "rest"}.${index === playheadStepIndex ? ` ${playbackStatus === "playing" ? "Playing now" : "Transport position"}.` : ""} Set to ${selectedNoteName}.`,
+        `Step ${index + 1}, ${hasNote ? `${getNoteName(step.note)}, ${Math.round(step.gate * 100)}% gate${step.accented ? ", accented" : ""}` : "rest"}.${index === playheadStepIndex ? ` ${playbackStatus === "playing" ? "Playing now" : "Transport position"}.` : ""}`,
       );
     });
   }
 
-  function handleSelectionChange(event) {
+  function handleNoteSelectionChange(event) {
+    onEditAction?.();
     event.currentTarget.blur();
     constrainPitchSelection();
-    if (selectedStepIndex !== null) patternState.setStep(selectedStepIndex, getSelectedNote());
+    const note = getSelectedNote();
+    if (selectedStepIndex !== null) patternState.setStep(selectedStepIndex, note);
+    previewSelectedNote(note);
     render();
   }
 
-  pitchSelect.addEventListener("change", handleSelectionChange);
-  octaveSelect.addEventListener("change", handleSelectionChange);
+  function handleGateChange() {
+    onEditAction?.();
+    if (selectedStepIndex !== null) {
+      patternState.setGate(selectedStepIndex, Number(gateSelect.value));
+    }
+    gateSelect.blur();
+    render();
+  }
+
+  function handleAccentChange() {
+    onEditAction?.();
+    if (selectedStepIndex !== null) {
+      patternState.setAccent(selectedStepIndex, accentInput.checked);
+      const step = patternState.getState().steps[selectedStepIndex];
+      if (step) previewSelectedNote(step.note, step.accented);
+    }
+    render();
+  }
+
+  function handlePreviewChange() {
+    if (!previewInput.checked || selectedStepIndex === null) return;
+    const step = patternState.getState().steps[selectedStepIndex];
+    if (step) previewSelectedNote(step.note, step.accented);
+  }
+
+  pitchSelect.addEventListener("change", handleNoteSelectionChange);
+  octaveSelect.addEventListener("change", handleNoteSelectionChange);
+  gateSelect.addEventListener("change", handleGateChange);
+  accentInput.addEventListener("change", handleAccentChange);
+  previewInput.addEventListener("change", handlePreviewChange);
   patternState.addEventListener("change", render);
   render();
 
   function dispose() {
-    pitchSelect.removeEventListener("change", handleSelectionChange);
-    octaveSelect.removeEventListener("change", handleSelectionChange);
+    pitchSelect.removeEventListener("change", handleNoteSelectionChange);
+    octaveSelect.removeEventListener("change", handleNoteSelectionChange);
+    gateSelect.removeEventListener("change", handleGateChange);
+    accentInput.removeEventListener("change", handleAccentChange);
+    previewInput.removeEventListener("change", handlePreviewChange);
     patternState.removeEventListener("change", render);
   }
 

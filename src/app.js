@@ -1,6 +1,7 @@
 import { audioEngine, createAudioEngineError, isAudioEngineError } from "./audio-engine.js";
 import { createInputController } from "./input-controller.js";
 import { createInstrumentState } from "./instrument-state.js";
+import { createNotePreview } from "./note-preview.js";
 import { createPatternEditor } from "./pattern-editor.js";
 import { createPatternState } from "./pattern-state.js";
 import { createStepScheduler } from "./step-scheduler.js";
@@ -8,7 +9,7 @@ import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS 
 import { createVoiceEngine } from "./voice-engine.js";
 
 const selectors = {
-  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternGrid: "#pattern-grid", patternLength: "#pattern-length", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", tempo: "#tempo", tempoValue: "#tempo-value", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
+  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternAccent: "#pattern-accent", patternGate: "#pattern-gate", patternGrid: "#pattern-grid", patternLength: "#pattern-length", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", patternPreview: "#pattern-preview", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", tempo: "#tempo", tempoValue: "#tempo-value", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 elements.actionLabel = document.querySelector("#audio-action span");
@@ -16,6 +17,11 @@ elements.actionLabel = document.querySelector("#audio-action span");
 const instrumentState = createInstrumentState();
 const patternState = createPatternState();
 const voiceEngine = createVoiceEngine({ getAudioTime: audioEngine.getCurrentTime, getOutputNode: audioEngine.getInputNode });
+const notePreview = createNotePreview({
+  getAudioTime: audioEngine.getCurrentTime,
+  getInstrumentConfig: instrumentState.getState,
+  voiceEngine,
+});
 const stepScheduler = createStepScheduler({
   getAudioTime: audioEngine.getCurrentTime,
   getInstrumentConfig: instrumentState.getState,
@@ -52,8 +58,12 @@ patternEditor = createPatternEditor({
   grid: elements.patternGrid,
   pitchSelect: elements.patternPitch,
   octaveSelect: elements.patternOctave,
+  gateSelect: elements.patternGate,
+  accentInput: elements.patternAccent,
+  previewInput: elements.patternPreview,
   selectedNoteOutput: elements.selectedPatternNote,
   getNoteName: noteName,
+  previewNote: notePreview.play,
 });
 
 function createKeyButton(key, colour) {
@@ -197,6 +207,7 @@ function render() {
 
 function stopAllSound() {
   stepScheduler.stop();
+  notePreview.stop();
   inputController.stopAll();
   voiceEngine.stopAll();
 }
@@ -255,6 +266,7 @@ document.addEventListener("keyup", inputController.handleKeyUp);
 window.addEventListener("keyup", inputController.handleKeyUp);
 function pauseForInterruption() {
   stepScheduler.pause();
+  notePreview.stop();
   inputController.stopAll();
   voiceEngine.stopAll();
 }

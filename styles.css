@@ -466,6 +466,16 @@ footer {
   gap: 6px;
 }
 
+.pattern-toggle {
+  display: flex !important;
+  align-items: center;
+  min-height: 44px;
+  grid-template-columns: auto 1fr;
+}
+
+.pattern-toggle input {
+  accent-color: var(--acid);
+}
 .pattern-note-picker select {
   min-height: 44px;
   padding: 8px 12px;
@@ -588,9 +598,18 @@ footer {
   color: var(--muted);
   font-size: 0.7rem;
 }
+.pattern-step-set small {
+  min-height: 1em;
+  color: var(--muted);
+  font-size: 0.62rem;
+}
 
 .pattern-step.has-note .pattern-step-set strong {
   color: var(--acid);
+}
+
+.pattern-step.has-note.accented .pattern-step-set strong {
+  color: var(--orange);
 }
 
 .pattern-step-clear {
