@@ -573,6 +573,7 @@ footer {
   opacity: 0.42;
 }
 
+.history-actions,
 .transpose-actions {
   display: flex;
   align-items: center;

@@ -4,6 +4,7 @@ export const MIN_PATTERN_NOTE = 36;
 export const MAX_PATTERN_NOTE = 112;
 export const DEFAULT_PATTERN_GATE = 0.75;
 export const SUPPORTED_PATTERN_GATES = Object.freeze([0.25, 0.5, 0.75, 1]);
+export const MAX_PATTERN_HISTORY = 100;
 
 function validateLength(length) {
   if (!SUPPORTED_PATTERN_LENGTHS.includes(length)) {
@@ -46,6 +47,10 @@ function cloneStep(step) {
   return step === null ? null : { ...step };
 }
 
+function cloneSteps(steps) {
+  return steps.map(cloneStep);
+}
+
 function normalizeStep(step) {
   if (step === null) return null;
   if (Number.isInteger(step)) return createNoteStep(step);
@@ -60,12 +65,22 @@ function createInitialSteps(initialSteps) {
   return initialSteps.map(normalizeStep);
 }
 
+function validateSemitoneDelta(semitones) {
+  if (!Number.isInteger(semitones) || semitones === 0) {
+    throw new RangeError("Transpose amount must be a non-zero integer.");
+  }
+}
+
 export function createPatternState(initialSteps) {
   const events = new EventTarget();
+  const past = [];
+  const future = [];
   let steps = createInitialSteps(initialSteps);
 
   function getState() {
     return Object.freeze({
+      canRedo: future.length > 0,
+      canUndo: past.length > 0,
       length: steps.length,
       steps: Object.freeze(
         steps.map((step) => step === null ? null : Object.freeze(cloneStep(step))),
@@ -77,12 +92,23 @@ export function createPatternState(initialSteps) {
     events.dispatchEvent(new CustomEvent("change", { detail: getState() }));
   }
 
-  function replaceStep(index, nextStep) {
-    const nextSteps = [...steps];
-    nextSteps[index] = nextStep;
-    steps = nextSteps;
+  function retainPast(snapshot) {
+    past.push(snapshot);
+    if (past.length > MAX_PATTERN_HISTORY) past.shift();
+  }
+
+  function commit(nextSteps) {
+    retainPast(cloneSteps(steps));
+    future.length = 0;
+    steps = cloneSteps(nextSteps);
     emitChange();
     return true;
+  }
+
+  function replaceStep(index, nextStep) {
+    const nextSteps = cloneSteps(steps);
+    nextSteps[index] = cloneStep(nextStep);
+    return commit(nextSteps);
   }
 
   function setStep(index, note) {
@@ -121,11 +147,9 @@ export function createPatternState(initialSteps) {
   function setLength(nextLength) {
     validateLength(nextLength);
     if (steps.length === nextLength) return false;
-    const nextSteps = steps.slice(0, nextLength).map(cloneStep);
+    const nextSteps = cloneSteps(steps.slice(0, nextLength));
     while (nextSteps.length < nextLength) nextSteps.push(null);
-    steps = nextSteps;
-    emitChange();
-    return true;
+    return commit(nextSteps);
   }
 
   function canDuplicate() {
@@ -134,23 +158,12 @@ export function createPatternState(initialSteps) {
 
   function duplicate() {
     if (!canDuplicate()) return false;
-    const original = steps.map(cloneStep);
-    steps = [...original.map(cloneStep), ...original.map(cloneStep)];
-    emitChange();
-    return true;
+    return commit([...cloneSteps(steps), ...cloneSteps(steps)]);
   }
 
   function clearPattern() {
     if (steps.every((step) => step === null)) return false;
-    steps = Array(steps.length).fill(null);
-    emitChange();
-    return true;
-  }
-
-  function validateSemitoneDelta(semitones) {
-    if (!Number.isInteger(semitones) || semitones === 0) {
-      throw new RangeError("Transpose amount must be a non-zero integer.");
-    }
+    return commit(Array(steps.length).fill(null));
   }
 
   function canTranspose(semitones) {
@@ -163,12 +176,25 @@ export function createPatternState(initialSteps) {
 
   function transpose(semitones) {
     if (!canTranspose(semitones)) return false;
-    if (steps.every((step) => step === null)) return false;
-    steps = steps.map(
+    return commit(steps.map(
       (step) => step === null
         ? null
         : createNoteStep(step.note + semitones, step.gate, step.accented),
-    );
+    ));
+  }
+
+  function undo() {
+    if (past.length === 0) return false;
+    future.push(cloneSteps(steps));
+    steps = cloneSteps(past.pop());
+    emitChange();
+    return true;
+  }
+
+  function redo() {
+    if (future.length === 0) return false;
+    retainPast(cloneSteps(steps));
+    steps = cloneSteps(future.pop());
     emitChange();
     return true;
   }
@@ -181,11 +207,13 @@ export function createPatternState(initialSteps) {
     clearStep,
     duplicate,
     getState,
+    redo,
     removeEventListener: events.removeEventListener.bind(events),
     setAccent,
     setGate,
     setLength,
     setStep,
     transpose,
+    undo,
   });
 }
