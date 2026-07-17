@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A browser-based chiptune workstation built with the Web Audio API."
+    />
+    <title>Chiptune Workstation</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">Web Audio workstation</p>
+          <h1>Chiptune<br />Workstation</h1>
+        </div>
+        <div class="status-cluster" aria-live="polite">
+          <span id="status-light" class="status-light" aria-hidden="true"></span>
+          <div>
+            <span class="status-label">Audio engine</span>
+            <strong id="audio-state">Not started</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="workspace" aria-labelledby="setup-title">
+        <div class="workspace-copy">
+          <span class="step-number">01</span>
+          <div>
+            <p class="eyebrow">System setup</p>
+            <h2 id="setup-title">Start the audio engine</h2>
+            <p id="status-description" class="lede">
+              Browsers require a deliberate gesture before they allow sound. Nothing
+              will play until you enable audio.
+            </p>
+          </div>
+        </div>
+
+        <div class="control-panel">
+          <button id="audio-action" class="primary-action" type="button">
+            <span>Enable audio</span>
+            <span aria-hidden="true">↗</span>
+          </button>
+
+          <div id="error-panel" class="error-panel" role="alert" hidden>
+            <strong>Audio could not start</strong>
+            <p id="error-message"></p>
+          </div>
+
+          <div class="meters" aria-label="Audio engine information">
+            <div>
+              <span>Context</span>
+              <strong id="context-state">—</strong>
+            </div>
+            <div>
+              <span>Sample rate</span>
+              <strong id="sample-rate">—</strong>
+            </div>
+            <div>
+              <span>Audio time</span>
+              <strong id="audio-time">—</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="signal-strip" aria-labelledby="signal-title">
+        <div>
+          <p class="eyebrow">Master signal path</p>
+          <h2 id="signal-title">Output check</h2>
+          <p>
+            The diagnostic tone travels through the same master gain stage that every
+            future instrument will use.
+          </p>
+        </div>
+
+        <div class="signal-controls">
+          <button id="test-signal" class="secondary-action" type="button" disabled>
+            Play test signal
+          </button>
+          <button
+            id="mute-toggle"
+            class="mute-toggle"
+            type="button"
+            aria-pressed="false"
+            disabled
+          >
+            <span class="mute-icon" aria-hidden="true">◼</span>
+            <span id="mute-label">Mute output</span>
+          </button>
+        </div>
+      </section>
+
+      <footer>
+        <span>Epic 01 / Audio foundation</span>
+        <span>No audio is created before your gesture.</span>
+      </footer>
+    </main>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
