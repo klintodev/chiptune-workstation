@@ -42,12 +42,23 @@ export function createStepScheduler({
   const events = new EventTarget();
   const stepDurationSeconds = getSixteenthNoteDuration(bpm);
   let nextSessionId = 1;
+  let nextVoiceId = 1;
+  let retainedStepIndex = 0;
+  let status = "stopped";
   let session = null;
 
-  function emitState(status, sessionId, error) {
+  function emitState(error) {
     events.dispatchEvent(new CustomEvent("statechange", {
-      detail: { status, sessionId, error },
+      detail: { ...getState(), error },
     }));
+  }
+
+  function getState() {
+    return Object.freeze({
+      status,
+      retainedStepIndex,
+      sessionId: session?.id ?? null,
+    });
   }
 
   function clearSessionTimer(activeSession) {
@@ -56,36 +67,76 @@ export function createStepScheduler({
     activeSession.timer = null;
   }
 
-  function finishSession(activeSession) {
-    if (session !== activeSession) return;
-    clearSessionTimer(activeSession);
-    session = null;
-    emitState("complete", activeSession.id);
+  function releaseSessionVoices(activeSession, stopTime) {
+    for (const record of activeSession.voices.values()) record.voice.stop(stopTime);
+    activeSession.voices.clear();
   }
 
-  function stopSession(activeSession, status = "stopped", error) {
+  function endSession(activeSession, stopTime) {
     if (session !== activeSession) return false;
     clearSessionTimer(activeSession);
-    const stopTime = getAudioTime();
-    for (const voice of activeSession.voices.values()) voice.stop(stopTime);
+    releaseSessionVoices(activeSession, stopTime);
     session = null;
-    emitState(status, activeSession.id, error);
     return true;
+  }
+
+  function pruneFinishedVoices(activeSession, now) {
+    for (const [id, record] of activeSession.voices) {
+      if (record.endTime <= now) activeSession.voices.delete(id);
+    }
+  }
+
+  function getNextStepAtTime(activeSession, audioTime) {
+    if (audioTime <= activeSession.anchorTime) return activeSession.anchorStepIndex;
+    const elapsedSteps = Math.ceil(
+      (audioTime - activeSession.anchorTime) / stepDurationSeconds,
+    );
+    return (activeSession.anchorStepIndex + elapsedSteps) % activeSession.stepCount;
+  }
+
+  function getPlayheadStep(audioTime) {
+    const activeSession = session;
+    if (status !== "playing" || !activeSession) return retainedStepIndex;
+    const resolvedAudioTime = audioTime ?? getAudioTime();
+    if (resolvedAudioTime <= activeSession.anchorTime) return activeSession.anchorStepIndex;
+    const elapsedSteps = Math.floor(
+      (resolvedAudioTime - activeSession.anchorTime) / stepDurationSeconds,
+    );
+    return (activeSession.anchorStepIndex + elapsedSteps) % activeSession.stepCount;
   }
 
   function scheduleStep(activeSession, stepIndex, startTime) {
     const note = getPatternState().steps[stepIndex];
     if (note === null) return;
     const config = getInstrumentConfig();
+    const duration = stepDurationSeconds * gateRatio;
     const voice = voiceEngine.trigger({
       type: config.voiceType,
       frequency: midiNoteToFrequency(note),
       startTime,
-      duration: stepDurationSeconds * gateRatio,
+      duration,
       attackSeconds: config.attackSeconds,
       releaseSeconds: config.releaseSeconds,
     });
-    activeSession.voices.set(stepIndex, voice);
+    activeSession.voices.set(nextVoiceId, {
+      voice,
+      endTime: startTime + duration + config.releaseSeconds + 0.01,
+    });
+    nextVoiceId += 1;
+  }
+
+  function failSession(activeSession, error) {
+    if (session !== activeSession) return;
+    clearSessionTimer(activeSession);
+    try {
+      releaseSessionVoices(activeSession, getAudioTime());
+    } catch {
+      activeSession.voices.clear();
+    }
+    session = null;
+    retainedStepIndex = 0;
+    status = "stopped";
+    emitState(error);
   }
 
   function tick(sessionId) {
@@ -94,76 +145,84 @@ export function createStepScheduler({
 
     try {
       const now = getAudioTime();
+      pruneFinishedVoices(activeSession, now);
 
-      while (
-        activeSession.nextStepIndex < activeSession.stepCount &&
-        activeSession.nextStepTime < now
-      ) {
-        activeSession.nextStepIndex += 1;
-        activeSession.nextStepTime += stepDurationSeconds;
+      if (activeSession.nextStepTime < now) {
+        const missedSteps = Math.ceil(
+          (now - activeSession.nextStepTime) / stepDurationSeconds,
+        );
+        activeSession.nextStepIndex =
+          (activeSession.nextStepIndex + missedSteps) % activeSession.stepCount;
+        activeSession.nextStepTime += missedSteps * stepDurationSeconds;
       }
 
       const horizon = now + lookAheadSeconds;
-      while (
-        activeSession.nextStepIndex < activeSession.stepCount &&
-        activeSession.nextStepTime <= horizon
-      ) {
-        scheduleStep(
-          activeSession,
-          activeSession.nextStepIndex,
-          activeSession.nextStepTime,
-        );
-        activeSession.nextStepIndex += 1;
+      while (activeSession.nextStepTime <= horizon) {
+        scheduleStep(activeSession, activeSession.nextStepIndex, activeSession.nextStepTime);
+        activeSession.nextStepIndex = (activeSession.nextStepIndex + 1) % activeSession.stepCount;
         activeSession.nextStepTime += stepDurationSeconds;
       }
-
-      if (
-        activeSession.nextStepIndex >= activeSession.stepCount &&
-        now >= activeSession.endTime
-      ) {
-        finishSession(activeSession);
-      }
     } catch (error) {
-      stopSession(activeSession, "error", error);
+      failSession(activeSession, error);
     }
   }
 
-  function playOnce() {
-    if (session) return false;
+  function play() {
+    if (status === "playing") return false;
     const { steps } = getPatternState();
     if (!Array.isArray(steps) || steps.length === 0) {
       throw new RangeError("A scheduled pattern must contain at least one step.");
     }
 
-    const startTime = getAudioTime() + startLeadSeconds;
+    const anchorTime = getAudioTime() + startLeadSeconds;
     const activeSession = {
+      anchorStepIndex: retainedStepIndex,
+      anchorTime,
       id: nextSessionId,
+      nextStepIndex: retainedStepIndex,
+      nextStepTime: anchorTime,
+      stepCount: steps.length,
       timer: null,
       voices: new Map(),
-      stepCount: steps.length,
-      nextStepIndex: 0,
-      nextStepTime: startTime,
-      endTime: startTime + steps.length * stepDurationSeconds,
     };
     nextSessionId += 1;
     session = activeSession;
+    status = "playing";
     activeSession.timer = setIntervalFn(
       () => tick(activeSession.id),
       schedulerIntervalMs,
     );
-    emitState("playing", activeSession.id);
+    emitState();
     tick(activeSession.id);
     return true;
   }
 
+  function pause() {
+    const activeSession = session;
+    if (status !== "playing" || !activeSession) return false;
+    const now = getAudioTime();
+    retainedStepIndex = getNextStepAtTime(activeSession, now);
+    endSession(activeSession, now);
+    status = "paused";
+    emitState();
+    return true;
+  }
+
   function stop() {
-    return session ? stopSession(session) : false;
+    if (status === "stopped") return false;
+    if (session) endSession(session, getAudioTime());
+    retainedStepIndex = 0;
+    status = "stopped";
+    emitState();
+    return true;
   }
 
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
-    getIsPlaying: () => session !== null,
-    playOnce,
+    getPlayheadStep,
+    getState,
+    pause,
+    play,
     removeEventListener: events.removeEventListener.bind(events),
     stop,
   });

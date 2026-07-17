@@ -8,7 +8,7 @@ import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS 
 import { createVoiceEngine } from "./voice-engine.js";
 
 const selectors = {
-  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternGrid: "#pattern-grid", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", playPatternOnce: "#play-pattern-once", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
+  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternGrid: "#pattern-grid", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 elements.actionLabel = document.querySelector("#audio-action span");
@@ -41,6 +41,7 @@ const stateContent = {
 
 let errorState = null;
 let timeFrame = null;
+let playheadFrame = null;
 
 function noteName(note) {
   const names = ["C", "C\u266F", "D", "D\u266F", "E", "F", "F\u266F", "G", "G\u266F", "A", "A\u266F", "B"];
@@ -126,10 +127,45 @@ function renderInstrument() {
   renderKeys();
 }
 
-function renderPatternPlayback() {
-  const playing = stepScheduler.getIsPlaying();
-  elements.playPatternOnce.disabled = !audioEngine.isReady() || playing;
-  elements.playPatternOnce.textContent = playing ? "Playing one pass..." : "Play pattern once";
+function renderPlayhead() {
+  const transport = stepScheduler.getState();
+  const stepIndex = stepScheduler.getPlayheadStep();
+  patternEditor.setPlayhead(stepIndex, transport.status);
+  const stepLabel = String(stepIndex + 1).padStart(2, "0");
+  elements.transportStatus.value = transport.status === "paused"
+    ? `Paused / Next step ${stepLabel}`
+    : `${transport.status === "playing" ? "Playing" : "Stopped"} / Step ${stepLabel}`;
+}
+
+function startPlayheadDisplay() {
+  if (playheadFrame !== null) return;
+  const update = () => {
+    if (stepScheduler.getState().status !== "playing") {
+      playheadFrame = null;
+      renderPlayhead();
+      return;
+    }
+    renderPlayhead();
+    playheadFrame = requestAnimationFrame(update);
+  };
+  playheadFrame = requestAnimationFrame(update);
+}
+
+function stopPlayheadDisplay() {
+  if (playheadFrame !== null) cancelAnimationFrame(playheadFrame);
+  playheadFrame = null;
+  renderPlayhead();
+}
+
+function renderPatternTransport() {
+  const { status } = stepScheduler.getState();
+  const playing = status === "playing";
+  elements.transportPlay.disabled = !audioEngine.isReady() || playing;
+  elements.transportPlay.textContent = status === "paused" ? "Resume" : "Play";
+  elements.transportPause.disabled = !playing;
+  elements.transportStop.disabled = status === "stopped";
+  if (playing) startPlayheadDisplay();
+  else stopPlayheadDisplay();
 }
 function render() {
   const state = audioEngine.getState();
@@ -147,7 +183,7 @@ function render() {
   elements.action.disabled = state === "running" || state === "closed";
   elements.stopSound.disabled = !ready;
   renderInstrument();
-  renderPatternPlayback();
+  renderPatternTransport();
   if (ready) startTimeDisplay();
   else { stopTimeDisplay(); elements.audioTime.textContent = "\u2014"; }
 }
@@ -170,11 +206,13 @@ elements.action.addEventListener("click", async () => {
   render();
 });
 
-elements.playPatternOnce.addEventListener("click", () => {
-  try { stepScheduler.playOnce(); }
-  catch (error) { console.error("Pattern preview could not start.", error); }
-  renderPatternPlayback();
+elements.transportPlay.addEventListener("click", () => {
+  try { stepScheduler.play(); }
+  catch (error) { console.error("Pattern playback could not start.", error); }
+  renderPatternTransport();
 });
+elements.transportPause.addEventListener("click", stepScheduler.pause);
+elements.transportStop.addEventListener("click", stepScheduler.stop);
 elements.stopSound.addEventListener("click", stopAllSound);
 elements.voiceType.addEventListener("change", () => { instrumentState.setVoiceType(elements.voiceType.value); elements.voiceType.blur(); });
 elements.octaveDown.addEventListener("click", () => instrumentState.setOctaveOffset(instrumentState.getState().octaveOffset - 1));
@@ -200,11 +238,17 @@ instrumentState.addEventListener("change", () => {
 document.addEventListener("keydown", inputController.handleKeyDown);
 document.addEventListener("keyup", inputController.handleKeyUp);
 window.addEventListener("keyup", inputController.handleKeyUp);
-document.addEventListener("visibilitychange", () => { if (document.hidden) stopAllSound(); });
-window.addEventListener("blur", stopAllSound);
-window.addEventListener("pagehide", () => { stopAllSound(); stopTimeDisplay(); });
+function pauseForInterruption() {
+  stepScheduler.pause();
+  inputController.stopAll();
+  voiceEngine.stopAll();
+}
+
+document.addEventListener("visibilitychange", () => { if (document.hidden) pauseForInterruption(); });
+window.addEventListener("blur", pauseForInterruption);
+window.addEventListener("pagehide", () => { pauseForInterruption(); stopTimeDisplay(); });
 audioEngine.addEventListener("statechange", () => { if (audioEngine.getState() === "running") errorState = null; render(); });
-stepScheduler.addEventListener("statechange", renderPatternPlayback);
+stepScheduler.addEventListener("statechange", renderPatternTransport);
 
 voiceEngine.setVolume(instrumentState.getState().volume);
 render();

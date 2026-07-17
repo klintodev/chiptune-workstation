@@ -10,6 +10,8 @@ export function createPatternEditor({
 }) {
   const stepElements = [];
   let selectedStepIndex = null;
+  let playheadStepIndex = 0;
+  let playbackStatus = "stopped";
 
   function getSelectedNote() {
     return (Number(octaveSelect.value) + 1) * 12 + Number(pitchSelect.value);
@@ -36,6 +38,14 @@ export function createPatternEditor({
     render();
   }
 
+  function setPlayhead(stepIndex, nextPlaybackStatus) {
+    if (!Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= PATTERN_STEP_COUNT) {
+      throw new RangeError(`Playhead step must be between 0 and ${PATTERN_STEP_COUNT - 1}.`);
+    }
+    playheadStepIndex = stepIndex;
+    playbackStatus = nextPlaybackStatus;
+    render();
+  }
   function createStep(index) {
     const container = document.createElement("div");
     const setButton = document.createElement("button");
@@ -79,12 +89,14 @@ export function createPatternEditor({
       const hasNote = note !== null;
       elements.container.classList.toggle("has-note", hasNote);
       elements.container.classList.toggle("selected", index === selectedStepIndex);
+      elements.container.classList.toggle("playhead", index === playheadStepIndex);
+      elements.container.classList.toggle("playhead-playing", index === playheadStepIndex && playbackStatus === "playing");
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
       elements.value.textContent = hasNote ? getNoteName(note) : "Rest";
       elements.clearButton.disabled = !hasNote;
       elements.setButton.setAttribute(
         "aria-label",
-        `Step ${index + 1}, ${hasNote ? getNoteName(note) : "rest"}. Set to ${selectedNoteName}.`,
+        `Step ${index + 1}, ${hasNote ? getNoteName(note) : "rest"}.${index === playheadStepIndex ? ` ${playbackStatus === "playing" ? "Playing now" : "Transport position"}.` : ""} Set to ${selectedNoteName}.`,
       );
     });
   }
@@ -108,5 +120,5 @@ export function createPatternEditor({
     patternState.removeEventListener("change", render);
   }
 
-  return Object.freeze({ dispose, render, setSelectedNote });
+  return Object.freeze({ dispose, render, setPlayhead, setSelectedNote });
 }
