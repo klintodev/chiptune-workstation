@@ -5,3 +5,5 @@ Epics translate product requirements into independently deliverable implementati
 - [PRD 01 — Playable Instrument](./prd-01-playable-instrument.md)
 - [PRD 02 - Single-Track Step Sequencer](./prd-02-single-track-step-sequencer.md)
 - [PRD 03 - Pattern Editing](./prd-03-pattern-editing.md)
+- [PRD 05 - Multi-Track Arrangement](./prd-05-multi-track-arrangement.md)
+- [PRD 06 - DAW Workspace Redesign](./prd-06-daw-workspace-redesign.md)

@@ -1,4 +1,7 @@
 export const DEFAULT_PATTERN_LENGTH = 16;
+export const DEFAULT_PATTERN_ROOT_OCTAVE = 4;
+export const MIN_PATTERN_ROOT_OCTAVE = 2;
+export const MAX_PATTERN_ROOT_OCTAVE = 6;
 export const SUPPORTED_PATTERN_LENGTHS = Object.freeze([4, 8, 16, 32]);
 export const MIN_PATTERN_NOTE = 36;
 export const MAX_PATTERN_NOTE = 112;
@@ -9,9 +12,7 @@ export const MAX_PATTERN_HISTORY = 100;
 
 function validateLength(length) {
   if (!SUPPORTED_PATTERN_LENGTHS.includes(length)) {
-    throw new RangeError(
-      `Pattern length must be one of: ${SUPPORTED_PATTERN_LENGTHS.join(", ")}.`,
-    );
+    throw new RangeError(`Pattern length must be one of: ${SUPPORTED_PATTERN_LENGTHS.join(", ")}.`);
   }
 }
 
@@ -23,17 +24,13 @@ function validateStepIndex(index, length) {
 
 function validateNote(note) {
   if (!Number.isInteger(note) || note < MIN_PATTERN_NOTE || note > MAX_PATTERN_NOTE) {
-    throw new RangeError(
-      `Pattern note must be an integer between ${MIN_PATTERN_NOTE} and ${MAX_PATTERN_NOTE}.`,
-    );
+    throw new RangeError(`Pattern note must be an integer between ${MIN_PATTERN_NOTE} and ${MAX_PATTERN_NOTE}.`);
   }
 }
 
 function validateGate(gate) {
   if (!SUPPORTED_PATTERN_GATES.includes(gate)) {
-    throw new RangeError(
-      `Pattern gate must be one of: ${SUPPORTED_PATTERN_GATES.join(", ")}.`,
-    );
+    throw new RangeError(`Pattern gate must be one of: ${SUPPORTED_PATTERN_GATES.join(", ")}.`);
   }
 }
 
@@ -75,16 +72,37 @@ function validateSemitoneDelta(semitones) {
   }
 }
 
+function stepsEqual(left, right) {
+  return left.length === right.length && left.every((step, index) => {
+    const candidate = right[index];
+    if (step === null || candidate === null) return step === candidate;
+    return step.note === candidate.note && step.gate === candidate.gate && step.volume === candidate.volume;
+  });
+}
+
 export function createPatternState(initialSteps, options = {}) {
   const events = new EventTarget();
-  const { projectState = null, trackId = "track-1" } = options;
+  const {
+    getPatternId = () => options.patternId ?? "pattern-1",
+    projectState = null,
+    sessionState = null,
+  } = options;
   const past = [];
   const future = [];
   let historyGroupActive = false;
   let groupedHistoryRecorded = false;
   let projectMutationActive = false;
+
+  function resolvePatternId() {
+    const requested = getPatternId();
+    if (!projectState) return requested;
+    const patterns = projectState.getState().patterns;
+    return patterns.some((pattern) => pattern.id === requested) ? requested : patterns[0].id;
+  }
+
+  let activePatternId = projectState ? resolvePatternId() : null;
   let steps = projectState
-    ? cloneSteps(projectState.getTrack(trackId).pattern.steps)
+    ? cloneSteps(projectState.getPattern(activePatternId).steps)
     : createInitialSteps(initialSteps);
 
   function getState() {
@@ -95,9 +113,8 @@ export function createPatternState(initialSteps, options = {}) {
       canRedo: history.canRedo,
       canUndo: history.canUndo,
       length: steps.length,
-      steps: Object.freeze(
-        steps.map((step) => step === null ? null : Object.freeze(cloneStep(step))),
-      ),
+      patternId: projectState ? resolvePatternId() : null,
+      steps: Object.freeze(steps.map((step) => step === null ? null : Object.freeze(cloneStep(step)))),
     });
   }
 
@@ -111,51 +128,45 @@ export function createPatternState(initialSteps, options = {}) {
   }
 
   function commit(nextSteps) {
-    if (!projectState) {
+    const normalized = cloneSteps(nextSteps);
+    if (projectState) {
+      const patternId = resolvePatternId();
+      projectMutationActive = true;
+      try {
+        projectState.updatePattern(
+          patternId,
+          (pattern) => ({ ...pattern, steps: cloneSteps(normalized) }),
+          { field: "pattern.steps" },
+        );
+        activePatternId = patternId;
+        steps = normalized;
+      } finally {
+        projectMutationActive = false;
+      }
+    } else {
       if (!historyGroupActive || !groupedHistoryRecorded) {
         retainPast(cloneSteps(steps));
         groupedHistoryRecorded = historyGroupActive;
       }
       future.length = 0;
+      steps = normalized;
     }
-    steps = cloneSteps(nextSteps);
-    persistSteps();
     emitChange();
     return true;
   }
 
-  function persistSteps() {
-    if (!projectState) return;
-    const nextSteps = cloneSteps(steps);
-    projectMutationActive = true;
-    try {
-      projectState.updateTrack(
-        trackId,
-        (track) => ({ ...track, pattern: { ...track.pattern, steps: nextSteps } }),
-        { field: "pattern.steps" },
-      );
-    } finally {
-      projectMutationActive = false;
-    }
-  }
-
   function beginHistoryGroup() {
-    if (projectState) {
-      projectState.beginHistoryGroup();
-      return;
-    }
+    if (projectState) return projectState.beginHistoryGroup();
     historyGroupActive = true;
     groupedHistoryRecorded = false;
   }
 
   function endHistoryGroup() {
-    if (projectState) {
-      projectState.endHistoryGroup();
-      return;
-    }
+    if (projectState) return projectState.endHistoryGroup();
     historyGroupActive = false;
     groupedHistoryRecorded = false;
   }
+
   function replaceStep(index, nextStep) {
     const nextSteps = cloneSteps(steps);
     nextSteps[index] = cloneStep(nextStep);
@@ -242,7 +253,6 @@ export function createPatternState(initialSteps, options = {}) {
     if (past.length === 0) return false;
     future.push(cloneSteps(steps));
     steps = cloneSteps(past.pop());
-    persistSteps();
     emitChange();
     return true;
   }
@@ -253,44 +263,55 @@ export function createPatternState(initialSteps, options = {}) {
     if (future.length === 0) return false;
     retainPast(cloneSteps(steps));
     steps = cloneSteps(future.pop());
-    persistSteps();
     emitChange();
     return true;
   }
 
-  function stepsEqual(left, right) {
-    return left.length === right.length && left.every((step, index) => {
-      const candidate = right[index];
-      if (step === null || candidate === null) return step === candidate;
-      return step.note === candidate.note && step.gate === candidate.gate && step.volume === candidate.volume;
-    });
+  function syncFromProject() {
+    if (!projectState) return false;
+    const nextPatternId = resolvePatternId();
+    const projectSteps = projectState.getPattern(nextPatternId).steps;
+    const changed = nextPatternId !== activePatternId || !stepsEqual(steps, projectSteps);
+    activePatternId = nextPatternId;
+    if (changed) steps = cloneSteps(projectSteps);
+    return changed;
   }
 
   function handleProjectChange() {
-    const projectSteps = projectState.getTrack(trackId).pattern.steps;
-    if (!stepsEqual(steps, projectSteps)) steps = cloneSteps(projectSteps);
+    syncFromProject();
     if (!projectMutationActive) emitChange();
   }
 
+  function handleSessionChange(event) {
+    if (event.detail.slice !== "workspace") return;
+    if (syncFromProject()) emitChange();
+  }
+
   projectState?.addEventListener("change", handleProjectChange);
+  sessionState?.addEventListener("change", handleSessionChange);
+
+  function dispose() {
+    projectState?.removeEventListener("change", handleProjectChange);
+    sessionState?.removeEventListener("change", handleSessionChange);
+  }
 
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
-    dispose: () => projectState?.removeEventListener("change", handleProjectChange),
     beginHistoryGroup,
     canDuplicate,
     canTranspose,
     clearPattern,
     clearStep,
+    dispose,
     duplicate,
     endHistoryGroup,
     getState,
     redo,
     removeEventListener: events.removeEventListener.bind(events),
-    setVolume,
     setGate,
     setLength,
     setStep,
+    setVolume,
     transpose,
     undo,
   });

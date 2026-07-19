@@ -1,27 +1,34 @@
 .keyboard-section {
-  border: 1px solid var(--line);
-  border-top: 0;
-  padding: clamp(24px, 4vw, 48px);
+  min-width: 0;
+  padding: 12px 16px 16px;
   background: var(--black);
 }
 
 .keyboard-heading {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  max-width: 816px;
+  margin-bottom: 10px;
+}
+
+.keyboard-heading h2 {
+  margin: 0;
 }
 
 .keyboard-heading p {
-  max-width: 60ch;
-  margin-bottom: 0;
+  margin: 0;
   color: var(--muted);
 }
 
+.keyboard-heading p:last-child {
+  display: none;
+}
+
 .panic-button {
-  min-height: 44px;
-  padding: 8px 14px;
+  min-height: 34px;
+  padding: 6px 12px;
   border: 1px solid var(--orange);
   color: var(--orange);
   background: transparent;
@@ -29,33 +36,65 @@
   font: inherit;
 }
 
-.keyboard-manual + .keyboard-manual {
-  margin-top: 16px;
+.panic-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
-.key-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 6px;
+.keyboard-keybed {
+  --white-key-width: 48px;
+  --white-key-height: 132px;
+  --black-key-width: 30px;
+  --black-key-height: 78px;
+  width: 816px;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+}
+
+.keyboard-keybed-surface {
+  position: relative;
+  width: max-content;
+  height: var(--white-key-height);
+}
+
+.keyboard-white-keys {
+  display: grid;
+  width: max-content;
+  height: var(--white-key-height);
+  grid-template-columns: repeat(var(--white-key-count), var(--white-key-width));
 }
 
 .music-key {
   display: grid;
-  place-items: center;
-  min-width: 48px;
-  min-height: 58px;
-  padding: 6px;
+  align-content: end;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 3px;
   border: 1px solid var(--line);
-  color: var(--black);
-  background: var(--ink);
+  border-radius: 0 0 3px 3px;
   cursor: pointer;
   font: inherit;
   touch-action: none;
   user-select: none;
 }
 
+.music-key.white {
+  z-index: 1;
+  width: var(--white-key-width);
+  height: var(--white-key-height);
+  color: var(--black);
+  background: var(--ink);
+}
+
 .music-key.black {
-  min-height: 44px;
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  width: var(--black-key-width);
+  height: var(--black-key-height);
+  transform: translateX(-50%);
   color: var(--ink);
   background: var(--panel-raised);
 }
@@ -68,23 +107,36 @@
   opacity: 0.65;
 }
 
-.music-key.active {
+.music-key:hover:not(:disabled) {
+  border-color: var(--acid);
+}
+
+.music-key.active,
+.music-key.black.active {
   border-color: var(--acid);
   color: var(--black);
   background: var(--acid);
 }
 
-.music-key.black.active {
-  color: var(--black);
+.music-key:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 @media (max-width: 760px) {
-  .keyboard-heading {
-    align-items: stretch;
-    flex-direction: column;
+  .keyboard-section {
+    padding-inline: 12px;
   }
 
-  .keyboard-manual {
-    overflow-x: auto;
+  .keyboard-heading {
+    align-items: flex-start;
+  }
+
+  .keyboard-keybed {
+    --white-key-width: 44px;
+    --white-key-height: 116px;
+    --black-key-width: 28px;
+    --black-key-height: 70px;
+    width: 100%;
   }
 }

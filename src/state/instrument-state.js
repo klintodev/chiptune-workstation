@@ -26,16 +26,35 @@ function validateValue(key, value) {
   }
 }
 
+function configsEqual(left, right) {
+  return Object.keys(DEFAULTS).every((key) => left[key] === right[key]);
+}
+
 export function createInstrumentState(initial = {}, options = {}) {
   const events = new EventTarget();
-  const { projectState = null, trackId = "track-1" } = options;
+  const {
+    getTrackId = () => options.trackId ?? "track-1",
+    projectState = null,
+    sessionState = null,
+  } = options;
   let localState = projectState ? null : { ...DEFAULTS, ...initial };
-  let previousProjectConfig = projectState ? getState() : null;
+
+  function resolveTrackId() {
+    const requested = getTrackId();
+    if (!projectState) return requested;
+    const tracks = projectState.getState().tracks;
+    return tracks.some((track) => track.id === requested) ? requested : tracks[0].id;
+  }
 
   function getState() {
-    const state = projectState ? projectState.getTrack(trackId).instrument : localState;
+    const state = projectState
+      ? projectState.getTrack(resolveTrackId()).instrument
+      : localState;
     return Object.freeze({ ...state });
   }
+
+  let previousTrackId = resolveTrackId();
+  let previousConfig = getState();
 
   function emitChange() {
     events.dispatchEvent(new CustomEvent("change", { detail: getState() }));
@@ -47,6 +66,7 @@ export function createInstrumentState(initial = {}, options = {}) {
     if (state[key] === value) return false;
 
     if (projectState) {
+      const trackId = resolveTrackId();
       projectState.updateTrack(
         trackId,
         (track) => ({ ...track, instrument: { ...track.instrument, [key]: value } }),
@@ -54,13 +74,16 @@ export function createInstrumentState(initial = {}, options = {}) {
       );
     } else {
       localState = { ...localState, [key]: value };
+      previousConfig = getState();
+      emitChange();
     }
-    if (!projectState) emitChange();
     return true;
   }
 
   function reset() {
+    if (configsEqual(getState(), DEFAULTS)) return false;
     if (projectState) {
+      const trackId = resolveTrackId();
       projectState.updateTrack(
         trackId,
         (track) => ({ ...track, instrument: { ...DEFAULTS } }),
@@ -68,24 +91,41 @@ export function createInstrumentState(initial = {}, options = {}) {
       );
     } else {
       localState = { ...DEFAULTS };
+      previousConfig = getState();
+      emitChange();
     }
-    if (!projectState) emitChange();
+    return true;
+  }
+
+  function syncAndEmit() {
+    const trackId = resolveTrackId();
+    const config = getState();
+    if (trackId === previousTrackId && configsEqual(config, previousConfig)) return false;
+    previousTrackId = trackId;
+    previousConfig = config;
+    emitChange();
     return true;
   }
 
   function handleProjectChange() {
-    const config = getState();
-    const changed = Object.keys(config).some((key) => config[key] !== previousProjectConfig[key]);
-    if (!changed) return;
-    previousProjectConfig = config;
-    emitChange();
+    syncAndEmit();
+  }
+
+  function handleSessionChange(event) {
+    if (event.detail.slice === "workspace") syncAndEmit();
   }
 
   projectState?.addEventListener("change", handleProjectChange);
+  sessionState?.addEventListener("change", handleSessionChange);
+
+  function dispose() {
+    projectState?.removeEventListener("change", handleProjectChange);
+    sessionState?.removeEventListener("change", handleSessionChange);
+  }
 
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
-    dispose: () => projectState?.removeEventListener("change", handleProjectChange),
+    dispose,
     getState,
     removeEventListener: events.removeEventListener.bind(events),
     reset,

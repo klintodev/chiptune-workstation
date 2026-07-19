@@ -3,6 +3,15 @@ const DEFAULT_SESSION = Object.freeze({
   audio: Object.freeze({ error: null, status: "idle" }),
   editor: Object.freeze({ clearPatternArmed: false, selectedStepIndex: null }),
   transport: Object.freeze({ retainedStepIndex: 0, status: "stopped" }),
+  workspace: Object.freeze({
+    activeDockPanel: "sequencer",
+    arrangementStartStep: 0,
+    detailPanelCollapsed: false,
+    playbackMode: "arrangement",
+    selectedClipId: null,
+    selectedPatternId: "pattern-1",
+    selectedTrackId: "track-1",
+  }),
 });
 
 function freezeSession(session) {
@@ -10,6 +19,7 @@ function freezeSession(session) {
   Object.freeze(session.audio);
   Object.freeze(session.editor);
   Object.freeze(session.transport);
+  Object.freeze(session.workspace);
   return Object.freeze(session);
 }
 
@@ -20,15 +30,29 @@ function normalizeSession(session) {
     audio: { ...session.audio },
     editor: { ...session.editor },
     transport: { ...session.transport },
+    workspace: { ...session.workspace },
   });
 }
 
 export function createSessionState(initial = DEFAULT_SESSION) {
   const events = new EventTarget();
-  let state = normalizeSession(initial);
+  let state = normalizeSession({
+    ...DEFAULT_SESSION,
+    ...initial,
+    audio: { ...DEFAULT_SESSION.audio, ...initial.audio },
+    editor: { ...DEFAULT_SESSION.editor, ...initial.editor },
+    transport: { ...DEFAULT_SESSION.transport, ...initial.transport },
+    workspace: { ...DEFAULT_SESSION.workspace, ...initial.workspace },
+  });
 
   function getState() {
     return state;
+  }
+
+  function emitChange(slice) {
+    events.dispatchEvent(new CustomEvent("change", {
+      detail: Object.freeze({ slice, state }),
+    }));
   }
 
   function update(slice, values) {
@@ -36,9 +60,7 @@ export function createSessionState(initial = DEFAULT_SESSION) {
     const changed = Object.entries(values).some(([key, value]) => state[slice][key] !== value);
     if (!changed) return false;
     state = normalizeSession({ ...state, [slice]: nextSlice });
-    events.dispatchEvent(new CustomEvent("change", {
-      detail: Object.freeze({ slice, state }),
-    }));
+    emitChange(slice);
     return true;
   }
 
@@ -49,9 +71,7 @@ export function createSessionState(initial = DEFAULT_SESSION) {
       nextNotes.every((note, index) => note === state.activeNotes[index])
     ) return false;
     state = normalizeSession({ ...state, activeNotes: nextNotes });
-    events.dispatchEvent(new CustomEvent("change", {
-      detail: Object.freeze({ slice: "activeNotes", state }),
-    }));
+    emitChange("activeNotes");
     return true;
   }
 
@@ -63,5 +83,6 @@ export function createSessionState(initial = DEFAULT_SESSION) {
     setAudio: (values) => update("audio", values),
     setEditor: (values) => update("editor", values),
     setTransport: (values) => update("transport", values),
+    setWorkspace: (values) => update("workspace", values),
   });
 }

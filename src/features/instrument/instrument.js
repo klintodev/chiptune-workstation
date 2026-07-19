@@ -1,10 +1,12 @@
 import { queryRequired } from "../../shared/query-required.js";
+
 export function createInstrumentFeature({
+  getTrackName = () => "Selected track",
   inputController,
   instrumentState,
   onRenderKeyboard,
+  projectState,
   root = document,
-  voiceEngine,
 }) {
   const lifecycle = new AbortController();
   const elements = {
@@ -16,6 +18,7 @@ export function createInstrumentFeature({
     release: queryRequired(root, "#release"),
     releaseValue: queryRequired(root, "#release-value"),
     reset: queryRequired(root, "#reset-instrument"),
+    trackName: queryRequired(root, "#instrument-track-name"),
     voiceType: queryRequired(root, "#voice-type"),
     volume: queryRequired(root, "#volume"),
     volumeValue: queryRequired(root, "#volume-value"),
@@ -23,10 +26,9 @@ export function createInstrumentFeature({
 
   function render() {
     const config = instrumentState.getState();
+    elements.trackName.textContent = getTrackName();
     elements.voiceType.value = config.voiceType;
-    elements.octaveValue.textContent = config.octaveOffset > 0
-      ? `+${config.octaveOffset}`
-      : String(config.octaveOffset);
+    elements.octaveValue.textContent = config.octaveOffset > 0 ? `+${config.octaveOffset}` : String(config.octaveOffset);
     elements.octaveDown.disabled = config.octaveOffset <= -2;
     elements.octaveUp.disabled = config.octaveOffset >= 2;
     elements.volume.value = String(config.volume * 100);
@@ -59,23 +61,26 @@ export function createInstrumentFeature({
   }, { signal: lifecycle.signal });
   elements.reset.addEventListener("click", instrumentState.reset, { signal: lifecycle.signal });
 
+  const groupedInputs = [elements.volume, elements.attack, elements.release];
+  const beginGroup = () => projectState?.beginHistoryGroup();
+  const endGroup = () => projectState?.endHistoryGroup();
+  for (const input of groupedInputs) {
+    input.addEventListener("pointerdown", beginGroup, { signal: lifecycle.signal });
+    input.addEventListener("pointerup", endGroup, { signal: lifecycle.signal });
+    input.addEventListener("pointercancel", endGroup, { signal: lifecycle.signal });
+    input.addEventListener("change", endGroup, { signal: lifecycle.signal });
+  }
+
   let previousConfig = instrumentState.getState();
   const handleStateChange = () => {
     const config = instrumentState.getState();
-    voiceEngine.setVolume(config.volume);
-    if (
-      config.voiceType !== previousConfig.voiceType ||
-      config.octaveOffset !== previousConfig.octaveOffset
-    ) inputController.refreshActiveVoices();
+    if (config.voiceType !== previousConfig.voiceType || config.octaveOffset !== previousConfig.octaveOffset) {
+      inputController.refreshActiveVoices();
+    }
     previousConfig = config;
     render();
   };
   instrumentState.addEventListener("change", handleStateChange, { signal: lifecycle.signal });
 
-  voiceEngine.setVolume(instrumentState.getState().volume);
-
-  return Object.freeze({
-    dispose: () => lifecycle.abort(),
-    render,
-  });
+  return Object.freeze({ dispose: () => lifecycle.abort(), render });
 }

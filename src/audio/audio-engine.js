@@ -1,4 +1,5 @@
-const DEFAULT_MASTER_GAIN = 0.35;
+export const DEFAULT_MASTER_GAIN = 0.35;
+const MASTER_RAMP_SECONDS = 0.015;
 
 export function createAudioEngineError(code, message, cause) {
   const error = new Error(message, { cause });
@@ -15,6 +16,7 @@ export function createAudioEngine() {
   const events = new EventTarget();
   let context = null;
   let masterGain = null;
+  let masterVolume = DEFAULT_MASTER_GAIN;
   let initialization = null;
   let disposed = false;
 
@@ -28,11 +30,9 @@ export function createAudioEngine() {
   }
 
   function emitState() {
-    events.dispatchEvent(
-      new CustomEvent("statechange", {
-        detail: { state: getState(), sampleRate: context?.sampleRate ?? null },
-      }),
-    );
+    events.dispatchEvent(new CustomEvent("statechange", {
+      detail: { state: getState(), sampleRate: context?.sampleRate ?? null },
+    }));
   }
 
   function requireReady() {
@@ -46,7 +46,6 @@ export function createAudioEngine() {
 
   async function enableOnce() {
     const Context = globalThis.AudioContext ?? globalThis.webkitAudioContext;
-
     if (!Context) {
       throw createAudioEngineError(
         "unsupported",
@@ -59,24 +58,20 @@ export function createAudioEngine() {
         context = new Context();
         context.addEventListener("statechange", emitState);
         masterGain = context.createGain();
-        masterGain.gain.setValueAtTime(DEFAULT_MASTER_GAIN, context.currentTime);
+        masterGain.gain.setValueAtTime(masterVolume, context.currentTime);
         masterGain.connect(context.destination);
       }
-
       if (context.state === "suspended") await context.resume();
-
       if (context.state !== "running") {
         throw createAudioEngineError(
           "blocked",
           "Audio is still paused by the browser. Select Enable audio again to retry.",
         );
       }
-
       emitState();
     } catch (error) {
       emitState();
       if (isAudioEngineError(error)) throw error;
-
       throw createAudioEngineError(
         "initialization-failed",
         "The browser could not start audio. Check the site's sound permissions and try again.",
@@ -92,10 +87,8 @@ export function createAudioEngine() {
         "The audio engine has been closed. Reload the page to start a new session.",
       );
     }
-
     if (initialization) return initialization;
     initialization = enableOnce();
-
     try {
       await initialization;
     } finally {
@@ -118,17 +111,29 @@ export function createAudioEngine() {
     return context.currentTime;
   }
 
+  function setMasterVolume(nextVolume) {
+    if (!Number.isFinite(nextVolume) || nextVolume < 0 || nextVolume > 1) {
+      throw new RangeError("Master volume must be between zero and one.");
+    }
+    if (masterVolume === nextVolume) return false;
+    masterVolume = nextVolume;
+    if (masterGain) {
+      const now = masterGain.context.currentTime;
+      masterGain.gain.cancelScheduledValues(now);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+      masterGain.gain.linearRampToValueAtTime(masterVolume, now + MASTER_RAMP_SECONDS);
+    }
+    return true;
+  }
 
   async function dispose() {
     if (disposed) return;
     disposed = true;
     const contextToClose = context;
-
     contextToClose?.removeEventListener("statechange", emitState);
     masterGain?.disconnect();
     masterGain = null;
     context = null;
-
     if (contextToClose && contextToClose.state !== "closed") {
       try {
         await contextToClose.close();
@@ -141,15 +146,17 @@ export function createAudioEngine() {
 
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
-    removeEventListener: events.removeEventListener.bind(events),
-    enable,
     dispose,
+    enable,
     getCurrentTime,
     getInputNode,
+    getMasterVolume: () => masterVolume,
     getObservationNode: getInputNode,
     getSampleRate: () => context?.sampleRate ?? null,
     getState,
     isReady,
+    removeEventListener: events.removeEventListener.bind(events),
+    setMasterVolume,
   });
 }
 

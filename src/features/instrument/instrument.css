@@ -1,63 +1,117 @@
 .voice-lab {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border: 1px solid var(--line);
-  border-top: 0;
-  background: var(--panel);
-}
-
-.voice-lab > div {
-  display: grid;
-  align-content: center;
-  gap: 12px;
-  padding: clamp(24px, 4vw, 48px);
-}
-
-.voice-lab > div:first-child {
-  border-right: 1px solid var(--line);
-}
-
-.voice-lab p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.voice-controls label {
-  display: grid;
-  gap: 6px;
-}
-
-.voice-controls select,
-.voice-controls button {
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  color: var(--ink);
+  overflow: hidden;
+  padding: 10px 14px 14px;
   background: var(--black);
-  font: inherit;
 }
 
-.voice-controls button:not(:disabled) {
-  cursor: pointer;
+.device-rack-header {
+  display: flex;
+  align-items: baseline;
+  height: 34px;
+  gap: 10px;
 }
 
-.voice-controls button:hover:not(:disabled) {
-  border-color: var(--acid);
+.device-rack-header h2 {
+  margin: 0;
+  font-size: 1rem;
 }
 
-#active-voices {
+.device-rack-header strong {
   color: var(--acid);
 }
 
-@media (max-width: 760px) {
-  .voice-lab {
-    grid-template-columns: 1fr;
-  }
-
-  .voice-lab > div:first-child {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
+.device-rack {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: max-content;
+  max-width: 100%;
 }
 
+.device {
+  min-width: 0;
+  height: 176px;
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.device legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.device label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 8px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.device label + label {
+  margin-top: 14px;
+}
+
+.device select,
+.device button {
+  min-height: 32px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--black);
+}
+
+.device select,
+.device label input {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.device output {
+  color: var(--acid);
+}
+
+.device-oscillator {
+  width: 230px;
+}
+
+.device-envelope {
+  width: 380px;
+}
+
+.device-output {
+  display: grid;
+  width: 250px;
+  align-content: start;
+  gap: 18px;
+}
+
+.octave-control {
+  display: grid;
+  grid-template-columns: 1fr 32px 34px 32px;
+  align-items: center;
+  gap: 4px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.octave-control strong {
+  color: var(--ink);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .voice-lab {
+    overflow-x: auto;
+  }
+
+  .device-rack {
+    min-width: 760px;
+  }
+}

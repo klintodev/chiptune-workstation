@@ -1,5 +1,5 @@
-import { KEY_BY_CODE } from "./keyboard-layout.js";
 import { midiNoteToFrequency } from "../../audio/voice-engine.js";
+import { KEY_BY_CODE } from "./keyboard-layout.js";
 
 function isTextEntry(target) {
   if (!(target instanceof Element)) return false;
@@ -13,7 +13,16 @@ function releaseControlFocus(target) {
   if (target instanceof HTMLInputElement && target.type === "range") target.blur();
 }
 
-export function createInputController({ voiceEngine, getInstrumentConfig, onActiveNotesChange, onNoteStart, root = document }) {
+export function createInputController({
+  getInstrumentConfig,
+  getKeyboardNoteOffset = () => 0,
+  getVoiceEngine,
+  onActiveNotesChange,
+  onNoteStart,
+  root = document,
+  voiceEngine,
+}) {
+  const resolveVoiceEngine = getVoiceEngine ?? (() => voiceEngine);
   const voicesByOwner = new Map();
   const ownersByNote = new Map();
 
@@ -23,14 +32,16 @@ export function createInputController({ voiceEngine, getInstrumentConfig, onActi
 
   function createVoice(baseNote) {
     const config = getInstrumentConfig();
-    const playedNote = baseNote + config.octaveOffset * 12;
-    const voice = voiceEngine.trigger({
+    const patternNote = baseNote + getKeyboardNoteOffset() * 12;
+    const playedNote = patternNote + config.octaveOffset * 12;
+    const activeVoiceEngine = resolveVoiceEngine();
+    const voice = activeVoiceEngine.trigger({
       type: config.voiceType,
       frequency: midiNoteToFrequency(playedNote),
       attackSeconds: config.attackSeconds,
       releaseSeconds: config.releaseSeconds,
     });
-    return { playedNote, voice };
+    return { patternNote, voice };
   }
 
   function start(owner, baseNote) {
@@ -47,7 +58,7 @@ export function createInputController({ voiceEngine, getInstrumentConfig, onActi
     owners.add(owner);
     ownersByNote.set(baseNote, owners);
     emitActiveNotes();
-    onNoteStart?.(started.playedNote);
+    onNoteStart?.(started.patternNote);
     return true;
   }
 

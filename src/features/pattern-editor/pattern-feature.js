@@ -3,13 +3,14 @@ import { createPatternEditor } from "./pattern-editor.js";
 import { createPatternHistoryShortcut } from "./pattern-shortcuts.js";
 
 export function createPatternFeature({
-  audioEngine,
   getNoteName,
+  isNoiseTrack = () => false,
   notePreview,
+  onError = () => {},
+  onStructuralEdit = () => {},
   patternState,
   projectState,
   root = document,
-  scheduler,
   sessionState,
 }) {
   const lifecycle = new AbortController();
@@ -19,23 +20,22 @@ export function createPatternFeature({
     grid: queryRequired(root, "#pattern-grid"),
     length: queryRequired(root, "#pattern-length"),
     octave: queryRequired(root, "#pattern-octave"),
-    pause: queryRequired(root, "#transport-pause"),
     pitch: queryRequired(root, "#pattern-pitch"),
-    play: queryRequired(root, "#transport-play"),
     preview: queryRequired(root, "#pattern-preview"),
     redo: queryRequired(root, "#pattern-redo"),
     selectedNote: queryRequired(root, "#selected-pattern-note"),
-    status: queryRequired(root, "#transport-status"),
-    stop: queryRequired(root, "#transport-stop"),
-    tempo: queryRequired(root, "#tempo"),
-    tempoValue: queryRequired(root, "#tempo-value"),
+    stepClear: queryRequired(root, "#selected-step-clear"),
+    stepGate: queryRequired(root, "#selected-step-gate"),
+    stepNumber: queryRequired(root, "#selected-step-number"),
+    stepSummary: queryRequired(root, "#selected-step-summary"),
+    stepVolume: queryRequired(root, "#selected-step-volume"),
+    stepVolumeValue: queryRequired(root, "#selected-step-volume-value"),
     transposeDown: queryRequired(root, "#transpose-down"),
     transposeOctaveDown: queryRequired(root, "#transpose-octave-down"),
     transposeOctaveUp: queryRequired(root, "#transpose-octave-up"),
     transposeUp: queryRequired(root, "#transpose-up"),
     undo: queryRequired(root, "#pattern-undo"),
   };
-  let playheadFrame = null;
 
   function renderLength() {
     elements.length.value = String(patternState.getState().length);
@@ -62,71 +62,40 @@ export function createPatternFeature({
   }
 
   const editor = createPatternEditor({
-    patternState,
-    grid: elements.grid,
-    pitchSelect: elements.pitch,
-    octaveSelect: elements.octave,
-    previewInput: elements.preview,
-    selectedNoteOutput: elements.selectedNote,
+    clearButton: elements.stepClear,
+    gateControl: elements.stepGate,
     getNoteName,
-    previewNote: notePreview.play,
+    grid: elements.grid,
+    isNoiseTrack,
+    octaveSelect: elements.octave,
     onEditAction: disarmClear,
+    patternState,
+    pitchSelect: elements.pitch,
+    previewInput: elements.preview,
+    previewNote: notePreview.play,
+    selectedNoteOutput: elements.selectedNote,
+    stepNumberOutput: elements.stepNumber,
+    stepSummaryOutput: elements.stepSummary,
+    volumeInput: elements.stepVolume,
+    volumeOutput: elements.stepVolumeValue,
   });
 
-  function renderPlayhead() {
-    const transport = scheduler.getState();
-    const stepIndex = scheduler.getPlayheadStep();
-    editor.setPlayhead(stepIndex, transport.status);
-    const stepLabel = String(stepIndex + 1).padStart(2, "0");
-    elements.status.value = transport.status === "paused"
-      ? `Paused / Next step ${stepLabel}`
-      : `${transport.status === "playing" ? "Playing" : "Stopped"} / Step ${stepLabel}`;
-  }
-
-  function startPlayheadDisplay() {
-    if (playheadFrame !== null) return;
-    const update = () => {
-      if (scheduler.getState().status !== "playing") {
-        playheadFrame = null;
-        renderPlayhead();
-        return;
-      }
-      renderPlayhead();
-      playheadFrame = requestAnimationFrame(update);
-    };
-    playheadFrame = requestAnimationFrame(update);
-  }
-
-  function stopPlayheadDisplay() {
-    if (playheadFrame !== null) cancelAnimationFrame(playheadFrame);
-    playheadFrame = null;
-    renderPlayhead();
-  }
-
-  function renderTransport() {
-    const { bpm, status } = scheduler.getState();
-    const playing = status === "playing";
-    elements.tempo.value = String(bpm);
-    elements.tempoValue.value = `${bpm} BPM`;
-    elements.play.disabled = !audioEngine.isReady() || playing;
-    elements.play.textContent = status === "paused" ? "Resume" : "Play";
-    elements.pause.disabled = !playing;
-    elements.stop.disabled = status === "stopped";
-    if (playing) startPlayheadDisplay();
-    else stopPlayheadDisplay();
-  }
-
-  function render() {
-    renderLength();
-    renderActions();
-    renderTransport();
+  function runAction(action, { structural = false } = {}) {
+    disarmClear();
+    if (structural) onStructuralEdit();
+    try {
+      onError("");
+      return action();
+    } catch (error) {
+      onError(error.message);
+      renderLength();
+      return false;
+    }
   }
 
   function restoreHistory(action, available) {
-    disarmClear();
     if (!available()) return false;
-    scheduler.stop();
-    return action();
+    return runAction(action, { structural: true });
   }
 
   const historyShortcut = createPatternHistoryShortcut({
@@ -135,9 +104,7 @@ export function createPatternFeature({
   });
 
   elements.length.addEventListener("change", () => {
-    disarmClear();
-    scheduler.stop();
-    patternState.setLength(Number(elements.length.value));
+    runAction(() => patternState.setLength(Number(elements.length.value)), { structural: true });
     elements.length.blur();
     renderLength();
   }, { signal: lifecycle.signal });
@@ -148,10 +115,7 @@ export function createPatternFeature({
     restoreHistory(patternState.redo, () => patternState.getState().canRedo);
   }, { signal: lifecycle.signal });
   elements.duplicate.addEventListener("click", () => {
-    disarmClear();
-    if (!patternState.canDuplicate()) return;
-    scheduler.stop();
-    patternState.duplicate();
+    if (patternState.canDuplicate()) runAction(patternState.duplicate, { structural: true });
   }, { signal: lifecycle.signal });
   elements.clear.addEventListener("click", () => {
     if (!sessionState.getState().editor.clearPatternArmed) {
@@ -160,33 +124,14 @@ export function createPatternFeature({
       return;
     }
     sessionState.setEditor({ clearPatternArmed: false });
-    patternState.clearPattern();
-    renderActions();
+    runAction(patternState.clearPattern);
   }, { signal: lifecycle.signal });
 
-  const transpose = (semitones) => {
-    disarmClear();
-    patternState.transpose(semitones);
-  };
+  const transpose = (semitones) => runAction(() => patternState.transpose(semitones));
   elements.transposeOctaveDown.addEventListener("click", () => transpose(-12), { signal: lifecycle.signal });
   elements.transposeDown.addEventListener("click", () => transpose(-1), { signal: lifecycle.signal });
   elements.transposeUp.addEventListener("click", () => transpose(1), { signal: lifecycle.signal });
   elements.transposeOctaveUp.addEventListener("click", () => transpose(12), { signal: lifecycle.signal });
-  elements.play.addEventListener("click", () => {
-    try {
-      scheduler.play();
-    } catch (error) {
-      console.error("Pattern playback could not start.", error);
-    }
-    renderTransport();
-  }, { signal: lifecycle.signal });
-  elements.pause.addEventListener("click", scheduler.pause, { signal: lifecycle.signal });
-  elements.stop.addEventListener("click", scheduler.stop, { signal: lifecycle.signal });
-  elements.tempo.addEventListener("input", () => {
-    const bpm = Number(elements.tempo.value);
-    projectState.setBpm(bpm);
-    scheduler.setBpm(bpm);
-  }, { signal: lifecycle.signal });
 
   root.addEventListener("keydown", historyShortcut, { capture: true, signal: lifecycle.signal });
   patternState.addEventListener("change", () => {
@@ -194,20 +139,17 @@ export function createPatternFeature({
     renderLength();
     renderActions();
   }, { signal: lifecycle.signal });
-  scheduler.addEventListener("statechange", () => {
-    const transport = scheduler.getState();
-    sessionState.setTransport({
-      retainedStepIndex: transport.retainedStepIndex,
-      status: transport.status,
-    });
-    renderTransport();
-  }, { signal: lifecycle.signal });
+
+  function render() {
+    renderLength();
+    renderActions();
+    editor.render();
+  }
 
   return Object.freeze({
     dispose() {
       lifecycle.abort();
       editor.dispose();
-      stopPlayheadDisplay();
     },
     render,
     setSelectedNote: editor.setSelectedNote,

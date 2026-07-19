@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createVoiceEngine } from "../src/audio/voice-engine.js";
 
-function createAudioHarness() {
+function createAudioHarness({ maxVoices = Infinity } = {}) {
   let now = 0;
   const gainNodes = [];
   const sources = [];
@@ -44,6 +44,7 @@ function createAudioHarness() {
   const voiceEngine = createVoiceEngine({
     getAudioTime: () => now,
     getOutputNode: () => output,
+    maxVoices,
   });
 
   return {
@@ -70,4 +71,19 @@ test("releasing during attack begins from the reached gain instead of peak volum
   assert.ok(heldGainEvent[1] < 1);
   assert.deepEqual(voiceGainEvents.at(-1), ["exponential", 0.0001, 0.75]);
   assert.equal(harness.sources[0].stopTime, 0.76);
+});
+
+test("the oldest voice is retired when the per-track limit is reached", () => {
+  const harness = createAudioHarness({ maxVoices: 2 });
+
+  harness.voiceEngine.trigger();
+  harness.setTime(0.1);
+  harness.voiceEngine.trigger();
+  harness.setTime(0.2);
+  harness.voiceEngine.trigger();
+
+  assert.equal(harness.voiceEngine.getActiveVoiceCount(), 2);
+  assert.equal(harness.sources[0].stopTime, 0.2);
+  assert.equal(harness.sources[1].stopTime, undefined);
+  assert.equal(harness.sources[2].stopTime, undefined);
 });

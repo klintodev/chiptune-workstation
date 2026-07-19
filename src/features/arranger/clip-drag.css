@@ -1,0 +1,83 @@
+.arrangement-clip {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.arrangement-clip:active {
+  cursor: grabbing;
+}
+
+.arrangement-clip.drag-source {
+  opacity: 0.25;
+}
+
+.arrangement-clip-drag-ghost {
+  position: fixed;
+  z-index: 200;
+  margin: 0;
+  pointer-events: none;
+  cursor: grabbing;
+  opacity: 0.92;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(216, 255, 62, 0.2);
+}
+
+.arrangement-clip-drag-ghost.invalid-drop {
+  border-color: var(--red);
+  color: var(--ink);
+  background: #381814;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(255, 77, 77, 0.28);
+}
+
+.track-lane.drag-target {
+  box-shadow: inset 0 0 0 2px var(--acid);
+}
+
+.track-lane.drag-target.invalid-drop {
+  box-shadow: inset 0 0 0 2px var(--red);
+  cursor: not-allowed;
+}
+.arrangement-clip {
+  padding-right: 30px;
+}
+
+.arrangement-clip > .arrangement-clip-remove {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  right: 4px;
+  display: inline-grid;
+  box-sizing: border-box;
+  width: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  height: 18px;
+  min-height: 0;
+  max-height: 18px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(10, 12, 8, 0.82);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  touch-action: manipulation;
+}
+
+.arrangement-clip > .arrangement-clip-remove:hover,
+.arrangement-clip > .arrangement-clip-remove:focus-visible {
+  border-color: var(--red);
+  color: var(--ink);
+  background: var(--red);
+}
+
+.arrangement-clip.selected > .arrangement-clip-remove {
+  border-color: rgba(10, 12, 8, 0.4);
+  color: var(--black);
+  background: rgba(246, 240, 219, 0.7);
+}
+
+.arrangement-clip-drag-ghost > .arrangement-clip-remove {
+  display: none;
+ }

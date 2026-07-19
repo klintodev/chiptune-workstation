@@ -40,6 +40,7 @@ export function createAudioStatusFeature({
     errorMessage: queryRequired(root, "#error-message"),
     errorPanel: queryRequired(root, "#error-panel"),
     sampleRate: queryRequired(root, "#sample-rate"),
+    setup: queryRequired(root, "#audio-setup"),
     statusDescription: queryRequired(root, "#status-description"),
     statusLight: queryRequired(root, "#status-light"),
   };
@@ -79,6 +80,7 @@ export function createAudioStatusFeature({
     elements.statusLight.dataset.state = error ? "error" : state;
     elements.errorPanel.hidden = !error;
     elements.errorMessage.textContent = error?.message ?? "";
+    elements.setup.hidden = state === "running" && !error;
     elements.action.disabled = state === "running" || state === "closed";
 
     if (audioEngine.isReady()) startTimeDisplay();
