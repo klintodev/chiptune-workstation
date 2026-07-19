@@ -146,6 +146,7 @@ export function createAudioEngine() {
     dispose,
     getCurrentTime,
     getInputNode,
+    getObservationNode: getInputNode,
     getSampleRate: () => context?.sampleRate ?? null,
     getState,
     isReady,

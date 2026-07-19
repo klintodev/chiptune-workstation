@@ -117,12 +117,22 @@ export function createVoiceEngine({ getAudioTime, getOutputNode }) {
     return Object.freeze({ id, stop: (time) => stop(id, time) });
   }
 
-  function stopAll(time = getAudioTime()) {
-    for (const id of activeVoices.keys()) stop(id, time);
+  function stopAll(time) {
+    if (activeVoices.size === 0) return;
+    const stopTime = time ?? getAudioTime();
+    for (const id of activeVoices.keys()) stop(id, stopTime);
+  }
+
+  function dispose() {
+    stopAll();
+    instrumentOutput?.disconnect();
+    instrumentOutput = null;
+    noiseBuffer = null;
   }
 
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
+    dispose,
     getActiveVoiceCount: () => activeVoices.size,
     removeEventListener: events.removeEventListener.bind(events),
     setVolume,

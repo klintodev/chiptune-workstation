@@ -1,4 +1,4 @@
-# PRD 01: Playable Instrument
+# PRD 1: Playable Instrument
 
 ## Description
 

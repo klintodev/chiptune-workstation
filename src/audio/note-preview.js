@@ -1,4 +1,4 @@
-import { DEFAULT_PATTERN_VOLUME } from "./pattern-state.js";
+import { DEFAULT_PATTERN_VOLUME } from "../state/pattern-state.js";
 import { midiNoteToFrequency } from "./voice-engine.js";
 
 export function createNotePreview({ getAudioTime, getInstrumentConfig, voiceEngine }) {

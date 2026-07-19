@@ -1,0 +1,40 @@
+:root {
+  color-scheme: dark;
+  font-family: "Courier New", Courier, monospace;
+  --ink: #f6f0db;
+  --muted: #a9a58f;
+  --panel: #171913;
+  --panel-raised: #20231b;
+  --line: #3b4032;
+  --acid: #d8ff3e;
+  --orange: #ff6a2a;
+  --red: #ff4d4d;
+  --black: #0c0d0a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  background:
+    linear-gradient(rgba(216, 255, 62, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(216, 255, 62, 0.025) 1px, transparent 1px),
+    var(--black);
+  background-size: 24px 24px;
+}
+
+button {
+  font: inherit;
+}
+
+.shell {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 40px 0 24px;
+}
+

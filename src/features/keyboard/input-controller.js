@@ -1,5 +1,5 @@
 import { KEY_BY_CODE } from "./keyboard-layout.js";
-import { midiNoteToFrequency } from "./voice-engine.js";
+import { midiNoteToFrequency } from "../../audio/voice-engine.js";
 
 function isTextEntry(target) {
   if (!(target instanceof Element)) return false;
@@ -13,7 +13,7 @@ function releaseControlFocus(target) {
   if (target instanceof HTMLInputElement && target.type === "range") target.blur();
 }
 
-export function createInputController({ voiceEngine, getInstrumentConfig, onActiveNotesChange, onNoteStart }) {
+export function createInputController({ voiceEngine, getInstrumentConfig, onActiveNotesChange, onNoteStart, root = document }) {
   const voicesByOwner = new Map();
   const ownersByNote = new Map();
 
@@ -90,13 +90,20 @@ export function createInputController({ voiceEngine, getInstrumentConfig, onActi
     stop(`keyboard:${event.code}`);
   }
 
-  document.addEventListener("pointerdown", (event) => {
+  function handlePointerDown(event) {
     if (!(event.target instanceof Element)) return;
     const isInterruptingControl =
       event.target.matches("textarea") ||
       (event.target instanceof HTMLInputElement && event.target.type !== "range");
     if (isInterruptingControl) stopAll();
-  }, true);
+  }
 
-  return Object.freeze({ handleKeyDown, handleKeyUp, refreshActiveVoices, start, stop, stopAll });
+  root.addEventListener("pointerdown", handlePointerDown, true);
+
+  function dispose() {
+    root.removeEventListener("pointerdown", handlePointerDown, true);
+    stopAll();
+  }
+
+  return Object.freeze({ dispose, handleKeyDown, handleKeyUp, refreshActiveVoices, start, stop, stopAll });
 }

@@ -1,0 +1,90 @@
+.keyboard-section {
+  border: 1px solid var(--line);
+  border-top: 0;
+  padding: clamp(24px, 4vw, 48px);
+  background: var(--black);
+}
+
+.keyboard-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.keyboard-heading p {
+  max-width: 60ch;
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.panic-button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--orange);
+  color: var(--orange);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.keyboard-manual + .keyboard-manual {
+  margin-top: 16px;
+}
+
+.key-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.music-key {
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+  min-height: 58px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  color: var(--black);
+  background: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  touch-action: none;
+  user-select: none;
+}
+
+.music-key.black {
+  min-height: 44px;
+  color: var(--ink);
+  background: var(--panel-raised);
+}
+
+.music-key span {
+  font-weight: 900;
+}
+
+.music-key small {
+  opacity: 0.65;
+}
+
+.music-key.active {
+  border-color: var(--acid);
+  color: var(--black);
+  background: var(--acid);
+}
+
+.music-key.black.active {
+  color: var(--black);
+}
+
+@media (max-width: 760px) {
+  .keyboard-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .keyboard-manual {
+    overflow-x: auto;
+  }
+}

@@ -1,4 +1,4 @@
-# PRD 03: Pattern Editing
+# PRD 3: Pattern Editing
 
 ## Description
 

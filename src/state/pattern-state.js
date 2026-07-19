@@ -75,18 +75,25 @@ function validateSemitoneDelta(semitones) {
   }
 }
 
-export function createPatternState(initialSteps) {
+export function createPatternState(initialSteps, options = {}) {
   const events = new EventTarget();
+  const { projectState = null, trackId = "track-1" } = options;
   const past = [];
   const future = [];
   let historyGroupActive = false;
   let groupedHistoryRecorded = false;
-  let steps = createInitialSteps(initialSteps);
+  let projectMutationActive = false;
+  let steps = projectState
+    ? cloneSteps(projectState.getTrack(trackId).pattern.steps)
+    : createInitialSteps(initialSteps);
 
   function getState() {
+    const history = projectState
+      ? projectState.getHistoryState()
+      : { canRedo: future.length > 0, canUndo: past.length > 0 };
     return Object.freeze({
-      canRedo: future.length > 0,
-      canUndo: past.length > 0,
+      canRedo: history.canRedo,
+      canUndo: history.canUndo,
       length: steps.length,
       steps: Object.freeze(
         steps.map((step) => step === null ? null : Object.freeze(cloneStep(step))),
@@ -104,22 +111,48 @@ export function createPatternState(initialSteps) {
   }
 
   function commit(nextSteps) {
-    if (!historyGroupActive || !groupedHistoryRecorded) {
-      retainPast(cloneSteps(steps));
-      groupedHistoryRecorded = historyGroupActive;
+    if (!projectState) {
+      if (!historyGroupActive || !groupedHistoryRecorded) {
+        retainPast(cloneSteps(steps));
+        groupedHistoryRecorded = historyGroupActive;
+      }
+      future.length = 0;
     }
-    future.length = 0;
     steps = cloneSteps(nextSteps);
+    persistSteps();
     emitChange();
     return true;
   }
 
+  function persistSteps() {
+    if (!projectState) return;
+    const nextSteps = cloneSteps(steps);
+    projectMutationActive = true;
+    try {
+      projectState.updateTrack(
+        trackId,
+        (track) => ({ ...track, pattern: { ...track.pattern, steps: nextSteps } }),
+        { field: "pattern.steps" },
+      );
+    } finally {
+      projectMutationActive = false;
+    }
+  }
+
   function beginHistoryGroup() {
+    if (projectState) {
+      projectState.beginHistoryGroup();
+      return;
+    }
     historyGroupActive = true;
     groupedHistoryRecorded = false;
   }
 
   function endHistoryGroup() {
+    if (projectState) {
+      projectState.endHistoryGroup();
+      return;
+    }
     historyGroupActive = false;
     groupedHistoryRecorded = false;
   }
@@ -204,25 +237,46 @@ export function createPatternState(initialSteps) {
   }
 
   function undo() {
+    if (projectState) return projectState.undo();
     endHistoryGroup();
     if (past.length === 0) return false;
     future.push(cloneSteps(steps));
     steps = cloneSteps(past.pop());
+    persistSteps();
     emitChange();
     return true;
   }
 
   function redo() {
+    if (projectState) return projectState.redo();
     endHistoryGroup();
     if (future.length === 0) return false;
     retainPast(cloneSteps(steps));
     steps = cloneSteps(future.pop());
+    persistSteps();
     emitChange();
     return true;
   }
 
+  function stepsEqual(left, right) {
+    return left.length === right.length && left.every((step, index) => {
+      const candidate = right[index];
+      if (step === null || candidate === null) return step === candidate;
+      return step.note === candidate.note && step.gate === candidate.gate && step.volume === candidate.volume;
+    });
+  }
+
+  function handleProjectChange() {
+    const projectSteps = projectState.getTrack(trackId).pattern.steps;
+    if (!stepsEqual(steps, projectSteps)) steps = cloneSteps(projectSteps);
+    if (!projectMutationActive) emitChange();
+  }
+
+  projectState?.addEventListener("change", handleProjectChange);
+
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
+    dispose: () => projectState?.removeEventListener("change", handleProjectChange),
     beginHistoryGroup,
     canDuplicate,
     canTranspose,

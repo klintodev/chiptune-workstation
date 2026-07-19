@@ -3,7 +3,7 @@ import {
   DEFAULT_PATTERN_VOLUME,
   MAX_PATTERN_NOTE,
   MIN_PATTERN_NOTE,
-} from "./pattern-state.js";
+} from "../../state/pattern-state.js";
 
 const GRID_NAVIGATION_KEYS = new Set([
   "ArrowDown",

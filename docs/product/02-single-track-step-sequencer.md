@@ -1,4 +1,4 @@
-# PRD 02: Single-Track Step Sequencer
+# PRD 2: Single-Track Step Sequencer
 
 ## Description
 
@@ -12,7 +12,7 @@ The defining quality requirement is stable playback. The application may use a p
 - Each step must support either one note or a rest.
 - The user must be able to set, replace, and clear the note on a step.
 - The user must be able to select the pitch and octave assigned to a step.
-- The sequencer must use the instrument interface established by PRD 01.
+- The sequencer must use the instrument interface established by PRD 1.
 - The user must be able to play, pause, stop, and return playback to the beginning of the pattern.
 - The user must be able to change tempo within a defined safe range.
 - The current playback step must be visually indicated.
