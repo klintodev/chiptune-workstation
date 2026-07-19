@@ -8,7 +8,7 @@ These epics deliver [PRD 03: Pattern Editing](../product/03-pattern-editing.md).
 - Shortening permanently removes steps beyond the new length; lengthening adds rests.
 - Changing length during playback stops transport and returns it to step 1 before resizing.
 - Per-step gate choices are 25%, 50%, 75%, and 100% of one step.
-- Chip intensity is represented by a binary accent rather than continuous velocity.
+- Every occupied step has a 0–100% volume slider; new notes default to 70%.
 - Audible note preview is optional and off by default.
 - Duplicating appends one copy of the current contents into the next supported length.
 - Clear uses an explicit armed confirmation rather than a modal dialog.
@@ -84,7 +84,7 @@ Requirements:
 
 ### Outcome
 
-The user can shape the selected step's pitch, gate, and accent and optionally hear edits immediately.
+The user can shape each step's pitch, gate, and volume and optionally hear edits immediately.
 
 ### User stories
 
@@ -111,16 +111,16 @@ Requirements:
 - Rests do not retain hidden gate data.
 - The scheduler derives note duration from the step's gate and current BPM.
 
-#### US11.3 - Accent a note
+#### US11.3 - Set note volume
 
-As a user, I want to accent selected notes so that the pattern has chip-style dynamics.
+As a user, I want to set the volume of each note so that the pattern has controllable dynamics.
 
 Requirements:
 
-- Accent is an explicit per-step boolean.
-- Accented and normal notes are visibly distinct.
-- Accent affects only that voice instance's gain.
-- Accent does not mutate global instrument volume.
+- Volume is an explicit per-step value from 0% to 100%.
+- Every occupied step exposes its own volume slider.
+- Volume changes affect only that voice instance's gain.
+- Per-note volume does not mutate global instrument volume.
 
 #### US11.4 - Preview edits
 
@@ -136,7 +136,7 @@ Requirements:
 
 ### Tangible technical requirements
 
-- A note step is serializable as pitch, gate, and accent data.
+- A note step is serializable as pitch, gate, and volume data.
 - Legacy numeric note steps are migrated predictably or replaced atomically.
 - Per-voice intensity is applied before the shared instrument output.
 - Preview ownership can be stopped without affecting other voice owners.
@@ -180,7 +180,7 @@ Requirements:
 
 - Controls transpose every occupied step by one semitone.
 - Rests remain rests.
-- Gate and accent values remain unchanged.
+- Gate and volume values remain unchanged.
 - If any result is out of range, the whole operation is rejected unchanged.
 
 #### US12.4 - Transpose by octave
@@ -214,7 +214,7 @@ As a user, I want to undo my last pattern change so that mistakes are inexpensiv
 
 Requirements:
 
-- Undo covers set, replace, clear-step, resize, duplicate, clear-pattern, transpose, gate, and accent changes.
+- Undo covers set, replace, clear-step, resize, duplicate, clear-pattern, transpose, gate, and volume changes.
 - One user operation creates at most one history entry.
 - Undo restores the complete prior pattern state.
 - Undo is unavailable when history is empty.

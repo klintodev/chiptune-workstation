@@ -3,6 +3,7 @@ export const SUPPORTED_PATTERN_LENGTHS = Object.freeze([4, 8, 16, 32]);
 export const MIN_PATTERN_NOTE = 36;
 export const MAX_PATTERN_NOTE = 112;
 export const DEFAULT_PATTERN_GATE = 0.75;
+export const DEFAULT_PATTERN_VOLUME = 0.7;
 export const SUPPORTED_PATTERN_GATES = Object.freeze([0.25, 0.5, 0.75, 1]);
 export const MAX_PATTERN_HISTORY = 100;
 
@@ -36,11 +37,13 @@ function validateGate(gate) {
   }
 }
 
-function createNoteStep(note, gate = DEFAULT_PATTERN_GATE, accented = false) {
+function createNoteStep(note, gate = DEFAULT_PATTERN_GATE, volume = DEFAULT_PATTERN_VOLUME) {
   validateNote(note);
   validateGate(gate);
-  if (typeof accented !== "boolean") throw new TypeError("Pattern accent must be a boolean.");
-  return { note, gate, accented };
+  if (!Number.isFinite(volume) || volume < 0 || volume > 1) {
+    throw new RangeError("Pattern volume must be between zero and one.");
+  }
+  return { note, gate, volume };
 }
 
 function cloneStep(step) {
@@ -55,7 +58,8 @@ function normalizeStep(step) {
   if (step === null) return null;
   if (Number.isInteger(step)) return createNoteStep(step);
   if (!step || typeof step !== "object") throw new TypeError("Invalid pattern step.");
-  return createNoteStep(step.note, step.gate, step.accented);
+  const volume = step.volume ?? (step.accented === true ? 1 : DEFAULT_PATTERN_VOLUME);
+  return createNoteStep(step.note, step.gate, volume);
 }
 
 function createInitialSteps(initialSteps) {
@@ -75,6 +79,8 @@ export function createPatternState(initialSteps) {
   const events = new EventTarget();
   const past = [];
   const future = [];
+  let historyGroupActive = false;
+  let groupedHistoryRecorded = false;
   let steps = createInitialSteps(initialSteps);
 
   function getState() {
@@ -98,13 +104,25 @@ export function createPatternState(initialSteps) {
   }
 
   function commit(nextSteps) {
-    retainPast(cloneSteps(steps));
+    if (!historyGroupActive || !groupedHistoryRecorded) {
+      retainPast(cloneSteps(steps));
+      groupedHistoryRecorded = historyGroupActive;
+    }
     future.length = 0;
     steps = cloneSteps(nextSteps);
     emitChange();
     return true;
   }
 
+  function beginHistoryGroup() {
+    historyGroupActive = true;
+    groupedHistoryRecorded = false;
+  }
+
+  function endHistoryGroup() {
+    historyGroupActive = false;
+    groupedHistoryRecorded = false;
+  }
   function replaceStep(index, nextStep) {
     const nextSteps = cloneSteps(steps);
     nextSteps[index] = cloneStep(nextStep);
@@ -118,7 +136,7 @@ export function createPatternState(initialSteps) {
     if (current?.note === note) return false;
     return replaceStep(
       index,
-      createNoteStep(note, current?.gate ?? DEFAULT_PATTERN_GATE, current?.accented ?? false),
+      createNoteStep(note, current?.gate ?? DEFAULT_PATTERN_GATE, current?.volume ?? DEFAULT_PATTERN_VOLUME),
     );
   }
 
@@ -133,15 +151,17 @@ export function createPatternState(initialSteps) {
     validateGate(gate);
     const current = steps[index];
     if (current === null || current.gate === gate) return false;
-    return replaceStep(index, createNoteStep(current.note, gate, current.accented));
+    return replaceStep(index, createNoteStep(current.note, gate, current.volume));
   }
 
-  function setAccent(index, accented) {
+  function setVolume(index, volume) {
     validateStepIndex(index, steps.length);
-    if (typeof accented !== "boolean") throw new TypeError("Pattern accent must be a boolean.");
+    if (!Number.isFinite(volume) || volume < 0 || volume > 1) {
+      throw new RangeError("Pattern volume must be between zero and one.");
+    }
     const current = steps[index];
-    if (current === null || current.accented === accented) return false;
-    return replaceStep(index, createNoteStep(current.note, current.gate, accented));
+    if (current === null || current.volume === volume) return false;
+    return replaceStep(index, createNoteStep(current.note, current.gate, volume));
   }
 
   function setLength(nextLength) {
@@ -179,11 +199,12 @@ export function createPatternState(initialSteps) {
     return commit(steps.map(
       (step) => step === null
         ? null
-        : createNoteStep(step.note + semitones, step.gate, step.accented),
+        : createNoteStep(step.note + semitones, step.gate, step.volume),
     ));
   }
 
   function undo() {
+    endHistoryGroup();
     if (past.length === 0) return false;
     future.push(cloneSteps(steps));
     steps = cloneSteps(past.pop());
@@ -192,6 +213,7 @@ export function createPatternState(initialSteps) {
   }
 
   function redo() {
+    endHistoryGroup();
     if (future.length === 0) return false;
     retainPast(cloneSteps(steps));
     steps = cloneSteps(future.pop());
@@ -201,15 +223,17 @@ export function createPatternState(initialSteps) {
 
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
+    beginHistoryGroup,
     canDuplicate,
     canTranspose,
     clearPattern,
     clearStep,
     duplicate,
+    endHistoryGroup,
     getState,
     redo,
     removeEventListener: events.removeEventListener.bind(events),
-    setAccent,
+    setVolume,
     setGate,
     setLength,
     setStep,

@@ -10,7 +10,7 @@ import { LOWER_BLACK_KEYS, LOWER_WHITE_KEYS, UPPER_BLACK_KEYS, UPPER_WHITE_KEYS 
 import { createVoiceEngine } from "./voice-engine.js";
 
 const selectors = {
-  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternAccent: "#pattern-accent", patternClear: "#pattern-clear", patternDuplicate: "#pattern-duplicate", patternGate: "#pattern-gate", patternGrid: "#pattern-grid", patternLength: "#pattern-length", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", patternPreview: "#pattern-preview", patternRedo: "#pattern-redo", patternUndo: "#pattern-undo", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", transposeDown: "#transpose-down", transposeOctaveDown: "#transpose-octave-down", transposeOctaveUp: "#transpose-octave-up", transposeUp: "#transpose-up", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", tempo: "#tempo", tempoValue: "#tempo-value", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
+  action: "#audio-action", attack: "#attack", attackValue: "#attack-value", release: "#release", releaseValue: "#release-value", audioState: "#audio-state", audioTime: "#audio-time", contextState: "#context-state", errorMessage: "#error-message", errorPanel: "#error-panel", patternClear: "#pattern-clear", patternDuplicate: "#pattern-duplicate", patternGate: "#pattern-gate", patternGrid: "#pattern-grid", patternLength: "#pattern-length", patternOctave: "#pattern-octave", patternPitch: "#pattern-pitch", patternPreview: "#pattern-preview", patternRedo: "#pattern-redo", patternUndo: "#pattern-undo", transportPause: "#transport-pause", transportPlay: "#transport-play", transportStatus: "#transport-status", transportStop: "#transport-stop", transposeDown: "#transpose-down", transposeOctaveDown: "#transpose-octave-down", transposeOctaveUp: "#transpose-octave-up", transposeUp: "#transpose-up", octaveDown: "#octave-down", octaveUp: "#octave-up", octaveValue: "#octave-value", resetInstrument: "#reset-instrument", sampleRate: "#sample-rate", selectedPatternNote: "#selected-pattern-note", statusDescription: "#status-description", statusLight: "#status-light", tempo: "#tempo", tempoValue: "#tempo-value", stopSound: "#stop-sound", voiceType: "#voice-type", volume: "#volume", volumeValue: "#volume-value",
 };
 const elements = Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, document.querySelector(selector)]));
 elements.actionLabel = document.querySelector("#audio-action span");
@@ -61,7 +61,6 @@ patternEditor = createPatternEditor({
   pitchSelect: elements.patternPitch,
   octaveSelect: elements.patternOctave,
   gateSelect: elements.patternGate,
-  accentInput: elements.patternAccent,
   previewInput: elements.patternPreview,
   selectedNoteOutput: elements.selectedPatternNote,
   getNoteName: noteName,

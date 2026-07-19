@@ -1,3 +1,4 @@
+import { DEFAULT_PATTERN_VOLUME } from "./pattern-state.js";
 import { midiNoteToFrequency } from "./voice-engine.js";
 
 export function createNotePreview({ getAudioTime, getInstrumentConfig, voiceEngine }) {
@@ -10,8 +11,9 @@ export function createNotePreview({ getAudioTime, getInstrumentConfig, voiceEngi
     return stopped;
   }
 
-  function play(note, accented = false) {
+  function play(note, volume = DEFAULT_PATTERN_VOLUME) {
     stop();
+    if (volume === 0) return false;
     const config = getInstrumentConfig();
     try {
       activeVoice = voiceEngine.trigger({
@@ -19,7 +21,7 @@ export function createNotePreview({ getAudioTime, getInstrumentConfig, voiceEngi
         frequency: midiNoteToFrequency(note),
         startTime: getAudioTime(),
         duration: 0.14,
-        intensity: accented ? 1 : 0.7,
+        intensity: volume,
         attackSeconds: config.attackSeconds,
         releaseSeconds: config.releaseSeconds,
       });

@@ -124,7 +124,7 @@ export function createStepScheduler({
 
   function scheduleStep(activeSession, stepIndex, startTime) {
     const step = getPatternState().steps[stepIndex];
-    if (step === null) return;
+    if (step === null || step.volume === 0) return;
     const config = getInstrumentConfig();
     const duration = activeSession.stepDurationSeconds * step.gate;
     const voice = voiceEngine.trigger({
@@ -132,7 +132,7 @@ export function createStepScheduler({
       frequency: midiNoteToFrequency(step.note),
       startTime,
       duration,
-      intensity: step.accented ? 1 : 0.7,
+      intensity: step.volume,
       attackSeconds: config.attackSeconds,
       releaseSeconds: config.releaseSeconds,
     });

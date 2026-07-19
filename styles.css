@@ -662,10 +662,28 @@ footer {
   color: var(--acid);
 }
 
-.pattern-step.has-note.accented .pattern-step-set strong {
-  color: var(--orange);
+
+.pattern-step-volume {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  padding: 0 10px 10px;
+  color: var(--muted);
+  font-size: 0.62rem;
 }
 
+.pattern-step-volume[hidden] {
+  display: none;
+}
+.pattern-step-volume input {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--acid);
+}
+
+.pattern-step-volume output {
+  color: var(--ink);
+}
 .pattern-step-clear {
   min-height: 30px;
   border-top: 1px solid var(--line) !important;
@@ -673,9 +691,12 @@ footer {
   font-size: 0.7rem !important;
 }
 
-.pattern-step-clear:hover:not(:disabled),
-.pattern-step-set:hover {
+.pattern-step:hover {
   background: var(--panel-raised);
+}
+
+.pattern-step-clear:hover:not(:disabled) {
+  color: var(--ink) !important;
 }
 
 .pattern-step-clear:disabled {

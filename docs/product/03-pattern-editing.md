@@ -26,7 +26,6 @@ This feature is about editing fluency rather than adding tracks or arranging a f
 ## Open questions
 
 - Which pattern lengths should be supported initially?
-- Is velocity authentic and useful for the intended sound, or should it be replaced by accent?
 - Are arbitrary note lengths necessary, or are fixed gates plus ties a better chiptune workflow?
 - Should patterns support chords before the multi-track feature exists?
 - Which operations belong in the first undo/redo history?
