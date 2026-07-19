@@ -23,24 +23,6 @@
         </div>
       </section>
 
-      <section class="voice-lab" aria-labelledby="instrument-title">
-        <div><p class="eyebrow">Instrument</p><h2 id="instrument-title">Controls</h2><p>Changes affect new notes. Notes already playing retain the settings they started with.</p></div>
-        <div class="voice-controls">
-          <label>Voice<select id="voice-type"><option value="square">Square</option><option value="triangle">Triangle</option><option value="sawtooth">Sawtooth</option><option value="noise">Noise</option></select></label>
-          <div class="octave-control"><button id="octave-down" type="button" aria-label="Octave down">&minus;</button><span>Octave <strong id="octave-value">0</strong></span><button id="octave-up" type="button" aria-label="Octave up">+</button></div>
-          <label>Volume <output id="volume-value" for="volume">35%</output><input id="volume" type="range" min="0" max="100" step="1" value="35" /></label>
-          <label>Attack <output id="attack-value" for="attack">8 ms</output><input id="attack" type="range" min="1" max="2000" step="1" value="8" /></label>
-          <label>Release <output id="release-value" for="release">30 ms</output><input id="release" type="range" min="10" max="3000" step="10" value="30" /></label>
-          <button id="reset-instrument" type="button">Reset instrument</button>
-        </div>
-      </section>
-
-      <section class="keyboard-section" aria-labelledby="keyboard-title">
-        <div class="keyboard-heading"><div><p class="eyebrow">Play</p><h2 id="keyboard-title">Keyboard</h2><p>Numbers and home row play black keys. QWERTY and ZXCV rows play white keys.</p></div><button id="stop-sound" class="panic-button" type="button" disabled>Stop sound</button></div>
-        <div class="keyboard-manual" aria-label="Upper keyboard register"><div id="upper-black-keys" class="key-row black-row"></div><div id="upper-white-keys" class="key-row white-row"></div></div>
-        <div class="keyboard-manual" aria-label="Lower keyboard register"><div id="lower-black-keys" class="key-row black-row"></div><div id="lower-white-keys" class="key-row white-row"></div></div>
-      </section>
-
       <section class="sequencer-section" aria-labelledby="sequencer-title">
         <div class="sequencer-heading">
           <div><p class="eyebrow">Pattern</p><h2 id="sequencer-title">Pattern editor</h2><p>Choose a note, then place it on a step. Shortening permanently removes later steps.</p></div>
@@ -48,7 +30,6 @@
             <label>Length<select id="pattern-length"><option value="4">4 steps</option><option value="8">8 steps</option><option value="16" selected>16 steps</option><option value="32">32 steps</option></select></label>
             <label>Pitch<select id="pattern-pitch"><option value="0">C</option><option value="1">C&#9839;</option><option value="2">D</option><option value="3">D&#9839;</option><option value="4">E</option><option value="5">F</option><option value="6">F&#9839;</option><option value="7">G</option><option value="8">G&#9839;</option><option value="9">A</option><option value="10">A&#9839;</option><option value="11">B</option></select></label>
             <label>Octave<select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
-            <label>Gate<select id="pattern-gate"><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75" selected>75%</option><option value="1">100%</option></select></label>
             <label class="pattern-toggle"><input id="pattern-preview" type="checkbox" /> Preview</label>
             <p>Selected <output id="selected-pattern-note">C4</output></p>
             <div class="pattern-transport" aria-label="Pattern transport">
@@ -74,6 +55,24 @@
         </div>
         <div id="pattern-grid" class="pattern-grid" aria-label="16-step pattern"></div>
       </section>
+      <section class="voice-lab" aria-labelledby="instrument-title">
+        <div><p class="eyebrow">Instrument</p><h2 id="instrument-title">Controls</h2><p>Changes affect new notes. Notes already playing retain the settings they started with.</p></div>
+        <div class="voice-controls">
+          <label>Voice<select id="voice-type"><option value="square">Square</option><option value="triangle">Triangle</option><option value="sawtooth">Sawtooth</option><option value="noise">Noise</option></select></label>
+          <div class="octave-control"><button id="octave-down" type="button" aria-label="Octave down">&minus;</button><span>Octave <strong id="octave-value">0</strong></span><button id="octave-up" type="button" aria-label="Octave up">+</button></div>
+          <label>Volume <output id="volume-value" for="volume">35%</output><input id="volume" type="range" min="0" max="100" step="1" value="35" /></label>
+          <label>Attack <output id="attack-value" for="attack">8 ms</output><input id="attack" type="range" min="1" max="2000" step="1" value="8" /></label>
+          <label>Release <output id="release-value" for="release">30 ms</output><input id="release" type="range" min="10" max="3000" step="10" value="30" /></label>
+          <button id="reset-instrument" type="button">Reset instrument</button>
+        </div>
+      </section>
+
+      <section class="keyboard-section" aria-labelledby="keyboard-title">
+        <div class="keyboard-heading"><div><p class="eyebrow">Play</p><h2 id="keyboard-title">Keyboard</h2><p>Numbers and home row play black keys. QWERTY and ZXCV rows play white keys.</p></div><button id="stop-sound" class="panic-button" type="button" disabled>Stop sound</button></div>
+        <div class="keyboard-manual" aria-label="Upper keyboard register"><div id="upper-black-keys" class="key-row black-row"></div><div id="upper-white-keys" class="key-row white-row"></div></div>
+        <div class="keyboard-manual" aria-label="Lower keyboard register"><div id="lower-black-keys" class="key-row black-row"></div><div id="lower-white-keys" class="key-row white-row"></div></div>
+      </section>
+
       <footer><span>No audio is created before your gesture.</span></footer>
     </main>
     <script type="module" src="./src/app.js"></script>

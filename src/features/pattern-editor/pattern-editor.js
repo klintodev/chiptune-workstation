@@ -1,8 +1,8 @@
 import {
-  DEFAULT_PATTERN_GATE,
   DEFAULT_PATTERN_VOLUME,
   MAX_PATTERN_NOTE,
   MIN_PATTERN_NOTE,
+  SUPPORTED_PATTERN_GATES,
 } from "../../state/pattern-state.js";
 
 const GRID_NAVIGATION_KEYS = new Set([
@@ -17,7 +17,6 @@ export function createPatternEditor({
   grid,
   pitchSelect,
   octaveSelect,
-  gateSelect,
   previewInput,
   selectedNoteOutput,
   getNoteName,
@@ -49,7 +48,6 @@ export function createPatternEditor({
     if (step === null) return;
     pitchSelect.value = String(step.note % 12);
     octaveSelect.value = String(Math.floor(step.note / 12) - 1);
-    gateSelect.value = String(step.gate);
     constrainPitchSelection();
   }
 
@@ -111,6 +109,8 @@ export function createPatternEditor({
     const volumeLabel = document.createElement("span");
     const volumeInput = document.createElement("input");
     const volumeOutput = document.createElement("output");
+    const gateControl = document.createElement("div");
+    const gateLabel = document.createElement("span");
     const clearButton = document.createElement("button");
 
     container.className = "pattern-step";
@@ -129,6 +129,28 @@ export function createPatternEditor({
     volumeInput.setAttribute("aria-label", `Step ${index + 1} volume`);
     volumeOutput.value = `${Math.round(DEFAULT_PATTERN_VOLUME * 100)}%`;
     volumeControl.append(volumeLabel, volumeOutput, volumeInput);
+    gateControl.className = "pattern-step-gate";
+    gateControl.setAttribute("role", "radiogroup");
+    gateControl.setAttribute("aria-label", `Step ${index + 1} gate`);
+    gateLabel.textContent = "Gate";
+    gateControl.append(gateLabel);
+    const gateButtons = SUPPORTED_PATTERN_GATES.map((gate) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "pattern-step-gate-option";
+      button.dataset.gate = String(gate);
+      button.textContent = `${Math.round(gate * 100)}%`;
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-label", `Step ${index + 1}, ${Math.round(gate * 100)}% gate`);
+      button.addEventListener("click", () => {
+        onEditAction?.();
+        selectedStepIndex = index;
+        patternState.setGate(index, gate);
+        render();
+      });
+      gateControl.append(button);
+      return { button, gate };
+    });
     clearButton.className = "pattern-step-clear";
     clearButton.type = "button";
     clearButton.dataset.stepIndex = String(index);
@@ -144,7 +166,6 @@ export function createPatternEditor({
       onEditAction?.();
       selectedStepIndex = index;
       patternState.clearStep(index);
-      gateSelect.value = String(DEFAULT_PATTERN_GATE);
       render();
     });
     volumeInput.addEventListener("pointerdown", () => {
@@ -167,12 +188,14 @@ export function createPatternEditor({
       const step = patternState.getState().steps[index];
       if (step) previewSelectedNote(step.note, step.volume);
     });
-    container.append(setButton, volumeControl, clearButton);
+    container.append(setButton, gateControl, volumeControl, clearButton);
     grid.append(container);
     stepElements.push({
       clearButton,
       container,
       detail,
+      gateButtons,
+      gateControl,
       setButton,
       value,
       volumeControl,
@@ -210,6 +233,14 @@ export function createPatternEditor({
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
       elements.value.textContent = hasNote ? getNoteName(step.note) : "Rest";
       elements.detail.textContent = hasNote ? `${Math.round(step.gate * 100)}% gate` : "";
+      elements.gateControl.hidden = !hasNote;
+      for (const { button, gate } of elements.gateButtons) {
+        const selected = hasNote && step.gate === gate;
+        button.disabled = !hasNote;
+        button.classList.toggle("selected", selected);
+        button.setAttribute("aria-checked", String(selected));
+        button.tabIndex = selected ? 0 : -1;
+      }
       elements.volumeControl.hidden = !hasNote;
       elements.volumeInput.disabled = !hasNote;
       const volumePercent = Math.round((step?.volume ?? DEFAULT_PATTERN_VOLUME) * 100);
@@ -270,7 +301,6 @@ export function createPatternEditor({
       previewSelectedNote(note, patternState.getState().steps[currentIndex].volume);
     } else {
       patternState.clearStep(currentIndex);
-      gateSelect.value = String(DEFAULT_PATTERN_GATE);
     }
     render();
     focusStep(currentIndex);
@@ -289,14 +319,6 @@ export function createPatternEditor({
     render();
   }
 
-  function handleGateChange() {
-    onEditAction?.();
-    if (selectedStepIndex !== null) {
-      patternState.setGate(selectedStepIndex, Number(gateSelect.value));
-    }
-    gateSelect.blur();
-    render();
-  }
 
   function handlePreviewChange() {
     if (!previewInput.checked || selectedStepIndex === null) return;
@@ -306,7 +328,6 @@ export function createPatternEditor({
 
   pitchSelect.addEventListener("change", handleNoteSelectionChange);
   octaveSelect.addEventListener("change", handleNoteSelectionChange);
-  gateSelect.addEventListener("change", handleGateChange);
   previewInput.addEventListener("change", handlePreviewChange);
   grid.addEventListener("keydown", handleGridKeyDown);
   patternState.addEventListener("change", render);
@@ -315,7 +336,6 @@ export function createPatternEditor({
   function dispose() {
     pitchSelect.removeEventListener("change", handleNoteSelectionChange);
     octaveSelect.removeEventListener("change", handleNoteSelectionChange);
-    gateSelect.removeEventListener("change", handleGateChange);
     previewInput.removeEventListener("change", handlePreviewChange);
     grid.removeEventListener("keydown", handleGridKeyDown);
     patternState.removeEventListener("change", render);

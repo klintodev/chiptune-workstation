@@ -228,6 +228,44 @@
 }
 
 
+.pattern-step-gate {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  padding: 0 8px 8px;
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.pattern-step-gate[hidden] {
+  display: none;
+}
+
+.pattern-step-gate > span {
+  grid-column: 1 / -1;
+}
+
+.pattern-step-gate button {
+  min-width: 0;
+  min-height: 24px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 0.55rem;
+}
+
+.pattern-step-gate button:hover:not(:disabled) {
+  border-color: var(--acid);
+  color: var(--ink);
+}
+
+.pattern-step-gate button.selected {
+  border-color: var(--acid);
+  color: var(--black);
+  background: var(--acid);
+}
+
 .pattern-step-volume {
   display: grid;
   grid-template-columns: 1fr auto;

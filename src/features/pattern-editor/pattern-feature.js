@@ -16,7 +16,6 @@ export function createPatternFeature({
   const elements = {
     clear: queryRequired(root, "#pattern-clear"),
     duplicate: queryRequired(root, "#pattern-duplicate"),
-    gate: queryRequired(root, "#pattern-gate"),
     grid: queryRequired(root, "#pattern-grid"),
     length: queryRequired(root, "#pattern-length"),
     octave: queryRequired(root, "#pattern-octave"),
@@ -67,7 +66,6 @@ export function createPatternFeature({
     grid: elements.grid,
     pitchSelect: elements.pitch,
     octaveSelect: elements.octave,
-    gateSelect: elements.gate,
     previewInput: elements.preview,
     selectedNoteOutput: elements.selectedNote,
     getNoteName,
