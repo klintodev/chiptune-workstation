@@ -11,17 +11,56 @@ import { createInstrumentFeature } from "./features/instrument/instrument.js";
 import { createInputController } from "./features/keyboard/input-controller.js";
 import { createKeyboardFeature } from "./features/keyboard/keyboard.js";
 import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js";
+import { createProjectLibraryFeature } from "./features/project-library/project-library.js";
 import { createThemeFeature } from "./features/theme/theme.js";
 import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js";
 import { getNoteName } from "./music/note.js";
 import { createInstrumentState } from "./state/instrument-state.js";
 import { DEFAULT_PATTERN_ROOT_OCTAVE, createPatternState } from "./state/pattern-state.js";
 import { createProjectState } from "./state/project-state.js";
+import {
+  createIndexedDbProjectRepository,
+  createMemoryProjectRepository,
+  createProjectPreferences,
+} from "./persistence/project-repository.js";
+import {
+  createProjectPersistence,
+  loadInitialProjectDocument,
+} from "./persistence/project-persistence.js";
 import { createSessionState } from "./state/session-state.js";
 import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
 
+const projectPreferences = createProjectPreferences();
+let projectRepository;
+let initialProjectDocument;
+let projectStorageError = null;
+let projectStoragePersistent = true;
+try {
+  projectRepository = createIndexedDbProjectRepository();
+  initialProjectDocument = await loadInitialProjectDocument({
+    preferences: projectPreferences,
+    repository: projectRepository,
+  });
+} catch (error) {
+  projectStorageError = error;
+  projectStoragePersistent = false;
+  projectRepository = createMemoryProjectRepository();
+  initialProjectDocument = await loadInitialProjectDocument({
+    preferences: projectPreferences,
+    repository: projectRepository,
+  });
+}
+
 const audioEngine = createAudioEngine();
-const projectState = createProjectState();
+const projectState = createProjectState(initialProjectDocument.project);
+const projectPersistence = createProjectPersistence({
+  initialDocument: initialProjectDocument,
+  initialError: projectStorageError,
+  persistent: projectStoragePersistent,
+  preferences: projectPreferences,
+  projectState,
+  repository: projectRepository,
+});
 const sessionState = createSessionState();
 const themeFeature = createThemeFeature({ sessionState });
 const workspaceTabs = createWorkspaceTabs({ projectState, sessionState });
@@ -113,6 +152,11 @@ arrangerFeature = createArrangerFeature({
   scheduler,
   sessionState,
 });
+const projectLibraryFeature = createProjectLibraryFeature({
+  onBeforeProjectChange: stopAllSound,
+  persistence: projectPersistence,
+  projectState,
+});
 
 const applicationLifecycle = new AbortController();
 const audioStatusFeature = createAudioStatusFeature({
@@ -144,10 +188,15 @@ function pauseForInterruption() {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) pauseForInterruption();
+  if (!document.hidden) return;
+  pauseForInterruption();
+  void projectPersistence.saveNow().catch(() => {});
 }, { signal: applicationLifecycle.signal });
 window.addEventListener("blur", pauseForInterruption, { signal: applicationLifecycle.signal });
-window.addEventListener("pagehide", pauseForInterruption, { signal: applicationLifecycle.signal });
+window.addEventListener("pagehide", () => {
+  pauseForInterruption();
+  void projectPersistence.saveNow().catch(() => {});
+}, { signal: applicationLifecycle.signal });
 
 let previousWorkspace = sessionState.getState().workspace;
 sessionState.addEventListener("change", (event) => {
@@ -177,6 +226,8 @@ function disposeApplication() {
   audioStatusFeature.dispose();
   arrangerFeature.dispose();
   patternFeature.dispose();
+  projectLibraryFeature.dispose();
+  projectPersistence.dispose();
   instrumentFeature.dispose();
   keyboardFeature.dispose();
   workspaceTabs.dispose();

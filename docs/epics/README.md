@@ -7,3 +7,4 @@ Epics translate product requirements into independently deliverable implementati
 - [PRD 03 - Pattern Editing](./prd-03-pattern-editing.md)
 - [PRD 05 - Multi-Track Arrangement](./prd-05-multi-track-arrangement.md)
 - [PRD 06 - DAW Workspace Redesign](./prd-06-daw-workspace-redesign.md)
+- [PRD 07 - Project Persistence](./prd-07-project-persistence.md)

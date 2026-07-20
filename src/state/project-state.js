@@ -493,6 +493,16 @@ export function createProjectState(initialProject = createDefaultProject()) {
     return Object.freeze({ clipId, patternId });
   }
 
+  function renameProject(name) {
+    const resolvedName = name.trim();
+    validateName(resolvedName, "Project");
+    if (state.metadata.title === resolvedName) return false;
+    return commit(
+      { ...state, metadata: { ...state.metadata, title: resolvedName } },
+      { field: "metadata.title", operation: "rename-project" },
+    );
+  }
+
   function renamePattern(patternId, name) {
     const resolvedName = name.trim();
     validateName(resolvedName, "Pattern");
@@ -779,6 +789,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
     removeEventListener: events.removeEventListener.bind(events),
     removeTrack,
     renamePattern,
+    renameProject,
     renameTrack,
     repeatClip,
     replace,

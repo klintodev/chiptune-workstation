@@ -27,11 +27,18 @@ The initial persistence experience is local-first and does not require accounts 
 
 ## Open questions
 
-- Should local projects use IndexedDB, local storage, the Origin Private File System, or an abstraction over these options?
-- Is saving explicit, automatic, or both?
-- How many local revisions, if any, should be retained?
-- What is the exported file extension and MIME type?
-- Is the portable format human-readable JSON, a compressed package, or both?
-- How are future binary assets represented or referenced?
-- Which migrations must be supported before the first public release?
-- Should users be warned about browser storage eviction and private-browsing limitations?
+Resolved for the first implementation:
+
+- IndexedDB stores projects behind a repository abstraction; `localStorage` stores only the last-opened project preference.
+- Saving is automatic after a short debounce, with visible save status.
+- Undo and redo history is bounded and session-only; local project revisions are not retained yet.
+- Portable files use human-readable JSON and the `.chipwork.json` extension.
+- The document envelope and project schema are independently versioned.
+- Existing supported project migrations remain supported; document migrations begin when the envelope changes.
+- The interface reports when browser storage is unavailable or a save fails.
+
+Deferred:
+
+- Binary asset representation.
+- Accounts, cloud repositories, synchronization, and conflict resolution.
+- Recoverable deletion and retained local revision history.
