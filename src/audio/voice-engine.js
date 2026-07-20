@@ -1,4 +1,4 @@
-const VOICE_TYPES = new Set(["square", "triangle", "sawtooth", "noise"]);
+const VOICE_TYPES = new Set(["pulse12", "pulse25", "square", "triangle", "sawtooth", "noise"]);
 const MIN_FREQUENCY = 20;
 const MAX_FREQUENCY = 20_000;
 const SILENCE = 0.0001;
@@ -16,6 +16,7 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
   const activeVoices = new Map();
   let nextId = 1;
   let noiseBuffer = null;
+  let pulseWaves = new Map();
   let instrumentOutput = null;
   let volume = 0.35;
 
@@ -46,10 +47,29 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
     return true;
   }
 
+  function getPulseWave(context, dutyCycle) {
+    if (pulseWaves.has(dutyCycle)) return pulseWaves.get(dutyCycle);
+    const harmonicCount = 64;
+    const real = new Float32Array(harmonicCount + 1);
+    const imaginary = new Float32Array(harmonicCount + 1);
+    for (let harmonic = 1; harmonic <= harmonicCount; harmonic += 1) {
+      const phase = 2 * Math.PI * harmonic * dutyCycle;
+      real[harmonic] = (2 * Math.sin(phase)) / (Math.PI * harmonic);
+      imaginary[harmonic] = (2 * (1 - Math.cos(phase))) / (Math.PI * harmonic);
+    }
+    const wave = context.createPeriodicWave(real, imaginary);
+    pulseWaves.set(dutyCycle, wave);
+    return wave;
+  }
+
   function createSource(context, type, frequency) {
     if (type !== "noise") {
       const source = context.createOscillator();
-      source.type = type;
+      if (type === "pulse12" || type === "pulse25") {
+        source.setPeriodicWave(getPulseWave(context, type === "pulse12" ? 0.125 : 0.25));
+      } else {
+        source.type = type;
+      }
       source.frequency.value = frequency;
       return source;
     }
@@ -179,6 +199,7 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
     instrumentOutput?.disconnect();
     instrumentOutput = null;
     noiseBuffer = null;
+    pulseWaves = new Map();
   }
 
   return Object.freeze({

@@ -13,7 +13,7 @@ const LIMITS = Object.freeze({
   releaseSeconds: [0.01, 3],
 });
 
-const VOICE_TYPES = new Set(["square", "triangle", "sawtooth", "noise"]);
+const VOICE_TYPES = new Set(["pulse12", "pulse25", "square", "triangle", "sawtooth", "noise"]);
 
 function validateValue(key, value) {
   if (key === "voiceType") {

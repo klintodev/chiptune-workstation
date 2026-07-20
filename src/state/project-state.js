@@ -14,11 +14,11 @@ export const PROJECT_SCHEMA_VERSION = 3;
 export const DEFAULT_PATTERN_ID = "pattern-1";
 export const DEFAULT_TRACK_ID = "track-1";
 export const MAX_PROJECT_HISTORY = 100;
-export const MAX_PROJECT_TRACKS = 4;
+export const MAX_PROJECT_TRACKS = 8;
 export const MAX_ARRANGEMENT_STEPS = 256;
 export const MAX_TRACK_VOICES = 16;
 
-const VOICE_TYPES = new Set(["square", "triangle", "sawtooth", "noise"]);
+const VOICE_TYPES = new Set(["pulse12", "pulse25", "square", "triangle", "sawtooth", "noise"]);
 
 function cloneStep(step) {
   return step === null ? null : { ...step };
@@ -462,6 +462,37 @@ export function createProjectState(initialProject = createDefaultProject()) {
     return id;
   }
 
+  function createPatternClip(trackId, startStep, name) {
+    const patternIds = new Set(state.patterns.map(({ id }) => id));
+    const names = new Set(state.patterns.map((pattern) => pattern.name));
+    const patternId = nextIdentifier("pattern", patternIds);
+    const pattern = {
+      id: patternId,
+      name: uniqueName(name?.trim() || `Pattern ${state.patterns.length + 1}`, names),
+      rootOctave: DEFAULT_PATTERN_ROOT_OCTAVE,
+      steps: Array(DEFAULT_PATTERN_LENGTH).fill(null),
+    };
+    const projectWithPattern = { ...state, patterns: [...state.patterns, pattern] };
+    if (!canPlaceClip(projectWithPattern, trackId, patternId, startStep)) {
+      throw new RangeError("A new pattern does not fit at the selected track position.");
+    }
+
+    const clipIds = new Set(state.tracks.flatMap((track) => track.clips.map((clip) => clip.id)));
+    const clipId = nextIdentifier("clip", clipIds);
+    const tracks = state.tracks.map((track) => track.id === trackId
+      ? {
+        ...track,
+        clips: [...track.clips, { id: clipId, patternId, startStep }]
+          .sort((left, right) => left.startStep - right.startStep),
+      }
+      : track);
+    commit(
+      { ...projectWithPattern, tracks },
+      { operation: "create-pattern-clip", trackId, patternId, clipId },
+    );
+    return Object.freeze({ clipId, patternId });
+  }
+
   function renamePattern(patternId, name) {
     const resolvedName = name.trim();
     validateName(resolvedName, "Pattern");
@@ -730,6 +761,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
     canMoveClip,
     createClipVariation,
     createPattern,
+    createPatternClip,
     deletePattern,
     duplicatePattern,
     endHistoryGroup,

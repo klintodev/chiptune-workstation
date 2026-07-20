@@ -70,6 +70,24 @@ test("clip placement rejects overlaps and arrangement overflow atomically", () =
   assert.equal(project.getClip(firstClipId).clip.startStep, 0);
 });
 
+test("creating a pattern on the grid atomically creates its first clip", () => {
+  const project = createProjectState();
+  project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+
+  const before = project.getState();
+  const created = project.createPatternClip(DEFAULT_TRACK_ID, 16);
+
+  assert.equal(project.getPattern(created.patternId).name, "Pattern 2");
+  assert.equal(project.getClip(created.clipId).clip.patternId, created.patternId);
+  assert.equal(project.getClip(created.clipId).clip.startStep, 16);
+
+  project.undo();
+  assert.deepEqual(project.getState(), before);
+
+  assert.throws(() => project.createPatternClip(DEFAULT_TRACK_ID, 8), RangeError);
+  assert.deepEqual(project.getState(), before);
+});
+
 test("clips move independently between tracks and repeat at the first available position", () => {
   const project = createProjectState();
   const secondTrackId = project.addTrack("Bass");

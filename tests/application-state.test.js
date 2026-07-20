@@ -47,11 +47,13 @@ test("session selection and playback state remain outside the persistable projec
 
   session.setAudio({ status: "running" });
   session.setTransport({ status: "playing", retainedStepIndex: 3 });
+  session.setTheme({ value: "light" });
   session.setWorkspace({ activeDockPanel: "instrument", playbackMode: "pattern", selectedClipId: "clip-1" });
   session.setActiveNotes(new Set([64, 60]));
 
   assert.deepEqual(session.getState().activeNotes, [60, 64]);
   assert.equal(session.getState().transport.status, "playing");
+  assert.equal(session.getState().theme.value, "light");
   assert.equal(session.getState().workspace.playbackMode, "pattern");
   assert.equal(session.getState().workspace.activeDockPanel, "instrument");
   assert.equal("audio" in project.getState(), false);

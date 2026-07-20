@@ -68,7 +68,7 @@ As a user, I want distinct chip-style waveforms so that I can choose a recognisa
 
 Requirements:
 
-- Square, triangle, and sawtooth pitched voices are available.
+- 12.5%, 25%, and 50% pulse, triangle, and sawtooth pitched voices are available.
 - A trigger accepts a musical note or frequency and an audio-clock start time.
 - The same note has consistent pitch across voice types.
 - Notes outside the supported range are rejected or constrained predictably.

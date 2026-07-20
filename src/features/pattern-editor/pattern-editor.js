@@ -27,12 +27,16 @@ export function createPatternEditor({
 }) {
   const lifecycle = new AbortController();
   const stepElements = [];
+  const inspector = clearButton.closest(".selected-step-inspector");
+  const inspectorWorkspace = inspector?.closest(".pattern-workspace");
+  const gridScroll = grid.closest(".pattern-grid-scroll");
   const gateButtons = [...gateControl.querySelectorAll("[data-gate]")].map((button) => ({
     button,
     gate: Number(button.dataset.gate),
   }));
   let activePatternId = patternState.getState().patternId;
   let activeVolumeStepIndex = null;
+  let inspectorOpen = false;
   let selectedStepIndex = null;
 
   function getSelectedNote() {
@@ -79,15 +83,11 @@ export function createPatternEditor({
 
 
 
-  function selectStep(index, assignRest, shouldPreview = true) {
+  function selectStep(index, shouldPreview = false) {
     onEditAction?.();
     selectedStepIndex = index;
     const step = patternState.getState().steps[index];
-    if (step === null && assignRest) {
-      const note = getSelectedNote();
-      patternState.setStep(index, note);
-      if (shouldPreview) previewSelectedNote(note, DEFAULT_PATTERN_VOLUME);
-    } else if (step !== null) {
+    if (step !== null) {
       loadStepControls(step);
       if (shouldPreview) previewSelectedNote(step.note, step.volume);
     }
@@ -101,37 +101,87 @@ export function createPatternEditor({
   function createStep(index) {
     const ownerDocument = grid.ownerDocument ?? document;
     const container = ownerDocument.createElement("div");
+    const editButton = ownerDocument.createElement("button");
     const setButton = ownerDocument.createElement("button");
     const number = ownerDocument.createElement("span");
     const value = ownerDocument.createElement("strong");
-    const detail = ownerDocument.createElement("small");
+    const detail = ownerDocument.createElement("span");
+    const meter = ownerDocument.createElement("span");
+    detail.className = "pattern-step-meter";
+    detail.setAttribute("aria-hidden", "true");
+    detail.append(meter);
     container.className = "pattern-step";
     setButton.className = "pattern-step-set";
     setButton.type = "button";
     setButton.dataset.stepIndex = String(index);
     number.textContent = String(index + 1).padStart(2, "0");
     setButton.append(number, value, detail);
+    editButton.className = "pattern-step-edit";
+    editButton.type = "button";
+    editButton.dataset.stepIndex = String(index);
+    editButton.textContent = "\u2699";
+    editButton.title = "Edit note";
     setButton.addEventListener("click", () => {
-      const step = patternState.getState().steps[index];
-      selectStep(index, step === null);
+      inspectorOpen = false;
+      selectStep(index);
     }, { signal: lifecycle.signal });
-    container.append(setButton);
+    setButton.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      inspectorOpen = false;
+      selectedStepIndex = null;
+      onEditAction?.();
+      patternState.clearStep(index);
+      render();
+    }, { signal: lifecycle.signal });
+    editButton.addEventListener("click", () => {
+      inspectorOpen = true;
+      selectStep(index);
+    }, { signal: lifecycle.signal });
+    container.append(setButton, editButton);
     grid.append(container);
-    stepElements.push({ container, detail, setButton, value });
+    stepElements.push({ container, detail, editButton, meter, setButton, value });
   }
 
   function syncStepElements(length) {
     while (stepElements.length < length) createStep(stepElements.length);
     while (stepElements.length > length) stepElements.pop().container.remove();
-    if (selectedStepIndex !== null && selectedStepIndex >= length) selectedStepIndex = null;
+    if (selectedStepIndex !== null && selectedStepIndex >= length) {
+      inspectorOpen = false;
+      selectedStepIndex = null;
+    }
 
     grid.setAttribute("aria-label", `${length}-step pattern`);
+    grid.style.setProperty("--pattern-step-count", String(length));
   }
+  function positionInspector() {
+    if (!inspector || !inspectorWorkspace || selectedStepIndex === null) return;
+    const selectedStep = stepElements[selectedStepIndex]?.container;
+    if (!selectedStep) return;
 
+    const workspaceBounds = inspectorWorkspace.getBoundingClientRect();
+    const stepBounds = selectedStep.getBoundingClientRect();
+    const inspectorWidth = inspector.offsetWidth || 320;
+    const edgeGap = 8;
+    const targetX = stepBounds.left + (stepBounds.width / 2) - workspaceBounds.left;
+    const minimumCenter = (inspectorWidth / 2) + edgeGap;
+    const maximumCenter = workspaceBounds.width - (inspectorWidth / 2) - edgeGap;
+    const popoverCenter = maximumCenter < minimumCenter
+      ? workspaceBounds.width / 2
+      : Math.min(maximumCenter, Math.max(minimumCenter, targetX));
+    const popoverLeft = popoverCenter - (inspectorWidth / 2);
+    const arrowLeft = Math.min(inspectorWidth - 14, Math.max(14, targetX - popoverLeft));
+
+    inspector.style.setProperty("--step-popover-left", `${popoverCenter}px`);
+    inspector.style.setProperty("--step-arrow-left", `${arrowLeft}px`);
+  }
   function renderInspector(pattern) {
     const selectedStep = selectedStepIndex === null ? null : pattern.steps[selectedStepIndex];
     const hasSelection = selectedStepIndex !== null;
     const hasNote = selectedStep !== null;
+    if (inspector) {
+      inspector.hidden = !hasSelection || !inspectorOpen;
+      if (hasSelection && inspectorOpen) positionInspector();
+    }
     stepNumberOutput.textContent = hasSelection
       ? String(selectedStepIndex + 1).padStart(2, "0")
       : "--";
@@ -158,6 +208,7 @@ export function createPatternEditor({
     const pattern = patternState.getState();
     if (pattern.patternId !== activePatternId) {
       activePatternId = pattern.patternId;
+      inspectorOpen = false;
       selectedStepIndex = null;
       activeVolumeStepIndex = null;
     }
@@ -169,12 +220,16 @@ export function createPatternEditor({
       const noteLabel = hasNote ? (isNoiseTrack() ? "Hit" : getNoteName(step.note)) : "Rest";
       elements.container.classList.toggle("has-note", hasNote);
       elements.container.classList.toggle("selected", index === selectedStepIndex);
+      elements.editButton.hidden = !hasNote;
+      elements.editButton.setAttribute("aria-label", `Edit step ${index + 1}, ${noteLabel}`);
 
       elements.setButton.tabIndex = index === (selectedStepIndex ?? 0) ? 0 : -1;
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
+      elements.setButton.title = hasNote ? "Right-click to clear this note." : "";
       elements.value.textContent = noteLabel;
-      elements.detail.textContent = hasNote
-        ? `${Math.round(step.gate * 100)}% / ${Math.round(step.volume * 100)}%`
+      elements.meter.style.width = hasNote ? `${Math.round(step.volume * 100)}%` : "0%";
+      elements.detail.title = hasNote
+        ? `${Math.round(step.gate * 100)}% gate · ${Math.round(step.volume * 100)}% velocity`
         : "";
       elements.setButton.setAttribute(
         "aria-label",
@@ -203,7 +258,7 @@ export function createPatternEditor({
       const delta = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
       const nextIndex = currentIndex + delta;
       if (nextIndex < 0 || nextIndex >= length) return;
-      selectStep(nextIndex, false, false);
+      selectStep(nextIndex);
       focusStep(nextIndex);
       return;
     }
@@ -283,6 +338,8 @@ export function createPatternEditor({
   octaveSelect.addEventListener("change", handleNoteSelectionChange, { signal: lifecycle.signal });
   previewInput.addEventListener("change", handlePreviewChange, { signal: lifecycle.signal });
   grid.addEventListener("keydown", handleGridKeyDown, { signal: lifecycle.signal });
+  gridScroll?.addEventListener("scroll", positionInspector, { signal: lifecycle.signal });
+  globalThis.addEventListener?.("resize", positionInspector, { signal: lifecycle.signal });
   patternState.addEventListener("change", render);
   render();
 

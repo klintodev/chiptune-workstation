@@ -11,11 +11,13 @@ export function createTransportControls({
 }) {
   const lifecycle = new AbortController();
   const elements = {
+    loop: queryRequired(root, "#transport-loop"),
     master: queryRequired(root, "#master-volume"),
     masterValue: queryRequired(root, "#master-volume-value"),
     mode: queryRequired(root, "#playback-mode"),
-    pause: queryRequired(root, "#transport-pause"),
     play: queryRequired(root, "#transport-play"),
+    projectTitle: queryRequired(root, "#project-title"),
+    start: queryRequired(root, "#transport-start"),
     status: queryRequired(root, "#transport-status"),
     stop: queryRequired(root, "#transport-stop"),
     tempo: queryRequired(root, "#tempo"),
@@ -31,9 +33,9 @@ export function createTransportControls({
     const stepLabel = String(stepIndex + 1).padStart(3, "0");
     const modeLabel = transport.mode === "pattern" ? "Pattern" : "Arrangement";
     const statusLabel = transport.status === "paused"
-      ? "Paused / Next"
+      ? "Paused · next"
       : transport.status === "playing" ? "Playing" : "Stopped";
-    elements.status.value = `${modeLabel} / ${statusLabel} step ${stepLabel}`;
+    elements.status.value = `${modeLabel} · ${statusLabel} · step ${stepLabel}`;
   }
 
   function startPlayheadDisplay() {
@@ -59,20 +61,25 @@ export function createTransportControls({
     const project = projectState.getState();
     const transport = scheduler.getState();
     const playing = transport.status === "playing";
+    const hasArrangement = projectState.getArrangementEnd() > 0;
+    elements.projectTitle.value = project.metadata.title;
     elements.mode.value = transport.mode;
     elements.tempo.value = String(project.transport.bpm);
-    elements.tempoValue.value = `${project.transport.bpm} BPM`;
+    elements.tempoValue.value = String(project.transport.bpm);
     elements.master.value = String(project.transport.masterVolume * 100);
     elements.masterValue.value = `${Math.round(project.transport.masterVolume * 100)}%`;
-    const hasArrangement = projectState.getArrangementEnd() > 0;
-    elements.play.disabled = !audioEngine.isReady() || playing || (transport.mode === "arrangement" && !hasArrangement);
-    const playLabel = transport.status === "paused" ? "Resume" : "Play";
-    elements.play.textContent = "\u25b6";
+    elements.play.disabled = !audioEngine.isReady() || (transport.mode === "arrangement" && !hasArrangement);
+    const playLabel = playing ? "Pause" : transport.status === "paused" ? "Resume" : "Play";
+    elements.play.textContent = playing ? "❙❙" : "▶";
+    elements.play.classList.toggle("playing", playing);
     elements.play.setAttribute("aria-label", playLabel);
     elements.play.title = `${playLabel} (Space)`;
-    elements.pause.title = "Pause (Space)";
-    elements.pause.disabled = !playing;
     elements.stop.disabled = transport.status === "stopped";
+    elements.start.disabled = transport.status === "stopped" && scheduler.getPlayheadStep() === 0;
+    elements.loop.disabled = !hasArrangement;
+    elements.loop.classList.toggle("active", project.transport.loop.enabled);
+    elements.loop.setAttribute("aria-pressed", String(project.transport.loop.enabled));
+    elements.loop.title = project.transport.loop.enabled ? "Disable arrangement loop" : "Loop the whole arrangement";
     if (playing) startPlayheadDisplay();
     else stopPlayheadDisplay();
   }
@@ -102,6 +109,22 @@ export function createTransportControls({
     return scheduler.getState().status === "playing" ? pausePlayback() : startPlayback();
   }
 
+  function jumpToStart() {
+    scheduler.stop();
+    scheduler.setStartStep(0);
+    sessionState.setWorkspace({ arrangementStartStep: 0 });
+    onError("");
+    render();
+  }
+
+  function toggleLoop() {
+    const project = projectState.getState();
+    const enabled = !project.transport.loop.enabled;
+    const endStep = Math.max(1, projectState.getArrangementEnd());
+    projectState.setLoop({ enabled, startStep: 0, endStep });
+    onError("");
+  }
+
   function blocksTransportShortcut(target) {
     if (!target?.matches) return false;
     if (target.matches("textarea, select, [contenteditable='true']")) return true;
@@ -116,9 +139,10 @@ export function createTransportControls({
     onError("");
     render();
   }, { signal: lifecycle.signal });
-  elements.play.addEventListener("click", startPlayback, { signal: lifecycle.signal });
-  elements.pause.addEventListener("click", pausePlayback, { signal: lifecycle.signal });
+  elements.start.addEventListener("click", jumpToStart, { signal: lifecycle.signal });
+  elements.play.addEventListener("click", togglePlayback, { signal: lifecycle.signal });
   elements.stop.addEventListener("click", scheduler.stop, { signal: lifecycle.signal });
+  elements.loop.addEventListener("click", toggleLoop, { signal: lifecycle.signal });
   root.addEventListener("keydown", (event) => {
     if (
       (event.code !== "Space" && event.key !== " " && event.key !== "Spacebar") ||
@@ -130,6 +154,7 @@ export function createTransportControls({
     event.preventDefault();
     togglePlayback();
   }, { signal: lifecycle.signal });
+
   function applyTempo({ reportInvalid = false } = {}) {
     const invalidMessage = "Tempo must be a whole number between 40 and 240 BPM.";
     const rawValue = elements.tempo.value.trim();
@@ -137,9 +162,7 @@ export function createTransportControls({
       if (reportInvalid) {
         onError(invalidMessage);
         render();
-      } else {
-        onError("");
-      }
+      } else onError("");
       return false;
     }
     const bpm = Number(rawValue);
@@ -148,7 +171,7 @@ export function createTransportControls({
       if (reportInvalid) render();
       return false;
     }
-    elements.tempoValue.value = `${bpm} BPM`;
+    elements.tempoValue.value = String(bpm);
     projectState.setBpm(bpm);
     scheduler.setBpm(bpm);
     onError("");
@@ -156,9 +179,7 @@ export function createTransportControls({
   }
 
   elements.tempo.addEventListener("input", () => applyTempo(), { signal: lifecycle.signal });
-  elements.tempo.addEventListener("change", () => applyTempo({ reportInvalid: true }), {
-    signal: lifecycle.signal,
-  });
+  elements.tempo.addEventListener("change", () => applyTempo({ reportInvalid: true }), { signal: lifecycle.signal });
   elements.master.addEventListener("input", () => {
     const volume = Number(elements.master.value) / 100;
     elements.masterValue.value = `${Math.round(volume * 100)}%`;
@@ -179,7 +200,6 @@ export function createTransportControls({
 
   elements.tempo.addEventListener("focus", beginRange, { signal: lifecycle.signal });
   elements.tempo.addEventListener("blur", finishRange, { signal: lifecycle.signal });
-
   elements.master.addEventListener("pointerdown", beginRange, { signal: lifecycle.signal });
   elements.master.addEventListener("pointerup", finishRange, { signal: lifecycle.signal });
   elements.master.addEventListener("pointercancel", finishRange, { signal: lifecycle.signal });
@@ -192,10 +212,7 @@ export function createTransportControls({
   };
   const handleSchedulerChange = (event) => {
     const transport = scheduler.getState();
-    sessionState.setTransport({
-      retainedStepIndex: transport.retainedStepIndex,
-      status: transport.status,
-    });
+    sessionState.setTransport({ retainedStepIndex: transport.retainedStepIndex, status: transport.status });
     if (event.detail.error) onError(event.detail.error.message);
     render();
   };

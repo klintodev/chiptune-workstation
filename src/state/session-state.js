@@ -3,6 +3,7 @@ const DEFAULT_SESSION = Object.freeze({
   audio: Object.freeze({ error: null, status: "idle" }),
   editor: Object.freeze({ clearPatternArmed: false, selectedStepIndex: null }),
   transport: Object.freeze({ retainedStepIndex: 0, status: "stopped" }),
+  theme: Object.freeze({ value: "dark" }),
   workspace: Object.freeze({
     activeDockPanel: "sequencer",
     arrangementStartStep: 0,
@@ -19,6 +20,7 @@ function freezeSession(session) {
   Object.freeze(session.audio);
   Object.freeze(session.editor);
   Object.freeze(session.transport);
+  Object.freeze(session.theme);
   Object.freeze(session.workspace);
   return Object.freeze(session);
 }
@@ -30,6 +32,7 @@ function normalizeSession(session) {
     audio: { ...session.audio },
     editor: { ...session.editor },
     transport: { ...session.transport },
+    theme: { ...session.theme },
     workspace: { ...session.workspace },
   });
 }
@@ -42,6 +45,7 @@ export function createSessionState(initial = DEFAULT_SESSION) {
     audio: { ...DEFAULT_SESSION.audio, ...initial.audio },
     editor: { ...DEFAULT_SESSION.editor, ...initial.editor },
     transport: { ...DEFAULT_SESSION.transport, ...initial.transport },
+    theme: { ...DEFAULT_SESSION.theme, ...initial.theme },
     workspace: { ...DEFAULT_SESSION.workspace, ...initial.workspace },
   });
 
@@ -83,6 +87,7 @@ export function createSessionState(initial = DEFAULT_SESSION) {
     setAudio: (values) => update("audio", values),
     setEditor: (values) => update("editor", values),
     setTransport: (values) => update("transport", values),
+    setTheme: (values) => update("theme", values),
     setWorkspace: (values) => update("workspace", values),
   });
 }

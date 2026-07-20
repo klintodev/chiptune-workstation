@@ -73,9 +73,9 @@
 }
 
 .arrangement-clip.selected > .arrangement-clip-remove {
-  border-color: rgba(10, 12, 8, 0.4);
+  border-color: var(--accent);
   color: var(--black);
-  background: rgba(246, 240, 219, 0.7);
+  background: var(--accent);
 }
 
 .arrangement-clip-drag-ghost > .arrangement-clip-remove {

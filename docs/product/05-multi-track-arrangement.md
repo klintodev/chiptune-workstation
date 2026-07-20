@@ -33,7 +33,7 @@ Clips remain linked to their source pattern so that one edit updates every place
 
 ### Track workflow
 
-- A project must support between one and four tracks.
+- A project must support between one and eight tracks.
 - A new project must begin with one track named `Pulse 1`.
 - The user must be able to add, select, rename, reorder, and remove tracks.
 - The final remaining track must not be removable.
@@ -45,7 +45,7 @@ Clips remain linked to their source pattern so that one edit updates every place
 ### Instruments and mixing
 
 - Every track must own an independent voice type, octave offset, instrument volume, attack, and release configuration.
-- The supported voice types remain square, triangle, sawtooth, and noise.
+- The supported voice types are 12.5%, 25%, and 50% pulse, triangle, sawtooth, and noise.
 - Noise tracks must use the same sequencer and arrangement model while presenting occupied steps as hits rather than meaningful pitches.
 - Every track must have independent volume, mute, and solo controls.
 - Multiple tracks may be soloed simultaneously.
@@ -89,7 +89,7 @@ Clips remain linked to their source pattern so that one edit updates every place
 - Project-level undo and redo must cover pattern, track, mixer, and arrangement mutations as coherent user actions.
 - Continuous range-input changes must remain grouped into one history entry.
 - A track must permit at most 16 active voices; when capacity is reached, the oldest voice must be retired before another is created.
-- The maximum of four tracks and 256 arrangement steps must be enforced in state rather than only in the interface.
+- The maximum of eight tracks and 256 arrangement steps must be enforced in state rather than only in the interface.
 - Track and clip controls must expose useful names, selected states, and keyboard focus.
 - The arrangement must support keyboard selection and movement without triggering live instrument notes.
 - Audio activation rules must remain unchanged: no audio context or sound is created before a permitted user gesture.
@@ -101,7 +101,7 @@ Clips remain linked to their source pattern so that one edit updates every place
 - Clips remain linked to their patterns; duplicating a pattern creates a variation.
 - Clips are positioned independently in track lanes rather than grouped into global scenes.
 - Tracks own instruments and mixer settings.
-- The initial limits are four tracks, 16 active voices per track, and 256 arrangement steps.
+- The initial limits are eight tracks, 16 active voices per track, and 256 arrangement steps.
 - New projects begin with one track and one empty pattern rather than a predefined ensemble.
 - The same sequencer serves pitched and noise tracks.
 - The first arrangement uses one constant project tempo and does not support per-clip overrides or effects.

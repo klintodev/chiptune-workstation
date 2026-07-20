@@ -6,6 +6,7 @@ import { createVoiceEngine } from "../src/audio/voice-engine.js";
 function createAudioHarness({ maxVoices = Infinity } = {}) {
   let now = 0;
   const gainNodes = [];
+  const periodicWaves = [];
   const sources = [];
   const context = {
     get currentTime() { return now; },
@@ -33,11 +34,17 @@ function createAudioHarness({ maxVoices = Infinity } = {}) {
         addEventListener() {},
         connect() {},
         disconnect() {},
+        setPeriodicWave(wave) { source.periodicWave = wave; },
         start() {},
         stop(time) { source.stopTime = time; },
       };
       sources.push(source);
       return source;
+    },
+    createPeriodicWave(real, imaginary) {
+      const wave = { imaginary: [...imaginary], real: [...real] };
+      periodicWaves.push(wave);
+      return wave;
     },
   };
   const output = { context };
@@ -49,6 +56,7 @@ function createAudioHarness({ maxVoices = Infinity } = {}) {
 
   return {
     gainNodes,
+    periodicWaves,
     sources,
     voiceEngine,
     setTime: (time) => { now = time; },
@@ -86,4 +94,15 @@ test("the oldest voice is retired when the per-track limit is reached", () => {
   assert.equal(harness.sources[0].stopTime, 0.2);
   assert.equal(harness.sources[1].stopTime, undefined);
   assert.equal(harness.sources[2].stopTime, undefined);
+});
+test("pulse-width voices use reusable periodic waves", () => {
+  const harness = createAudioHarness();
+
+  harness.voiceEngine.trigger({ type: "pulse25" });
+  harness.voiceEngine.trigger({ type: "pulse25" });
+  harness.voiceEngine.trigger({ type: "pulse12" });
+
+  assert.equal(harness.periodicWaves.length, 2);
+  assert.equal(harness.sources[0].periodicWave, harness.sources[1].periodicWave);
+  assert.notEqual(harness.sources[0].periodicWave, harness.sources[2].periodicWave);
 });

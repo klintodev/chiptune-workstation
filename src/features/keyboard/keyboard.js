@@ -65,7 +65,7 @@ export function createKeyboardFeature({
     for (const key of blackKeys) {
       const boundaryIndex = whiteKeys.findIndex((whiteKey) => whiteKey.note > key.note);
       const button = createKeyButton(key, "black");
-      button.style.left = `calc(${boundaryIndex} * var(--white-key-width))`;
+      button.style.left = `${(boundaryIndex / whiteKeys.length) * 100}%`;
       surface.append(button);
     }
 

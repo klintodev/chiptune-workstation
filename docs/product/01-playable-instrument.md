@@ -12,7 +12,7 @@ A user should be able to open the application, deliberately enable audio, select
 - The user must be able to play notes from an on-screen keyboard.
 - The user must be able to play notes from a mapped set of computer keyboard keys.
 - The interface must show which note or key is currently active.
-- The instrument must support square, triangle, sawtooth, and noise-based voices, subject to validation of the desired chiptune sound palette.
+- The instrument must support 12.5%, 25%, and 50% pulse, triangle, sawtooth, and noise-based voices, subject to validation of the desired chiptune sound palette.
 - The user must be able to change octave without reloading the application.
 - The user must be able to control the instrument's output volume.
 - Pitched voices must have a short configurable amplitude envelope so that notes start and stop without audible clicks.
@@ -25,7 +25,7 @@ A user should be able to open the application, deliberately enable audio, select
 ## Open questions
 
 - Is the first instrument monophonic, polyphonic, or selectable between the two?
-- Should pulse-width control be included now, or should the first square voice use a fixed duty cycle?
+- Should future pulse-width control remain stepped or become continuously variable?
 - Does sawtooth fit the desired aesthetic, or should pulse/noise variations take priority?
 - Should the noise voice be pitched, unpitched, or represented as a separate percussion instrument?
 - Which browsers and mobile devices are officially supported for the first release?

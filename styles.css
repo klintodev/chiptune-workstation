@@ -1,8 +1,9 @@
 @import url("./src/styles/base.css");
+@import url("./src/features/theme/theme.css");
 @import url("./src/features/audio-status/audio-status.css");
-@import url("./src/features/arranger/arranger.css?v=20260719-5");
+@import url("./src/features/arranger/arranger.css?v=20260720-1");
 @import url("./src/features/arranger/clip-drag.css");
 @import url("./src/features/instrument/instrument.css");
 @import url("./src/features/keyboard/keyboard.css");
-@import url("./src/features/pattern-editor/pattern-editor.css?v=20260719-5");
+@import url("./src/features/pattern-editor/pattern-editor.css?v=20260720-2");
 @import url("./src/features/workspace-tabs/workspace-tabs.css");

@@ -6,11 +6,12 @@ import {
 import { createNotePreview } from "./audio/note-preview.js";
 import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
 import { createAudioStatusFeature } from "./features/audio-status/audio-status.js";
-import { createArrangerFeature } from "./features/arranger/arranger-feature.js?v=20260719-7";
+import { createArrangerFeature } from "./features/arranger/arranger-feature.js?v=20260720-1";
 import { createInstrumentFeature } from "./features/instrument/instrument.js";
 import { createInputController } from "./features/keyboard/input-controller.js";
 import { createKeyboardFeature } from "./features/keyboard/keyboard.js";
 import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js";
+import { createThemeFeature } from "./features/theme/theme.js";
 import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js";
 import { getNoteName } from "./music/note.js";
 import { createInstrumentState } from "./state/instrument-state.js";
@@ -22,7 +23,8 @@ import { createArrangementScheduler } from "./transport/arrangement-scheduler.js
 const audioEngine = createAudioEngine();
 const projectState = createProjectState();
 const sessionState = createSessionState();
-const workspaceTabs = createWorkspaceTabs({ sessionState });
+const themeFeature = createThemeFeature({ sessionState });
+const workspaceTabs = createWorkspaceTabs({ projectState, sessionState });
 const getSelectedTrackId = () => sessionState.getState().workspace.selectedTrackId;
 const getSelectedPatternId = () => sessionState.getState().workspace.selectedPatternId;
 const getKeyboardNoteOffset = () => (
@@ -167,6 +169,7 @@ sessionState.addEventListener("change", (event) => {
 projectState.addEventListener("change", (event) => {
   scheduler.releaseInvalidOwnership();
   if (event.detail.field === "pattern.rootOctave") keyboardFeature.render();
+  if (event.detail.field === "track.name") instrumentFeature.render();
 }, { signal: applicationLifecycle.signal });
 
 function disposeApplication() {
@@ -177,6 +180,7 @@ function disposeApplication() {
   instrumentFeature.dispose();
   keyboardFeature.dispose();
   workspaceTabs.dispose();
+  themeFeature.dispose();
   inputController.dispose();
   patternState.dispose();
   instrumentState.dispose();

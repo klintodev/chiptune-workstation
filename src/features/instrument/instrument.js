@@ -22,12 +22,19 @@ export function createInstrumentFeature({
     voiceType: queryRequired(root, "#voice-type"),
     volume: queryRequired(root, "#volume"),
     volumeValue: queryRequired(root, "#volume-value"),
+    voiceOptions: [...root.querySelectorAll("#voice-options [data-voice]")],
   };
 
   function render() {
     const config = instrumentState.getState();
     elements.trackName.textContent = getTrackName();
     elements.voiceType.value = config.voiceType;
+    for (const button of elements.voiceOptions) {
+      const selected = button.dataset.voice === config.voiceType;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-checked", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
     elements.octaveValue.textContent = config.octaveOffset > 0 ? `+${config.octaveOffset}` : String(config.octaveOffset);
     elements.octaveDown.disabled = config.octaveOffset <= -2;
     elements.octaveUp.disabled = config.octaveOffset >= 2;
@@ -40,10 +47,18 @@ export function createInstrumentFeature({
     onRenderKeyboard?.();
   }
 
+  function selectVoice(voiceType) {
+    instrumentState.setVoiceType(voiceType);
+    elements.voiceType.value = voiceType;
+  }
+
   elements.voiceType.addEventListener("change", () => {
-    instrumentState.setVoiceType(elements.voiceType.value);
+    selectVoice(elements.voiceType.value);
     elements.voiceType.blur();
   }, { signal: lifecycle.signal });
+  for (const button of elements.voiceOptions) {
+    button.addEventListener("click", () => selectVoice(button.dataset.voice), { signal: lifecycle.signal });
+  }
   elements.octaveDown.addEventListener("click", () => {
     instrumentState.setOctaveOffset(instrumentState.getState().octaveOffset - 1);
   }, { signal: lifecycle.signal });

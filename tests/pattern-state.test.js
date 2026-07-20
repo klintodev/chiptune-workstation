@@ -51,6 +51,17 @@ test("new notes receive the documented gate and volume defaults", () => {
   });
 });
 
+test("clearing a note can be undone", () => {
+  const pattern = createPatternState();
+  pattern.setStep(0, 60);
+
+  assert.equal(pattern.clearStep(0), true);
+  assert.equal(pattern.getState().steps[0], null);
+
+  pattern.undo();
+  assert.equal(pattern.getState().steps[0].note, 60);
+});
+
 test("a history group turns continuous slider input into one undo step", () => {
   const pattern = createPatternState();
   pattern.setStep(0, 60);

@@ -29,7 +29,11 @@ export function createPatternLibrary({
   function selectPattern(patternId) {
     if (patternId === getWorkspace().selectedPatternId) return false;
     onBeforeSelectionChange();
-    return sessionState.setWorkspace({ selectedClipId: null, selectedPatternId: patternId });
+    return sessionState.setWorkspace({
+      activeDockPanel: "sequencer",
+      selectedClipId: null,
+      selectedPatternId: patternId,
+    });
   }
 
   function render() {
@@ -61,6 +65,7 @@ export function createPatternLibrary({
     elements.delete.disabled = project.patterns.length === 1;
     elements.place.disabled = project.tracks.length === 0;
     elements.placeTrack.textContent = track.name;
+    elements.placeStart.value = String(workspace.arrangementStartStep + 1);
   }
 
   elements.select.addEventListener("change", () => {
@@ -126,7 +131,10 @@ export function createPatternLibrary({
         workspace.selectedPatternId,
         startStep,
       );
-      sessionState.setWorkspace({ selectedClipId: clipId });
+      sessionState.setWorkspace({
+        activeDockPanel: "sequencer",
+        selectedClipId: clipId,
+      });
       onError("");
     } catch (error) {
       onError(error.message);

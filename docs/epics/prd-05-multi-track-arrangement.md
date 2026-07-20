@@ -4,7 +4,7 @@ These epics deliver [PRD 05: Multi-Track Arrangement](../product/05-multi-track-
 
 ## Initial scope decisions
 
-- The project contains a global pattern library and between one and four tracks.
+- The project contains a global pattern library and between one and eight tracks.
 - One sequencer edits the selected pattern.
 - Patterns contain notes, gate, and volume; tracks contain instruments and mixer settings.
 - A clip is a linked pattern reference positioned at an integer sixteenth-note step.
@@ -135,7 +135,7 @@ Requirements:
 
 ### Outcome
 
-The user can manage up to four tracks while the single sequencer, instrument controls, and keyboard consistently represent the selected track.
+The user can manage up to eight tracks while the single sequencer, instrument controls, and keyboard consistently represent the selected track.
 
 ### User stories
 
@@ -148,7 +148,7 @@ Requirements:
 - A new project begins with `Pulse 1` selected.
 - Add track creates an empty track with a unique identifier and predictable name.
 - New tracks receive independent default instrument and mixer settings.
-- Track creation is unavailable at the four-track limit.
+- Track creation is unavailable at the eight-track limit.
 - Selecting a track visibly identifies it and updates the projected controls.
 
 #### US17.2 - Rename and reorder tracks
@@ -493,7 +493,7 @@ Requirements:
 ## Definition of done for PRD 05
 
 - A user can create a pattern once, place linked copies independently across tracks, and duplicate the pattern to create a variation.
-- A user can add, name, reorder, mix, mute, solo, and remove up to four tracks.
+- A user can add, name, reorder, mix, mute, solo, and remove up to eight tracks.
 - Every track uses its own instrument while the one sequencer edits the selected pattern.
 - The independent clip arrangement plays through one synchronized audio-clock transport.
 - Pattern loop and full arrangement modes have distinct, predictable playheads.

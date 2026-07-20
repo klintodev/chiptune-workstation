@@ -6,6 +6,18 @@ import { queryRequired } from "../../shared/query-required.js";
 import { createClipDragController, getTimelineStep } from "./clip-drag-controller.js";
 
 const STEP_WIDTH = 14;
+const TRACK_COLOURS = Object.freeze([
+  "var(--accent)", "#f2b8d8", "#b7a9ec", "#f2b48c",
+  "#9fc6ed", "#d6a7ef", "#8fd3c8", "#ef9ca8",
+]);
+const VOICE_LABELS = Object.freeze({
+  pulse12: "pulse 12.5%",
+  pulse25: "pulse 25%",
+  square: "pulse 50%",
+  triangle: "triangle",
+  sawtooth: "saw",
+  noise: "noise",
+});
 
 function createButton(root, label, action, trackId) {
   const button = root.createElement("button");
@@ -53,12 +65,15 @@ function createClipContextMenu(root) {
   menu.className = "clip-context-menu";
   menu.hidden = true;
   menu.setAttribute("role", "menu");
+  const newPattern = root.createElement("button");
+  newPattern.type = "button";
+  newPattern.setAttribute("role", "menuitem");
   const variation = root.createElement("button");
   variation.type = "button";
   variation.setAttribute("role", "menuitem");
   variation.textContent = "Create variation";
-  menu.append(variation);
-  return Object.freeze({ menu, variation });
+  menu.append(newPattern, variation);
+  return Object.freeze({ menu, newPattern, variation });
 }
 
 export function createArrangementView({
@@ -78,7 +93,7 @@ export function createArrangementView({
   addTrack.id = "add-track";
   addTrack.className = "add-track";
   addTrack.type = "button";
-  addTrack.textContent = "+ Track";
+  addTrack.textContent = "+ Add track";
   const elements = {
     addTrack,
     canvas: queryRequired(root, "#arrangement-canvas"),
@@ -92,6 +107,7 @@ export function createArrangementView({
   };
   let activeRangeTrackId = null;
   let contextClipId = null;
+  let contextPlacement = null;
   let dialogReturnFocus = null;
   let pendingTrackId = null;
   let playheadStepIndex = sessionState.getState().workspace.arrangementStartStep;
@@ -119,7 +135,12 @@ export function createArrangementView({
     label.className = "arrangement-ruler-label";
     const labelText = root.createElement("span");
     labelText.textContent = "Tracks";
-    label.append(labelText, elements.addTrack);
+    const count = root.createElement("small");
+    count.textContent = `${projectState.getState().tracks.length}/${MAX_PROJECT_TRACKS}`;
+    const labelMeta = root.createElement("span");
+    labelMeta.className = "arrangement-ruler-meta";
+    labelMeta.append(count, elements.addTrack);
+    label.append(labelText, labelMeta);
     const ruler = root.createElement("div");
     ruler.className = "arrangement-ruler";
     ruler.dataset.action = "seek-arrangement";
@@ -147,15 +168,16 @@ export function createArrangementView({
     return row;
   }
 
-  function createTrackHeader(track, selected, canRemove) {
+  function createTrackHeader(track, trackIndex, selected, canRemove) {
     const header = root.createElement("div");
     header.className = "track-header";
+    header.dataset.trackId = track.id;
+
     const primary = root.createElement("div");
     primary.className = "track-primary";
-    const select = createButton(root, track.name, "select-track", track.id);
-    select.className = "track-select";
-    select.setAttribute("aria-pressed", String(selected));
-
+    const channel = root.createElement("span");
+    channel.className = "track-channel";
+    channel.textContent = `Track ${trackIndex + 1}`;
     const switches = root.createElement("div");
     switches.className = "track-switches";
     const mute = createButton(root, "M", "mute-track", track.id);
@@ -172,14 +194,21 @@ export function createArrangementView({
     remove.disabled = !canRemove;
     remove.setAttribute("aria-label", `Remove ${track.name}`);
     remove.title = canRemove ? `Remove ${track.name}` : "The project must keep one track";
-    primary.append(select, switches, remove);
+    primary.append(channel, switches, remove);
+
+    const name = root.createElement("input");
+    name.className = "track-name-input";
+    name.type = "text";
+    name.maxLength = 32;
+    name.value = track.name;
+    name.dataset.action = "rename-track";
+    name.dataset.trackId = track.id;
+    name.setAttribute("aria-label", `Rename ${track.name}`);
 
     const secondary = root.createElement("div");
     secondary.className = "track-secondary";
     const voice = root.createElement("small");
-    voice.textContent = track.instrument.voiceType === "noise"
-      ? "noise"
-      : track.instrument.voiceType;
+    voice.textContent = VOICE_LABELS[track.instrument.voiceType] ?? track.instrument.voiceType;
     const volume = root.createElement("label");
     volume.className = "track-volume";
     const volumeText = root.createElement("span");
@@ -196,10 +225,9 @@ export function createArrangementView({
     range.setAttribute("aria-label", `${track.name} volume`);
     volume.append(range, volumeText);
     secondary.append(voice, volume);
-    header.append(primary, secondary);
+    header.append(primary, name, secondary);
     return header;
   }
-
   function createLane(track, patterns, selectedClipId) {
     const lane = root.createElement("div");
     lane.className = "track-lane";
@@ -255,16 +283,17 @@ export function createArrangementView({
     const workspace = getWorkspace();
     const patterns = new Map(project.patterns.map((pattern) => [pattern.id, pattern]));
     const rows = [createRuler()];
-    for (const track of project.tracks) {
+    project.tracks.forEach((track, trackIndex) => {
       const row = root.createElement("div");
       row.className = "arrangement-track-row";
+      row.style.setProperty("--track-color", TRACK_COLOURS[trackIndex % TRACK_COLOURS.length]);
       row.classList.toggle("selected", track.id === workspace.selectedTrackId);
       row.append(
-        createTrackHeader(track, track.id === workspace.selectedTrackId, project.tracks.length > 1),
+        createTrackHeader(track, trackIndex, track.id === workspace.selectedTrackId, project.tracks.length > 1),
         createLane(track, patterns, workspace.selectedClipId),
       );
       rows.push(row);
-    }
+    });
     elements.canvas.replaceChildren(...rows);
     elements.addTrack.disabled = project.tracks.length >= MAX_PROJECT_TRACKS;
     elements.empty.hidden = project.tracks.some((track) => track.clips.length > 0);
@@ -285,9 +314,17 @@ export function createArrangementView({
     clipContextMenu.menu.hidden = true;
     const clipId = contextClipId;
     contextClipId = null;
+    contextPlacement = null;
     if (restoreFocus && clipId) {
       elements.canvas.querySelector(`[data-action="select-clip"][data-clip-id="${clipId}"]`)?.focus();
     }
+  }
+
+  function positionContextMenu(clientX, clientY) {
+    const viewportWidth = root.documentElement?.clientWidth ?? globalThis.innerWidth;
+    const viewportHeight = root.documentElement?.clientHeight ?? globalThis.innerHeight;
+    clipContextMenu.menu.style.left = `${Math.max(8, Math.min(clientX, viewportWidth - clipContextMenu.menu.offsetWidth - 8))}px`;
+    clipContextMenu.menu.style.top = `${Math.max(8, Math.min(clientY, viewportHeight - clipContextMenu.menu.offsetHeight - 8))}px`;
   }
 
   function openClipContextMenu(clipId, clientX, clientY) {
@@ -298,12 +335,29 @@ export function createArrangementView({
       selectedPatternId: selected.clip.patternId,
     });
     contextClipId = clipId;
+    contextPlacement = null;
+    clipContextMenu.newPattern.hidden = true;
+    clipContextMenu.variation.hidden = false;
     clipContextMenu.menu.hidden = false;
-    const viewportWidth = root.documentElement?.clientWidth ?? globalThis.innerWidth;
-    const viewportHeight = root.documentElement?.clientHeight ?? globalThis.innerHeight;
-    clipContextMenu.menu.style.left = `${Math.max(8, Math.min(clientX, viewportWidth - clipContextMenu.menu.offsetWidth - 8))}px`;
-    clipContextMenu.menu.style.top = `${Math.max(8, Math.min(clientY, viewportHeight - clipContextMenu.menu.offsetHeight - 8))}px`;
+    positionContextMenu(clientX, clientY);
     clipContextMenu.variation.focus();
+  }
+
+  function openLaneContextMenu(lane, clientX, clientY) {
+    const startStep = getTimelineStep({
+      clientX,
+      laneLeft: lane.getBoundingClientRect().left,
+      maxStep: MAX_ARRANGEMENT_STEPS - 1,
+      stepWidth: STEP_WIDTH,
+    });
+    contextClipId = null;
+    contextPlacement = { startStep, trackId: lane.dataset.trackId };
+    clipContextMenu.newPattern.hidden = false;
+    clipContextMenu.newPattern.textContent = `Create new pattern at step ${startStep + 1}`;
+    clipContextMenu.variation.hidden = true;
+    clipContextMenu.menu.hidden = false;
+    positionContextMenu(clientX, clientY);
+    clipContextMenu.newPattern.focus();
   }
 
   function closeTrackDeleteDialog({ restoreFocus = true } = {}) {
@@ -362,6 +416,27 @@ export function createArrangementView({
 
   function handleClick(event) {
     if (clipDragController.consumeClick(event)) return;
+    const trackHeader = event.target.closest(".track-header");
+    if (trackHeader) {
+      const nameInput = event.target.closest('[data-action="rename-track"]');
+      const workspace = getWorkspace();
+      const shouldRestoreNameFocus = nameInput && (
+        workspace.selectedTrackId !== trackHeader.dataset.trackId ||
+        workspace.activeDockPanel !== "instrument" ||
+        workspace.detailPanelCollapsed
+      );
+      selectTrack(trackHeader.dataset.trackId, {
+        activeDockPanel: "instrument",
+        selectedClipId: null,
+      });
+      if (shouldRestoreNameFocus) {
+        const replacement = elements.canvas.querySelector(
+          `[data-action="rename-track"][data-track-id="${trackHeader.dataset.trackId}"]`,
+        );
+        replacement?.focus();
+        replacement?.select();
+      }
+    }
     const target = event.target.closest("[data-action]");
     if (!target) {
       const lane = event.target.closest(".track-lane");
@@ -440,19 +515,53 @@ export function createArrangementView({
   elements.canvas.addEventListener("pointerup", finishRangeEdit, { signal: lifecycle.signal });
   elements.canvas.addEventListener("pointercancel", finishRangeEdit, { signal: lifecycle.signal });
   elements.canvas.addEventListener("change", (event) => {
-    if (event.target.dataset.action === "track-volume") finishRangeEdit();
+    if (event.target.dataset.action === "track-volume") {
+      finishRangeEdit();
+      return;
+    }
+    if (event.target.dataset.action !== "rename-track") return;
+    try {
+      projectState.renameTrack(event.target.dataset.trackId, event.target.value);
+      onError("");
+    } catch (error) {
+      onError(error.message);
+      render();
+    }
   }, { signal: lifecycle.signal });
   elements.canvas.addEventListener("click", handleClick, { signal: lifecycle.signal });
   elements.canvas.addEventListener("contextmenu", (event) => {
     const clip = event.target.closest(".arrangement-clip");
-    if (!clip) {
+    const lane = event.target.closest(".track-lane");
+    if (!lane) {
       closeClipContextMenu();
       return;
     }
     event.preventDefault();
-    openClipContextMenu(clip.dataset.clipId, event.clientX, event.clientY);
+    if (clip) {
+      openClipContextMenu(clip.dataset.clipId, event.clientX, event.clientY);
+    } else {
+      openLaneContextMenu(lane, event.clientX, event.clientY);
+    }
   }, { signal: lifecycle.signal });
   elements.canvas.addEventListener("keydown", (event) => {
+    const trackName = event.target.closest('[data-action="rename-track"]');
+    if (trackName && (event.key === "Enter" || event.key === "Escape")) {
+      event.preventDefault();
+      if (event.key === "Escape") {
+        trackName.value = projectState.getTrack(trackName.dataset.trackId).name;
+        trackName.blur();
+        return;
+      }
+      try {
+        projectState.renameTrack(trackName.dataset.trackId, trackName.value);
+        onError("");
+      } catch (error) {
+        onError(error.message);
+        render();
+      }
+      trackName.blur();
+      return;
+    }
     const contextClip = event.target.closest(".arrangement-clip");
     if (
       event.target === contextClip &&
@@ -523,6 +632,23 @@ export function createArrangementView({
       const patternId = projectState.createClipVariation(clipId);
       closeClipContextMenu();
       selectTrack(selected.track.id, {
+        activeDockPanel: "sequencer",
+        selectedClipId: clipId,
+        selectedPatternId: patternId,
+      });
+      onError("");
+    } catch (error) {
+      closeClipContextMenu();
+      onError(error.message);
+    }
+  }, { signal: lifecycle.signal });
+  clipContextMenu.newPattern.addEventListener("click", () => {
+    if (!contextPlacement) return;
+    const { startStep, trackId } = contextPlacement;
+    try {
+      const { clipId, patternId } = projectState.createPatternClip(trackId, startStep);
+      closeClipContextMenu();
+      selectTrack(trackId, {
         activeDockPanel: "sequencer",
         selectedClipId: clipId,
         selectedPatternId: patternId,

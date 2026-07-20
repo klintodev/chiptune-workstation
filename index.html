@@ -1,26 +1,40 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="A browser-based chiptune workstation built with the Web Audio API." />
     <title>Chiptune Workstation</title>
-    <link rel="stylesheet" href="./styles.css?v=20260719-5" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260720-2" />
   </head>
   <body>
     <main class="shell">
       <header class="global-bar">
-        <div class="brand"><span class="brand-mark" aria-hidden="true">CW</span><h1>Chiptune<br />Workstation</h1></div>
-        <div class="arrangement-transport" aria-label="Transport controls">
-          <button id="transport-play" class="transport-play" type="button" disabled aria-label="Play">&#9654;</button>
-          <button id="transport-pause" type="button" disabled aria-label="Pause">&#10074;&#10074;</button>
-          <button id="transport-stop" type="button" disabled aria-label="Stop">&#9632;</button>
+        <div class="project-cluster">
+          <div class="studio-badge"><span aria-hidden="true"></span><strong>Klinto Studio</strong></div>
+          <div class="project-name"><span>Project</span><output id="project-title">Untitled chiptune</output></div>
         </div>
-        <label class="toolbar-field mode-control"><span>Mode</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
-        <label class="toolbar-field tempo-control"><span>Tempo</span><span class="tempo-entry"><input id="tempo" type="number" min="40" max="240" step="1" value="120" inputmode="numeric" aria-label="Tempo in BPM" aria-describedby="tempo-value" /><output id="tempo-value" for="tempo">120 BPM</output></span></label>
-        <label class="toolbar-field master-control"><span>Master <output id="master-volume-value" for="master-volume">35%</output></span><input id="master-volume" type="range" min="0" max="100" step="1" value="35" /></label>
-        <output id="transport-status" class="transport-status" aria-live="polite">Arrangement / Stopped step 001</output>
-        <div class="status-cluster" aria-live="polite"><span id="status-light" class="status-light" aria-hidden="true"></span><div><span class="status-label">Audio</span><strong id="audio-state">Not started</strong></div></div>
+
+        <div class="global-transport" aria-label="Transport and mix controls">
+          <div class="arrangement-transport" aria-label="Transport controls">
+            <button id="transport-start" type="button" title="Return to start" aria-label="Return to start">&#9198;</button>
+            <button id="transport-play" class="transport-play" type="button" disabled aria-label="Play">&#9654;</button>
+            <button id="transport-stop" type="button" disabled aria-label="Stop">&#9632;</button>
+            <button id="transport-loop" type="button" disabled aria-label="Loop arrangement" aria-pressed="false">&#8635;</button>
+          </div>
+          <label class="tempo-control"><span>Tempo</span><span><input id="tempo" type="number" min="40" max="240" step="1" value="120" inputmode="numeric" aria-label="Tempo in BPM" /><output id="tempo-value" for="tempo">120</output><small>BPM</small></span></label>
+          <label class="master-control"><span>Master <output id="master-volume-value" for="master-volume">35%</output></span><input id="master-volume" type="range" min="0" max="100" step="1" value="35" /></label>
+        </div>
+
+        <div class="global-status">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false"><span data-theme-icon aria-hidden="true">&#9790;</span><span data-theme-label>Dark</span></button>
+          <label class="mode-control"><span>Mode</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
+          <div class="status-cluster" aria-live="polite"><span id="status-light" class="status-light" aria-hidden="true"></span><div><span class="status-label">Audio</span><strong id="audio-state">Not started</strong></div></div>
+          <output id="transport-status" class="transport-status" aria-live="polite">Arrangement / Stopped step 001</output>
+        </div>
       </header>
 
       <section id="audio-setup" class="audio-setup" aria-labelledby="setup-title">
@@ -35,86 +49,84 @@
       <div class="daw-workspace">
         <section class="arrangement-section" aria-labelledby="arrangement-title">
           <div class="arrangement-heading">
-            <div class="arrangement-title-group"><h2 id="arrangement-title">Arrangement</h2><span>16th-note grid</span></div>
+            <h2 id="arrangement-title">Arrangement</h2>
             <p id="arrangement-error" class="arrangement-error" role="alert" hidden></p>
-            <div class="arrangement-actions">
-              <details id="selected-track-menu" class="track-menu">
-                <summary>Track options</summary>
-                <div class="track-menu-panel">
-                  <label>Track name<input id="selected-track-name" type="text" maxlength="32" /></label>
-                  <div><button id="selected-track-up" type="button">Move up</button><button id="selected-track-down" type="button">Move down</button></div>
-                  <button id="selected-track-remove" class="danger-action" type="button">Remove track</button>
-                </div>
-              </details>
-            </div>
           </div>
-
           <div class="arrangement-stage">
-            <p id="arrangement-empty" class="arrangement-empty">No clips yet. Click a track lane to place the selected pattern.</p>
+            <p id="arrangement-empty" class="arrangement-empty">Program a pattern below, then click a lane or press Place to add it.</p>
             <div class="arrangement-scroll" tabindex="0" aria-label="Track arrangement timeline"><div id="arrangement-canvas" class="arrangement-canvas"></div></div>
           </div>
-
         </section>
 
         <section id="editor-dock" class="editor-dock" aria-label="Editing workspace">
           <div class="editor-tabbar">
-            <div id="workspace-tabs" class="workspace-tabs" role="tablist" aria-label="Editing tools">
-              <button id="workspace-tab-sequencer" type="button" role="tab" aria-controls="dock-panel-sequencer" aria-selected="true" data-panel="sequencer">Pattern</button>
-              <button id="workspace-tab-instrument" type="button" role="tab" aria-controls="dock-panel-instrument" aria-selected="false" data-panel="instrument" tabindex="-1">Instrument</button>
-              <button id="workspace-tab-keyboard" type="button" role="tab" aria-controls="dock-panel-keyboard" aria-selected="false" data-panel="keyboard" tabindex="-1">Keyboard</button>
+            <div class="dock-context"><span id="dock-context-dot" aria-hidden="true"></span><span id="dock-context-kicker">Pattern</span><strong id="dock-context-title">Pattern 1</strong></div>
+            <div class="dock-actions">
+              <button id="workspace-keyboard-toggle" type="button" aria-label="Open keyboard" aria-pressed="false" title="Keyboard">
+                <svg width="19" height="14" viewBox="0 0 19 14" aria-hidden="true"><rect x="0.6" y="0.6" width="17.8" height="12.8" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.2"></rect><path d="M4.8 1v12M9.5 1v12M14.2 1v12" stroke="currentColor" stroke-width="1.2"></path><rect x="3.3" y="1" width="3" height="7" rx="0.6" fill="currentColor"></rect><rect x="8" y="1" width="3" height="7" rx="0.6" fill="currentColor"></rect><rect x="12.7" y="1" width="3" height="7" rx="0.6" fill="currentColor"></rect></svg>
+              </button>
+              <button id="workspace-collapse" type="button" aria-expanded="true" aria-controls="dock-panels">Collapse &#9662;</button>
             </div>
-            <button id="workspace-collapse" class="workspace-collapse" type="button" aria-expanded="true" aria-controls="dock-panels">Collapse editor</button>
           </div>
+
           <div id="dock-panels" class="dock-panels">
-            <section id="dock-panel-sequencer" class="sequencer-section dock-panel" role="tabpanel" aria-labelledby="workspace-tab-sequencer">
+            <section id="dock-panel-sequencer" class="sequencer-section dock-panel" aria-label="Pattern editor">
               <div class="pattern-toolbar">
                 <span class="panel-context">Pattern</span>
-                <label>Pattern<select id="pattern-select"><option value="pattern-1">Pattern 1</option></select></label>
-                <label class="pattern-name-field">Name<input id="pattern-name" type="text" maxlength="40" value="Pattern 1" /></label>
-                <label>Length<select id="pattern-length"><option value="4">4</option><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option></select></label>
-                <label>Root octave<select id="pattern-root-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option></select></label>
-                <output id="pattern-usage">0 clips</output><button id="pattern-new" type="button">New</button><button id="pattern-variation" type="button">Duplicate</button>
-                <details class="pattern-menu"><summary>More</summary><div><button id="pattern-delete" type="button" disabled>Delete pattern</button><button id="pattern-clear" class="danger-action" type="button">Clear pattern</button></div></details>
-              </div>
-              <div class="pattern-commandbar">
-                <div class="history-actions" aria-label="Project history"><button id="pattern-undo" type="button" aria-label="Undo">&#8630;</button><button id="pattern-redo" type="button" aria-label="Redo">&#8631;</button></div>
-                <button id="pattern-duplicate" type="button">Double length</button>
-                <div class="transpose-actions" aria-label="Transpose pattern"><span>Transpose</span><button id="transpose-octave-down" type="button" aria-label="Transpose down one octave">-12</button><button id="transpose-down" type="button" aria-label="Transpose down one semitone">-1</button><button id="transpose-up" type="button" aria-label="Transpose up one semitone">+1</button><button id="transpose-octave-up" type="button" aria-label="Transpose up one octave">+12</button></div>
-                <div class="place-controls"><span>Place on <strong id="place-track-name">Pulse 1</strong></span><label>at<input id="place-start" type="number" min="1" max="256" step="1" value="1" /></label><button id="place-pattern" class="place-pattern" type="button">Add clip</button></div>
-              </div>
-              <div class="pattern-workspace">
-                <div class="pattern-grid-scroll"><div id="pattern-grid" class="pattern-grid" aria-label="16-step pattern"></div></div>
-                <div id="selected-step-inspector" class="selected-step-inspector">
-                  <div class="selected-step-title"><span>Step</span><strong id="selected-step-number">--</strong><output id="selected-step-summary">Select a step</output></div>
-                  <div class="pattern-note-picker">
-                    <label>Pitch<select id="pattern-pitch"><option value="0">C</option><option value="1">C&#9839;</option><option value="2">D</option><option value="3">D&#9839;</option><option value="4">E</option><option value="5">F</option><option value="6">F&#9839;</option><option value="7">G</option><option value="8">G&#9839;</option><option value="9">A</option><option value="10">A&#9839;</option><option value="11">B</option></select></label>
-                    <label>Octave<select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
-                    <label class="pattern-toggle"><input id="pattern-preview" type="checkbox" /> Preview</label><span class="selected-note-readout">Note <output id="selected-pattern-note">C4</output></span>
-                  </div>
-                  <div id="selected-step-gate" class="selected-step-gate" role="radiogroup" aria-label="Selected step gate"><span>Gate</span><button type="button" role="radio" data-gate="0.25">25%</button><button type="button" role="radio" data-gate="0.5">50%</button><button type="button" role="radio" data-gate="0.75">75%</button><button type="button" role="radio" data-gate="1">100%</button></div>
-                  <label class="selected-step-volume">Volume <input id="selected-step-volume" type="range" min="0" max="100" step="1" value="70" /><output id="selected-step-volume-value" for="selected-step-volume">70%</output></label>
-                  <button id="selected-step-clear" class="danger-action" type="button" disabled>Clear</button>
+                <label><span class="visually-hidden">Pattern</span><select id="pattern-select"><option value="pattern-1">Pattern 1</option></select></label>
+                <label class="pattern-name-field"><span>Name</span><input id="pattern-name" type="text" maxlength="40" value="Pattern 1" /></label>
+                <label><span>Length</span><select id="pattern-length"><option value="4">4</option><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option></select></label>
+                <label><span>Root</span><select id="pattern-root-octave" aria-label="Root octave"><option value="2">C2</option><option value="3">C3</option><option value="4" selected>C4</option><option value="5">C5</option><option value="6">C6</option></select></label>
+                <output id="pattern-usage">0 clips</output>
+                <div class="pattern-toolbar-actions">
+                  <button id="pattern-undo" type="button" aria-label="Undo">&#8630; Undo</button>
+                  <button id="pattern-redo" type="button" aria-label="Redo">&#8631; Redo</button>
+                  <input id="place-start" type="hidden" value="1" />
+                  <button id="place-pattern" class="place-pattern" type="button">&#9656; Place</button>
+                  <details class="pattern-menu"><summary aria-label="More pattern actions">&#8943;</summary><div><button id="pattern-new" type="button">New pattern</button><button id="pattern-variation" type="button">Duplicate variation</button><button id="pattern-duplicate" type="button">Double length</button><button id="pattern-delete" type="button" disabled>Delete pattern</button><button id="pattern-clear" class="danger-action" type="button">Clear pattern</button></div></details>
                 </div>
               </div>
-            </section>
 
-            <section id="dock-panel-instrument" class="voice-lab dock-panel" role="tabpanel" aria-labelledby="workspace-tab-instrument" hidden>
-              <div class="device-rack-header"><span class="panel-context">Instrument</span><h2 id="instrument-title"><strong id="instrument-track-name">Pulse 1</strong></h2></div>
-              <div class="device-rack">
-                <fieldset class="device device-oscillator"><legend>Oscillator</legend><label>Voice<select id="voice-type"><option value="square">Square</option><option value="triangle">Triangle</option><option value="sawtooth">Sawtooth</option><option value="noise">Noise</option></select></label><div class="octave-control"><span>Octave</span><button id="octave-down" type="button" aria-label="Octave down">&minus;</button><strong id="octave-value">0</strong><button id="octave-up" type="button" aria-label="Octave up">+</button></div></fieldset>
-                <fieldset class="device device-envelope"><legend>Envelope</legend><label>Attack <output id="attack-value" for="attack">8 ms</output><input id="attack" type="range" min="1" max="2000" step="1" value="8" /></label><label>Release <output id="release-value" for="release">30 ms</output><input id="release" type="range" min="10" max="3000" step="10" value="30" /></label></fieldset>
-                <fieldset class="device device-output"><legend>Output</legend><label>Volume <output id="volume-value" for="volume">35%</output><input id="volume" type="range" min="0" max="100" step="1" value="35" /></label><button id="reset-instrument" type="button">Reset instrument</button></fieldset>
+              <div class="pattern-commandbar">
+                <span>Transpose</span><button id="transpose-octave-down" type="button" aria-label="Transpose down one octave">-12</button><button id="transpose-down" type="button" aria-label="Transpose down one semitone">-1</button><button id="transpose-up" type="button" aria-label="Transpose up one semitone">+1</button><button id="transpose-octave-up" type="button" aria-label="Transpose up one octave">+12</button>
+                <span class="place-target">Place on <strong id="place-track-name">Pulse 1</strong> at the playhead</span>
+              </div>
+
+              <div class="pattern-workspace">
+                <div class="pattern-grid-scroll"><div id="pattern-grid" class="pattern-grid" aria-label="16-step pattern"></div></div>
+                <div id="selected-step-inspector" class="selected-step-inspector" hidden>
+                  <div class="selected-step-title"><span>Edit step</span><strong id="selected-step-number">--</strong><output id="selected-step-summary">Select a step</output><button id="selected-step-clear" class="danger-action" type="button" disabled>Clear</button></div>
+                  <div class="pattern-note-picker">
+                    <span>Note</span><label><span class="visually-hidden">Pitch</span><select id="pattern-pitch"><option value="0">C</option><option value="1">C&#9839;</option><option value="2">D</option><option value="3">D&#9839;</option><option value="4">E</option><option value="5">F</option><option value="6">F&#9839;</option><option value="7">G</option><option value="8">G&#9839;</option><option value="9">A</option><option value="10">A&#9839;</option><option value="11">B</option></select></label>
+                    <label><span class="visually-hidden">Octave</span><select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+                    <label class="pattern-toggle"><input id="pattern-preview" type="checkbox" /> Preview</label><output id="selected-pattern-note">C4</output>
+                  </div>
+                  <div id="selected-step-gate" class="selected-step-gate" role="radiogroup" aria-label="Selected step gate"><span>Gate</span><button type="button" role="radio" data-gate="0.25">1/4</button><button type="button" role="radio" data-gate="0.5">1/2</button><button type="button" role="radio" data-gate="0.75">3/4</button><button type="button" role="radio" data-gate="1">Full</button></div>
+                  <label class="selected-step-volume"><span>Velocity</span><input id="selected-step-volume" type="range" min="0" max="100" step="1" value="70" /><output id="selected-step-volume-value" for="selected-step-volume">70%</output></label>
+                </div>
+                <div class="pattern-help">Select a step, or play a note on the keyboard, to edit its pitch, gate and velocity.</div>
               </div>
             </section>
 
-            <section id="dock-panel-keyboard" class="keyboard-section dock-panel" role="tabpanel" aria-labelledby="workspace-tab-keyboard" hidden>
-              <div class="keyboard-heading"><div><span class="panel-context">Play selected instrument</span><h2 id="keyboard-title">Computer keyboard</h2></div><button id="stop-sound" class="panic-button" type="button" disabled>Stop sound</button></div>
+            <section id="dock-panel-instrument" class="voice-lab dock-panel" aria-label="Instrument editor" hidden>
+              <div class="device-rack-header"><span class="device-color" aria-hidden="true"></span><span class="panel-context">Instrument</span><h2><strong id="instrument-track-name">Pulse 1</strong></h2>
+                <details id="selected-track-menu" class="track-menu"><summary>Track options</summary><div class="track-menu-panel"><label>Track name<input id="selected-track-name" type="text" maxlength="32" /></label><div><button id="selected-track-up" type="button">Move up</button><button id="selected-track-down" type="button">Move down</button></div><button id="selected-track-remove" class="danger-action" type="button">Remove track</button></div></details>
+              </div>
+              <div class="device-rack">
+                <fieldset class="device device-oscillator"><legend>Oscillator</legend><select id="voice-type" class="visually-hidden" aria-label="Voice"><option value="pulse12">Pulse 12.5%</option><option value="pulse25">Pulse 25%</option><option value="square">Pulse 50%</option><option value="triangle">Triangle</option><option value="sawtooth">Saw</option><option value="noise">Noise</option></select><div id="voice-options" class="voice-options" role="radiogroup" aria-label="Voice"><button type="button" data-voice="pulse12">Pulse 12.5%</button><button type="button" data-voice="pulse25">Pulse 25%</button><button type="button" data-voice="square">Pulse 50%</button><button type="button" data-voice="triangle">Triangle</button><button type="button" data-voice="sawtooth">Saw</button><button type="button" data-voice="noise">Noise</button></div><div class="octave-control"><span>Octave</span><button id="octave-down" type="button" aria-label="Octave down">&minus;</button><strong id="octave-value">0</strong><button id="octave-up" type="button" aria-label="Octave up">+</button></div></fieldset>
+                <fieldset class="device device-envelope"><legend>Envelope</legend><label>Attack <output id="attack-value" for="attack">8 ms</output><input id="attack" type="range" min="1" max="2000" step="1" value="8" /></label><label>Release <output id="release-value" for="release">30 ms</output><input id="release" type="range" min="10" max="3000" step="10" value="30" /></label></fieldset>
+                <fieldset class="device device-output"><legend>Output</legend><label>Volume <output id="volume-value" for="volume">35%</output><input id="volume" type="range" min="0" max="100" step="1" value="35" /></label><button id="reset-instrument" type="button">Reset device</button></fieldset>
+              </div>
+            </section>
+
+            <section id="dock-panel-keyboard" class="keyboard-section dock-panel" aria-label="Playable keyboard" hidden>
+              <div class="keyboard-heading"><div><span class="panel-context">Keybed</span><h2 id="keyboard-title">Computer keyboard</h2><p>Two octaves mapped to your keyboard</p></div><button id="stop-sound" class="panic-button" type="button" disabled>&#9632; Stop sound</button></div>
               <div class="keyboard-scroll"><div id="keyboard-keybed" class="keyboard-keybed" aria-label="Playable keyboard"></div></div>
             </section>
           </div>
         </section>
       </div>
     </main>
-    <script type="module" src="./src/app.js?v=20260719-7"></script>
+    <script type="module" src="./src/app.js?v=20260720-1"></script>
   </body>
 </html>
