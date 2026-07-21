@@ -3,15 +3,15 @@ import {
   createAudioEngineError,
   isAudioEngineError,
 } from "./audio/audio-engine.js?v=20260721-3";
-import { createNotePreview } from "./audio/note-preview.js";
-import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
+import { createNotePreview } from "./audio/note-preview.js?v=20260721-1";
+import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260721-1";
 import { createAudioStatusFeature } from "./features/audio-status/audio-status.js?v=20260721-2";
-import { createArrangerFeature } from "./features/arranger/arranger-feature.js?v=20260721-2";
+import { createArrangerFeature } from "./features/arranger/arranger-feature.js?v=20260721-3";
 import { createInstrumentFeature } from "./features/instrument/instrument.js";
-import { createInputController } from "./features/keyboard/input-controller.js";
+import { createInputController } from "./features/keyboard/input-controller.js?v=20260721-1";
 import { createKeyboardFeature } from "./features/keyboard/keyboard.js";
-import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js?v=20260721-2";
-import { createProjectLibraryFeature } from "./features/project-library/project-library.js?v=20260721-2";
+import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js?v=20260721-3";
+import { createProjectLibraryFeature } from "./features/project-library/project-library.js?v=20260721-3";
 import { createThemeFeature } from "./features/theme/theme.js";
 import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js?v=20260721-2";
 import { getNoteName } from "./music/note.js";
@@ -28,7 +28,7 @@ import {
   loadInitialProjectDocument,
 } from "./persistence/project-persistence.js";
 import { createSessionState } from "./state/session-state.js";
-import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
+import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260721-2";
 
 const projectPreferences = createProjectPreferences();
 let projectRepository;
@@ -136,7 +136,6 @@ const instrumentFeature = createInstrumentFeature({
 });
 patternFeature = createPatternFeature({
   getNoteName,
-  isNoiseTrack: () => instrumentState.getState().voiceType === "noise",
   notePreview,
   onError: (message) => arrangerFeature?.showError(message),
   onStructuralEdit: scheduler.stop,

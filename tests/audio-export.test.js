@@ -54,6 +54,17 @@ test("render plan honours mute and solo state", () => {
   assert.deepEqual(createArrangementRenderPlan(project).tracks, []);
 });
 
+test("render plan preserves distinct pitches for noise voices", () => {
+  const project = createSong();
+  project.tracks[0].instrument.voiceType = "noise";
+  project.patterns[0].steps[1] = { note: 72, gate: 0.5, volume: 0.6 };
+
+  const plan = createArrangementRenderPlan(project);
+
+  assert.ok(plan.tracks[0].notes[1].frequency > plan.tracks[0].notes[0].frequency);
+  assert.equal(plan.tracks[0].notes[0].type, "noise");
+});
+
 test("render plan rejects empty and excessively long exports before rendering", () => {
   assert.throws(
     () => createArrangementRenderPlan(createDefaultProject()),

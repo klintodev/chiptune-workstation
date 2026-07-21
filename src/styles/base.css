@@ -35,6 +35,8 @@ body::before {
   content: "";
 }
 
+:root[data-theme="light"] body::before { display: none; }
+
 button,
 input,
 select,

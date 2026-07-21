@@ -18,7 +18,6 @@ export function createPatternEditor({
   gateControl,
   getNoteName,
   grid,
-  isNoiseTrack = () => false,
   noteDownButton,
   noteUpButton,
   octaveSelect,
@@ -49,6 +48,7 @@ export function createPatternEditor({
     button,
     gate: Number(button.dataset.gate),
   }));
+  const gateOutput = gateControl.querySelector("output");
   let activePatternId = patternState.getState().patternId;
   let activeVolumeStepIndex = null;
   let inspectorOpen = false;
@@ -203,7 +203,7 @@ export function createPatternEditor({
       : "--";
     stepSummaryOutput.value = !hasSelection
       ? "Select a step"
-      : hasNote ? (isNoiseTrack() ? "Hit" : getNoteName(selectedStep.note)) : "Rest";
+      : hasNote ? getNoteName(selectedStep.note) : "Rest";
     clearButton.disabled = !hasNote;
     gateControl.classList.toggle("disabled", !hasNote);
     volumeInput.disabled = !hasNote;
@@ -216,6 +216,11 @@ export function createPatternEditor({
       button.setAttribute("aria-checked", String(selected));
       button.tabIndex = selected || (!hasNote && gate === SUPPORTED_PATTERN_GATES[0]) ? 0 : -1;
     }
+    if (gateOutput) {
+      gateOutput.value = hasNote
+        ? selectedStep.gate === 1 ? "Full · 100%" : `${Math.round(selectedStep.gate * 100)}%`
+        : "—";
+    }
     const volumePercent = Math.round((selectedStep?.volume ?? DEFAULT_PATTERN_VOLUME) * 100);
     if (activeVolumeStepIndex === null) volumeInput.value = String(volumePercent);
     volumeOutput.value = `${volumePercent}%`;
@@ -223,7 +228,7 @@ export function createPatternEditor({
     selectionSummary.hidden = !hasSelection;
     if (hasSelection) {
       summaryStep.value = String(selectedStepIndex + 1).padStart(2, "0");
-      summaryNote.value = hasNote ? (isNoiseTrack() ? "Hit" : getNoteName(selectedStep.note)) : "Rest";
+      summaryNote.value = hasNote ? getNoteName(selectedStep.note) : "Rest";
       summaryGate.value = hasNote ? GATE_LABELS[selectedStep.gate] ?? `${Math.round(selectedStep.gate * 100)}%` : "—";
       summaryVolume.value = hasNote ? `${volumePercent}%` : "—";
     }
@@ -243,7 +248,7 @@ export function createPatternEditor({
     pattern.steps.forEach((step, index) => {
       const elements = stepElements[index];
       const hasNote = step !== null;
-      const noteLabel = hasNote ? (isNoiseTrack() ? "Hit" : getNoteName(step.note)) : "Rest";
+      const noteLabel = hasNote ? getNoteName(step.note) : "Rest";
       elements.container.classList.toggle("has-note", hasNote);
       elements.container.classList.toggle("selected", index === selectedStepIndex);
       elements.editButton.hidden = !hasNote;
@@ -320,14 +325,30 @@ export function createPatternEditor({
     if (step) previewSelectedNote(step.note, step.volume);
   }
 
-  for (const { button, gate } of gateButtons) {
-    button.addEventListener("click", () => {
-      if (selectedStepIndex === null || patternState.getState().steps[selectedStepIndex] === null) return;
-      onEditAction?.();
-      patternState.setGate(selectedStepIndex, gate);
-      render();
-    }, { signal: lifecycle.signal });
+  function selectGate(gate) {
+    if (selectedStepIndex === null || patternState.getState().steps[selectedStepIndex] === null) return;
+    onEditAction?.();
+    patternState.setGate(selectedStepIndex, gate);
+    render();
   }
+
+  for (const { button, gate } of gateButtons) {
+    button.addEventListener("click", () => selectGate(gate), { signal: lifecycle.signal });
+  }
+  gateControl.addEventListener("keydown", (event) => {
+    const currentIndex = gateButtons.findIndex(({ button }) => button === event.target);
+    if (currentIndex === -1) return;
+    let nextIndex = null;
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = Math.max(0, currentIndex - 1);
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = Math.min(gateButtons.length - 1, currentIndex + 1);
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = gateButtons.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const next = gateButtons[nextIndex];
+    next.button.focus();
+    selectGate(next.gate);
+  }, { signal: lifecycle.signal });
   clearButton.addEventListener("click", () => {
     if (selectedStepIndex === null) return;
     const clearedIndex = selectedStepIndex;

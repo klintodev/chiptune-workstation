@@ -1,4 +1,4 @@
-import { MAX_PROJECT_FILE_BYTES, PROJECT_FILE_EXTENSION } from "../../persistence/project-document.js";
+import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js";
 import { queryRequired } from "../../shared/query-required.js";
 
 const STATUS_LABELS = Object.freeze({
@@ -8,14 +8,6 @@ const STATUS_LABELS = Object.freeze({
   unavailable: "Not saved",
   unsaved: "Unsaved",
 });
-
-function safeFilename(title) {
-  const base = title.trim().toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-  return `${base || "untitled-chiptune"}${PROJECT_FILE_EXTENSION}`;
-}
 
 function formatUpdatedAt(value) {
   return new Intl.DateTimeFormat(undefined, {
@@ -41,7 +33,6 @@ export function createProjectLibraryFeature({
     dialog: queryRequired(root, "#project-library-dialog"),
     duplicate: queryRequired(root, "#project-duplicate"),
     error: queryRequired(root, "#project-library-error"),
-    export: queryRequired(root, "#project-export"),
     import: queryRequired(root, "#project-import"),
     importFile: queryRequired(root, "#project-import-file"),
     librarySaveStatus: queryRequired(root, "#project-library-save-status"),
@@ -56,12 +47,6 @@ export function createProjectLibraryFeature({
   let busy = false;
   let pendingDelete = null;
   let renderGeneration = 0;
-
-  function prepareExport() {
-    const text = persistence.getExportText();
-    elements.export.href = `data:application/json;charset=utf-8,${encodeURIComponent(text)}`;
-    elements.export.download = safeFilename(projectState.getState().metadata.title);
-  }
 
   function showError(message = "") {
     elements.error.textContent = message;
@@ -79,7 +64,6 @@ export function createProjectLibraryFeature({
     elements.open.dataset.saveState = state.status;
     elements.open.title = `${project.metadata.title} · ${STATUS_LABELS[state.status] ?? state.status}`;
     if (root.activeElement !== elements.name) elements.name.value = project.metadata.title;
-    prepareExport();
     elements.storageMessage.textContent = state.persistent
       ? "Projects are saved automatically in this browser."
       : `Browser storage is unavailable. This session will not survive a reload.${state.error?.message ? ` ${state.error.message}` : ""}`;
@@ -134,7 +118,6 @@ export function createProjectLibraryFeature({
       elements.close,
       elements.create,
       elements.duplicate,
-      elements.export,
       elements.import,
       elements.name,
     ]) {
@@ -214,13 +197,6 @@ export function createProjectLibraryFeature({
     onBeforeProjectChange();
     await persistence.duplicateProject();
   }, { closeAfter: true }), { signal: lifecycle.signal });
-  elements.export.addEventListener("click", (event) => {
-    if (busy) {
-      event.preventDefault();
-      return;
-    }
-    void persistence.saveNow().catch((error) => showError(error.message));
-  }, { signal: lifecycle.signal });
   elements.import.addEventListener("click", () => elements.importFile.click(), { signal: lifecycle.signal });
   elements.importFile.addEventListener("change", () => void run(async () => {
     const [file] = elements.importFile.files;

@@ -49,6 +49,35 @@ test("light-theme accent and muted text colours meet normal-text contrast", asyn
   assert.ok(contrast(token("muted"), token("panel")) >= 4.5);
 });
 
+test("the light theme removes scanlines and the project library omits JSON export", async () => {
+  const [baseCss, html] = await Promise.all([
+    readFile(new URL("src/styles/base.css", root), "utf8"),
+    readFile(new URL("index.html", root), "utf8"),
+  ]);
+  assert.match(baseCss, /:root\[data-theme="light"\]\s+body::before\s*{\s*display:\s*none;/);
+  assert.doesNotMatch(html, /id="project-export"/);
+  assert.match(html, /class="global-transport"[\s\S]*id="playback-mode"[\s\S]*class="global-status"/);
+});
+
+test("arrangement lanes and clips inherit their track colour without losing selection", async () => {
+  const css = await readFile(new URL("src/features/arranger/arranger.css", root), "utf8");
+  assert.match(css, /\.track-name-input\s*{[^}]*color:\s*var\(--track-color\)/);
+  assert.match(css, /\.track-volume input\s*{[^}]*accent-color:\s*var\(--track-color\)/);
+  assert.match(css, /\.track-lane\s*{[^}]*var\(--track-color\)/);
+  assert.match(css, /\.arrangement-clip\s*{[^}]*border:[^;}]*var\(--track-color\)[^}]*color:\s*var\(--track-color\)/);
+  assert.match(css, /\.arrangement-clip\.selected\s*{[^}]*var\(--track-color\)[^}]*var\(--accent\)/);
+});
+
+test("the add-track action follows the final arrangement lane", async () => {
+  const [css, view] = await Promise.all([
+    readFile(new URL("src/features/arranger/arranger.css", root), "utf8"),
+    readFile(new URL("src/features/arranger/arrangement-view.js", root), "utf8"),
+  ]);
+  assert.match(view, /labelMeta\.append\(count\)/);
+  assert.match(view, /rows\.push\(createAddTrackRow\(\)\)/);
+  assert.match(css, /\.arrangement-add-track-cell\s*{[^}]*position:\s*sticky/);
+});
+
 test("Firebase Hosting serves security headers and fresh HTML", async () => {
   const config = JSON.parse(await readFile(new URL("firebase.json", root), "utf8"));
   const security = config.hosting.headers.find(({ source }) => source === "**");

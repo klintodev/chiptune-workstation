@@ -139,7 +139,7 @@ export function createArrangementView({
     count.textContent = `${projectState.getState().tracks.length}/${MAX_PROJECT_TRACKS}`;
     const labelMeta = root.createElement("span");
     labelMeta.className = "arrangement-ruler-meta";
-    labelMeta.append(count, elements.addTrack);
+    labelMeta.append(count);
     label.append(labelText, labelMeta);
     const ruler = root.createElement("div");
     ruler.className = "arrangement-ruler";
@@ -165,6 +165,19 @@ export function createArrangementView({
     playhead.setAttribute("aria-hidden", "true");
     ruler.append(playhead);
     row.append(label, ruler);
+    return row;
+  }
+
+  function createAddTrackRow() {
+    const row = root.createElement("div");
+    row.className = "arrangement-add-track-row";
+    const action = root.createElement("div");
+    action.className = "arrangement-add-track-cell";
+    action.append(elements.addTrack);
+    const timeline = root.createElement("div");
+    timeline.className = "arrangement-add-track-timeline";
+    timeline.setAttribute("aria-hidden", "true");
+    row.append(action, timeline);
     return row;
   }
 
@@ -295,6 +308,7 @@ export function createArrangementView({
       );
       rows.push(row);
     });
+    rows.push(createAddTrackRow());
     elements.canvas.replaceChildren(...rows);
     elements.addTrack.disabled = project.tracks.length >= MAX_PROJECT_TRACKS;
     elements.empty.hidden = project.tracks.some((track) => track.clips.length > 0);

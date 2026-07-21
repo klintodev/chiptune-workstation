@@ -1,10 +1,9 @@
 import { queryRequired } from "../../shared/query-required.js";
-import { createPatternEditor } from "./pattern-editor.js";
+import { createPatternEditor } from "./pattern-editor.js?v=20260721-1";
 import { createPatternHistoryShortcut } from "./pattern-shortcuts.js";
 
 export function createPatternFeature({
   getNoteName,
-  isNoiseTrack = () => false,
   notePreview,
   onError = () => {},
   onStructuralEdit = () => {},
@@ -91,7 +90,6 @@ export function createPatternFeature({
     gateControl: elements.stepGate,
     getNoteName,
     grid: elements.grid,
-    isNoiseTrack,
     noteDownButton: elements.noteDown,
     noteUpButton: elements.noteUp,
     octaveSelect: elements.octave,

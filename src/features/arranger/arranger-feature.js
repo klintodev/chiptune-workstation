@@ -1,5 +1,5 @@
 import { queryRequired } from "../../shared/query-required.js";
-import { createArrangementView } from "./arrangement-view.js?v=20260720-1";
+import { createArrangementView } from "./arrangement-view.js?v=20260721-1";
 import { createPatternLibrary } from "./pattern-library.js";
 import { createTransportControls } from "./transport-controls.js?v=20260720-1";
 

@@ -2,7 +2,7 @@ import { createAudioEngine } from "./audio/audio-engine.js?v=20260721-3";
 import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
 import { createFirebaseClient } from "./firebase/firebase-client.js";
 import { createProjectState, getArrangementEnd } from "./state/project-state.js?v=20260721-3";
-import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
+import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260721-2";
 import { createAudioAnalyserReader } from "./visualiser/audio-features.js";
 import { fitCanvas, renderVisualFrame } from "./visualiser/canvas-renderer.js?v=20260721-3";
 

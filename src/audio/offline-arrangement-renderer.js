@@ -1,10 +1,10 @@
-import { createVoiceEngine, midiNoteToFrequency } from "./voice-engine.js";
+import { createVoiceEngine, midiNoteToFrequency } from "./voice-engine.js?v=20260721-1";
 import {
   createProjectState,
   getArrangementEnd,
   isTrackAudible,
 } from "../state/project-state.js?v=20260721-3";
-import { getSixteenthNoteDuration } from "../transport/step-scheduler.js";
+import { getSixteenthNoteDuration } from "../transport/step-scheduler.js?v=20260721-1";
 
 export const EXPORT_SAMPLE_RATE = 44_100;
 export const EXPORT_CHANNELS = 2;

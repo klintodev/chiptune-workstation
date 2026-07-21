@@ -1,6 +1,7 @@
 const VOICE_TYPES = new Set(["pulse12", "pulse25", "square", "triangle", "sawtooth", "noise"]);
 const MIN_FREQUENCY = 20;
 const MAX_FREQUENCY = 20_000;
+const NOISE_REFERENCE_FREQUENCY = 440;
 const SILENCE = 0.0001;
 const VOLUME_RAMP_SECONDS = 0.015;
 
@@ -76,11 +77,17 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
     if (noiseBuffer?.sampleRate !== context.sampleRate) {
       noiseBuffer = context.createBuffer(1, context.sampleRate, context.sampleRate);
       const samples = noiseBuffer.getChannelData(0);
-      for (let index = 0; index < samples.length; index += 1) samples[index] = Math.random() * 2 - 1;
+      const holdSamples = Math.max(1, Math.round(context.sampleRate / NOISE_REFERENCE_FREQUENCY));
+      let value = 0;
+      for (let index = 0; index < samples.length; index += 1) {
+        if (index % holdSamples === 0) value = Math.random() < 0.5 ? -1 : 1;
+        samples[index] = value;
+      }
     }
     const source = context.createBufferSource();
     source.buffer = noiseBuffer;
     source.loop = true;
+    source.playbackRate.value = frequency / NOISE_REFERENCE_FREQUENCY;
     return source;
   }
 
@@ -137,7 +144,7 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
     if (!Number.isFinite(startTime) || startTime < getAudioTime()) {
       throw new RangeError("Start time must use the current or future audio clock.");
     }
-    if (type !== "noise" && (!Number.isFinite(frequency) || frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY)) {
+    if (!Number.isFinite(frequency) || frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY) {
       throw new RangeError(`Frequency must be between ${MIN_FREQUENCY} and ${MAX_FREQUENCY} Hz.`);
     }
     if (duration !== undefined && (!Number.isFinite(duration) || duration <= 0)) {

@@ -1,4 +1,4 @@
-import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js";
+import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js?v=20260721-1";
 import { encodePcm16Wave } from "../../audio/wav-encoder.js";
 
 const STYLESHEET_ID = "audio-export-styles";
@@ -71,7 +71,7 @@ export function createAudioExportFeature({
       root.body.append(download);
       download.click();
       download.remove();
-      globalThis.setTimeout(() => urlApi.revokeObjectURL(url), 0);
+      globalThis.setTimeout(() => urlApi.revokeObjectURL(url), 1000);
       setStatus(`WAV ready: ${download.download}`);
     } catch (error) {
       setStatus(error?.message || "Audio export failed.", { error: true });

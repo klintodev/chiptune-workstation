@@ -64,10 +64,8 @@
 #project-library-save-status[data-state="unsaved"], #project-library-save-status[data-state="saving"] { border-color: var(--selection); color: var(--selection); }
 #project-library-save-status[data-state="error"], #project-library-save-status[data-state="unavailable"] { border-color: var(--danger); color: var(--danger); }
 .project-title-field input { min-height: 36px; padding: 5px 8px; font-size: 1.12rem; }
-.project-dialog-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.project-dialog-actions button,
-.project-dialog-actions a { display: grid; min-height: 34px; place-items: center; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--ink); background: var(--bg-1); font-family: "Silkscreen", monospace; font-size: 0.52rem; letter-spacing: 0.04em; text-decoration: none; text-transform: uppercase; }
-.project-dialog-actions a:hover { border-color: var(--accent); color: var(--accent-bright); }
+.project-dialog-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.project-dialog-actions button { display: grid; min-height: 34px; place-items: center; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--ink); background: var(--bg-1); font-family: "Silkscreen", monospace; font-size: 0.52rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .project-dialog-actions .disabled { pointer-events: none; opacity: 0.38; }
 .project-library-heading { display: flex; justify-content: space-between; padding-top: 3px; }
 .project-library-heading output { color: var(--label); font-family: "VT323", monospace; font-size: 0.78rem; letter-spacing: 0; text-transform: none; }

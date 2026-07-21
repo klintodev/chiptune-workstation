@@ -9,7 +9,29 @@ function createAudioHarness({ maxVoices = Infinity } = {}) {
   const periodicWaves = [];
   const sources = [];
   const context = {
+    sampleRate: 48_000,
     get currentTime() { return now; },
+    createBuffer(numberOfChannels, length, sampleRate) {
+      const channels = Array.from({ length: numberOfChannels }, () => new Float32Array(length));
+      return {
+        getChannelData: (index) => channels[index],
+        length,
+        numberOfChannels,
+        sampleRate,
+      };
+    },
+    createBufferSource() {
+      const source = {
+        playbackRate: { value: 1 },
+        addEventListener() {},
+        connect() {},
+        disconnect() {},
+        start() {},
+        stop(time) { source.stopTime = time; },
+      };
+      sources.push(source);
+      return source;
+    },
     createGain() {
       const events = [];
       const node = {
@@ -105,4 +127,15 @@ test("pulse-width voices use reusable periodic waves", () => {
   assert.equal(harness.periodicWaves.length, 2);
   assert.equal(harness.sources[0].periodicWave, harness.sources[1].periodicWave);
   assert.notEqual(harness.sources[0].periodicWave, harness.sources[2].periodicWave);
+});
+
+test("noise voices use note frequency to tune their sample-and-hold clock", () => {
+  const harness = createAudioHarness();
+
+  harness.voiceEngine.trigger({ frequency: 220, type: "noise" });
+  harness.voiceEngine.trigger({ frequency: 880, type: "noise" });
+
+  assert.equal(harness.sources[0].playbackRate.value, 0.5);
+  assert.equal(harness.sources[1].playbackRate.value, 2);
+  assert.equal(harness.sources[0].buffer, harness.sources[1].buffer);
 });

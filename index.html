@@ -29,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260721-3" />
+    <link rel="stylesheet" href="./styles.css?v=20260721-5" />
   </head>
   <body>
     <main class="shell">
@@ -50,6 +50,7 @@
             <button id="transport-stop" type="button" disabled aria-label="Stop">&#9632;</button>
             <button id="transport-loop" type="button" disabled aria-label="Loop arrangement" aria-pressed="false">&#8635;</button>
           </div>
+          <label class="mode-control"><span>Mode</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
           <label class="tempo-control"><span>Tempo</span><span><input id="tempo" type="number" min="40" max="240" step="1" value="120" inputmode="numeric" aria-label="Tempo in BPM" /><output id="tempo-value" for="tempo">120</output><small>BPM</small></span></label>
           <label class="master-control"><span>Master <output id="master-volume-value" for="master-volume">35%</output></span><input id="master-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Master output volume" /></label>
         </div>
@@ -59,7 +60,6 @@
           <div id="global-tools" class="global-tools" aria-label="Workstation tools"></div>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" title="Toggle theme"><span data-theme-icon aria-hidden="true">&#9790;</span><span data-theme-label>Dark</span></button>
           <div id="account-slot" class="account-slot"></div>
-          <label class="mode-control"><span>Mode</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
           <output id="transport-status" class="transport-status" aria-live="polite">Arrangement / Stopped step 001</output>
         </div>
       </header>
@@ -132,7 +132,10 @@
                     <label class="visually-hidden"><span>Octave</span><select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
                     <label class="pattern-toggle"><input id="pattern-preview" type="checkbox" /> Preview</label>
                   </div>
-                  <div id="selected-step-gate" class="selected-step-gate" role="radiogroup" aria-label="Selected step gate"><span>Gate</span><button type="button" role="radio" data-gate="0.25">1/4</button><button type="button" role="radio" data-gate="0.5">1/2</button><button type="button" role="radio" data-gate="0.75">3/4</button><button type="button" role="radio" data-gate="1">Full</button></div>
+                  <div id="selected-step-gate" class="selected-step-gate" role="radiogroup" aria-label="Selected step gate length">
+                    <div class="selected-step-gate-heading"><span>Gate length</span><output aria-live="polite">75%</output></div>
+                    <div class="selected-step-gate-options"><button type="button" role="radio" data-gate="0.25" aria-label="25 percent gate"><span>1/4</span><small>25%</small></button><button type="button" role="radio" data-gate="0.5" aria-label="50 percent gate"><span>1/2</span><small>50%</small></button><button type="button" role="radio" data-gate="0.75" aria-label="75 percent gate"><span>3/4</span><small>75%</small></button><button type="button" role="radio" data-gate="1" aria-label="Full gate"><span>Full</span><small>100%</small></button></div>
+                  </div>
                   <label class="selected-step-volume"><span>Velocity</span><input id="selected-step-volume" type="range" min="0" max="100" step="1" value="70" /><output id="selected-step-volume-value" for="selected-step-volume">70%</output></label>
                 </div>
                 <div class="pattern-footer">
@@ -183,7 +186,6 @@
         <div class="project-dialog-actions">
           <button id="project-new" type="button">New</button>
           <button id="project-duplicate" type="button">Duplicate</button>
-          <a id="project-export" href="#" download role="button">Export</a>
           <button id="project-import" type="button">Import</button>
           <input id="project-import-file" type="file" accept=".chipwork.json,.json,application/json" hidden />
         </div>
@@ -207,6 +209,6 @@
       </div>
     </dialog>
 
-    <script type="module" src="./src/app.js?v=20260721-9"></script>
+    <script type="module" src="./src/app.js?v=20260721-11"></script>
   </body>
 </html>

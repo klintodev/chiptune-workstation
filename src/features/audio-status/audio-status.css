@@ -96,8 +96,7 @@
   font-size: 0;
 }
 .global-tools button:first-child { border-left: 0; }
-.global-tools #visualiser-open::before { font-family: sans-serif; font-size: 0.9rem; content: "◉"; }
-.global-tools #project-publish-quick::before { font-family: sans-serif; font-size: 1rem; content: "↗"; }
+.global-tools button svg { width: 18px; height: 18px; overflow: visible; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .mode-control { display: flex; height: 34px; flex-direction: column; justify-content: center; gap: 1px; padding: 3px 7px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--bg-1); }
 .mode-control select { height: 18px; padding: 0; border: 0; color: var(--ink); background: transparent; font-size: 0.88rem; }
 .status-cluster { min-width: 92px; height: 34px; gap: 6px; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--bg-1); }

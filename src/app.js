@@ -1,7 +1,7 @@
-import { createAudioExportFeature } from "./features/audio-export/audio-export.js?v=20260721-2";
+import { createAudioExportFeature } from "./features/audio-export/audio-export.js?v=20260721-3";
 import { createAccountFeature } from "./features/account/account.js?v=20260721-5";
-import { createVisualiserFeature } from "./features/visualiser/visualiser.js?v=20260721-6";
-import { createPublishingFeature } from "./features/publishing/publishing.js?v=20260721-3";
+import { createVisualiserFeature } from "./features/visualiser/visualiser.js?v=20260721-7";
+import { createPublishingFeature } from "./features/publishing/publishing.js?v=20260721-4";
 import { createAccountService } from "./firebase/account-service.js?v=20260721-3";
 import { createIndexedDbCloudLinkRepository } from "./firebase/cloud-link-repository.js";
 import { createCloudProjectService } from "./firebase/cloud-project-service.js?v=20260721-2";
@@ -12,7 +12,7 @@ import {
   createIndexedDbProjectRepository,
   createProjectPreferences,
 } from "./persistence/project-repository.js";
-import { audioEngine, projectPersistence, projectState } from "./workstation-app.js?v=20260721-6";
+import { audioEngine, projectPersistence, projectState } from "./workstation-app.js?v=20260721-8";
 
 const audioExportFeature = createAudioExportFeature({
   persistence: projectPersistence,

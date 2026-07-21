@@ -1,4 +1,4 @@
-import { midiNoteToFrequency } from "../../audio/voice-engine.js";
+import { midiNoteToFrequency } from "../../audio/voice-engine.js?v=20260721-1";
 import { KEY_BY_CODE } from "./keyboard-layout.js";
 
 function isTextEntry(target) {

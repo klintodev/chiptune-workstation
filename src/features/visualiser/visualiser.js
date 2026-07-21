@@ -40,9 +40,9 @@ export function createVisualiserFeature({
   const open = root.createElement("button");
   open.id = "visualiser-open";
   open.type = "button";
-  open.textContent = "Visuals";
-  open.setAttribute("aria-label", "Open master visualiser");
-  open.title = "Master visualiser";
+  open.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v4M5 5v6M12 12v7M12 5v3M19 16v3M19 5v7"/><circle cx="5" cy="13" r="2"/><circle cx="12" cy="10" r="2"/><circle cx="19" cy="14" r="2"/></svg><span class="visually-hidden">Open visualiser</span>`;
+  open.setAttribute("aria-label", "Open visualiser");
+  open.title = "Open visualiser";
   (root.querySelector("#global-tools") ?? root.querySelector(".global-status"))?.append(open);
 
   const template = root.createElement("template");
