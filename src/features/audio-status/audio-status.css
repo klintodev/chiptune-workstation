@@ -2,7 +2,7 @@
   position: relative;
   z-index: 30;
   display: grid;
-  grid-template-columns: minmax(250px, 1fr) auto minmax(300px, 1fr);
+  grid-template-columns: minmax(300px, 1fr) auto minmax(300px, 1fr);
   align-items: center;
   gap: 14px;
   min-width: 0;
@@ -25,14 +25,14 @@
 .project-cluster { min-width: 0; gap: 12px; }
 .studio-badge { flex: 0 0 auto; gap: 7px; padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); }
 .studio-badge > span { width: 9px; height: 9px; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-.studio-badge strong { color: var(--accent); font-family: "Silkscreen", monospace; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.studio-badge h1 { margin: 0; color: var(--accent); font-family: "Silkscreen", monospace; font-size: 0.68rem; letter-spacing: 0.08em; line-height: 1; text-transform: uppercase; }
 .project-name { min-width: 0; align-items: flex-start; flex-direction: column; }
 .project-name > span,
 .status-label,
 .mode-control > span {
   color: var(--muted);
   font-family: "Silkscreen", monospace;
-  font-size: 0.43rem;
+  font-size: 0.54rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -59,46 +59,76 @@
   background: var(--bg-1);
 }
 .tempo-control > span:first-child,
-.master-control > span:first-child { color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.43rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.master-control > span:first-child { color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.52rem; letter-spacing: 0.1em; text-transform: uppercase; }
 .tempo-control > span:last-child { display: flex; align-items: baseline; gap: 4px; }
 .tempo-control input { width: 52px; height: 24px; padding: 0 3px; border: 0; color: var(--accent); background: transparent; font-size: 1.45rem; line-height: 1; -moz-appearance: textfield; }
 .tempo-control input::-webkit-inner-spin-button { opacity: 0.35; }
 .tempo-control output { display: none; }
-.tempo-control small { color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.42rem; }
+.tempo-control small { color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.5rem; }
 .master-control { width: 118px; }
 .master-control > span { display: flex; justify-content: space-between; }
 .master-control output { color: var(--ink); font-family: "VT323", monospace; font-size: 0.9rem; }
 .master-control input { width: 100%; }
 
-.global-status { justify-content: flex-end; min-width: 0; gap: 9px; }
+.global-status { justify-content: flex-end; min-width: 0; gap: 6px; }
+.global-tools,
+.account-slot { display: flex; align-items: stretch; }
+.global-tools {
+  height: 34px;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--bg-1);
+}
+.global-tools button {
+  display: grid;
+  width: 38px;
+  min-width: 38px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--accent);
+  background: transparent;
+  font-size: 0;
+}
+.global-tools button:first-child { border-left: 0; }
+.global-tools #visualiser-open::before { font-family: sans-serif; font-size: 0.9rem; content: "◉"; }
+.global-tools #project-publish-quick::before { font-family: sans-serif; font-size: 1rem; content: "↗"; }
 .mode-control { display: flex; height: 34px; flex-direction: column; justify-content: center; gap: 1px; padding: 3px 7px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--bg-1); }
 .mode-control select { height: 18px; padding: 0; border: 0; color: var(--ink); background: transparent; font-size: 0.88rem; }
-.status-cluster { min-width: 92px; gap: 6px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--bg-1); }
+.status-cluster { min-width: 92px; height: 34px; gap: 6px; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--bg-1); }
 .status-cluster strong { display: block; overflow: hidden; max-width: 82px; color: var(--ink); font-size: 0.95rem; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 .status-light { width: 9px; height: 9px; flex: 0 0 9px; border: 1px solid var(--line-bright); background: transparent; }
 .status-light[data-state="running"] { border-color: var(--accent); background: var(--accent); box-shadow: 0 0 9px var(--accent); }
 .status-light[data-state="suspended"] { border-color: var(--selection); background: var(--selection); }
 .status-light[data-state="error"], .status-light[data-state="closed"] { border-color: var(--danger); background: var(--danger); }
-.transport-status { display: block; overflow: hidden; min-width: 150px; max-width: 220px; padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--accent); background: var(--bg-1); font-size: 0.9rem; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.transport-status { position: absolute; right: 14px; bottom: -20px; z-index: 12; display: block; max-width: 260px; overflow: hidden; color: var(--muted); font-size: 0.78rem; line-height: 1; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
 
 .audio-setup { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: var(--overlay); backdrop-filter: blur(7px); }
-.audio-setup-card { display: grid; width: min(520px, 100%); gap: 18px; padding: 28px; border: 1px solid var(--line-bright); border-radius: 7px; background: var(--panel); box-shadow: 0 22px 70px var(--shadow); }
-.audio-setup-card h2 { margin: 7px 0 8px; color: var(--ink); font-size: 1.25rem; }
-.lede { margin-bottom: 0; color: var(--muted); font-size: 1.15rem; line-height: 1.35; }
-.primary-action { display: flex; justify-content: space-between; min-height: 46px; padding: 12px 14px; border-color: var(--accent); color: var(--black); background: var(--accent); }
+.audio-setup-card { display: grid; width: min(580px, 100%); gap: 18px; padding: 32px; border: 1px solid var(--line-bright); border-radius: 7px; background: var(--panel); box-shadow: 0 22px 70px var(--shadow); }
+.audio-setup-card h2 { margin: 9px 0 10px; color: var(--ink); font-size: clamp(1.55rem, 5vw, 2.15rem); }
+.lede { max-width: 48ch; margin-bottom: 0; color: var(--muted); font-size: 1.24rem; line-height: 1.42; }
+.primary-action { display: flex; justify-content: space-between; min-height: 52px; padding: 13px 16px; border-color: var(--accent); color: var(--black); background: var(--accent); font-size: 0.68rem; }
 .primary-action:hover:not(:disabled) { color: var(--accent); background: transparent; }
 .error-panel { padding: 12px; border: 1px solid var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, transparent); }
 .error-panel p { margin: 6px 0 0; }
+.audio-diagnostics { color: var(--muted); }
+.audio-diagnostics summary { min-height: 30px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg-1); font-family: "Silkscreen", monospace; font-size: 0.54rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.audio-diagnostics[open] summary { margin-bottom: 6px; border-color: var(--line-bright); color: var(--label); }
 .meters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border: 1px solid var(--line); background: var(--line); }
 .meters > div { display: grid; gap: 5px; padding: 9px; background: var(--bg-1); }
-.meters span { color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.43rem; text-transform: uppercase; }
+.meters span { color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.52rem; text-transform: uppercase; }
 .meters strong { overflow: hidden; color: var(--accent); font-size: 0.9rem; text-overflow: ellipsis; }
 
 @media (max-width: 1180px) {
   .global-bar { grid-template-columns: minmax(130px, 1fr) auto minmax(160px, 1fr); gap: 8px; padding-inline: 8px; }
-  .studio-badge strong, .project-name { display: none; }
+  .studio-badge h1, .project-name { display: none; }
   .global-status { gap: 5px; }
-  .transport-status { max-width: 165px; }
+  .transport-status { display: none; }
   .theme-toggle [data-theme-label], .status-cluster div, .mode-control > span { display: none; }
   .theme-toggle, .status-cluster { min-width: 34px; justify-content: center; padding-inline: 7px; }
 }

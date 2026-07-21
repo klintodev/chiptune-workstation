@@ -1,10 +1,10 @@
 :root {
   font-family: "VT323", "Courier New", monospace;
-  --global-bar-height: 56px;
+  --global-bar-height: 60px;
   --detail-height: 320px;
   --detail-tabs-height: 34px;
-  --track-header-width: 224px;
-  --track-height: 64px;
+  --track-header-width: 236px;
+  --track-height: 76px;
   --ruler-height: 28px;
 }
 
@@ -58,8 +58,9 @@ input[type="number"] {
 }
 
 button {
+  min-height: 30px;
   font-family: "Silkscreen", "Courier New", monospace;
-  font-size: 0.52rem;
+  font-size: 0.62rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -106,7 +107,7 @@ h2 { margin-bottom: 0; font-family: "Silkscreen", "Courier New", monospace; lett
   margin: 0;
   color: var(--muted);
   font-family: "Silkscreen", "Courier New", monospace;
-  font-size: 0.5rem;
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;

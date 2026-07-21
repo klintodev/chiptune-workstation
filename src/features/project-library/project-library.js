@@ -44,6 +44,7 @@ export function createProjectLibraryFeature({
     export: queryRequired(root, "#project-export"),
     import: queryRequired(root, "#project-import"),
     importFile: queryRequired(root, "#project-import-file"),
+    librarySaveStatus: queryRequired(root, "#project-library-save-status"),
     list: queryRequired(root, "#project-list"),
     name: queryRequired(root, "#project-name-input"),
     create: queryRequired(root, "#project-new"),
@@ -73,6 +74,9 @@ export function createProjectLibraryFeature({
     elements.title.value = project.metadata.title;
     elements.saveStatus.value = STATUS_LABELS[state.status] ?? state.status;
     elements.saveStatus.dataset.state = state.status;
+    elements.librarySaveStatus.value = STATUS_LABELS[state.status] ?? state.status;
+    elements.librarySaveStatus.dataset.state = state.status;
+    elements.open.dataset.saveState = state.status;
     elements.open.title = `${project.metadata.title} · ${STATUS_LABELS[state.status] ?? state.status}`;
     if (root.activeElement !== elements.name) elements.name.value = project.metadata.title;
     prepareExport();

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Klinto Studio</title>
+  <desc id="desc">A pixel-style letter K in the Klinto Studio colours.</desc>
+  <rect width="128" height="128" rx="20" fill="#211b28"/>
+  <rect x="7" y="7" width="114" height="114" rx="14" fill="none" stroke="#5f5270" stroke-width="4"/>
+  <path fill="#f0a6c8" d="M30 26h18v30h12V44h12V32h20v18H80v12H68v6h12v10h12v24H72V88H60V76H48v26H30z"/>
+  <rect x="96" y="26" width="8" height="8" fill="#f2b48c"/>
+  <rect x="102" y="88" width="8" height="14" fill="#b7a9ec"/>
+</svg>

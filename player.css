@@ -1,0 +1,24 @@
+:root { color-scheme: dark; --bg: #171220; --panel: #2c2537; --line: #65566f; --ink: #fff7ed; --muted: #b7a9b8; --accent: #f39bc4; --lime: #c8ff32; --danger: #ff6b5f; }
+* { box-sizing: border-box; }
+body { min-height: 100vh; margin: 0; color: var(--ink); background: var(--bg); font-family: "VT323", monospace; font-size: 1.2rem; }
+button, input { font: inherit; }
+button { min-height: 40px; padding: 7px 14px; border: 1px solid var(--line); color: var(--ink); background: #19151f; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.4; }
+a { color: var(--accent); }
+.player-shell { width: min(1080px, calc(100% - 28px)); margin: 0 auto; padding: 18px 0; }
+.player-shell > header, .player-shell > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 2px; color: var(--muted); }
+.player-shell > header a { color: var(--ink); font-family: "Silkscreen", monospace; font-size: 0.68rem; letter-spacing: 0.08em; text-decoration: none; text-transform: uppercase; }
+.player-card { display: grid; gap: 13px; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: 0 22px 70px #08050d99; }
+.player-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.player-heading h1 { margin: 3px 0; font-size: clamp(2rem, 5vw, 4rem); line-height: 0.95; }
+.player-heading p { margin: 0; color: var(--muted); }
+.eyebrow { color: var(--accent); font-family: "Silkscreen", monospace; font-size: 0.55rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.player-visual { overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: #080b08; }
+.player-visual canvas { display: block; width: 100%; height: min(55vh, 500px); }
+.player-controls { display: grid; grid-template-columns: auto minmax(150px, 220px) auto minmax(180px, 1fr); gap: 7px; }
+.player-controls .primary { border-color: var(--accent); color: #1d1522; background: var(--accent); }
+.player-controls label { display: grid; grid-template-columns: auto minmax(100px, 1fr); align-items: center; gap: 8px; padding: 0 9px; border: 1px solid var(--line); }
+.player-controls input { width: 100%; accent-color: var(--accent); }
+.player-progress { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); }
+.player-error { margin: 0; padding: 10px; border: 1px solid var(--danger); color: var(--danger); }
+@media (max-width: 650px) { .player-controls { grid-template-columns: auto 1fr auto; } .player-controls label { grid-column: 1 / -1; min-height: 42px; } .player-shell > header, .player-shell > footer { align-items: flex-start; flex-direction: column; } }

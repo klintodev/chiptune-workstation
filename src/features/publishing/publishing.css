@@ -1,0 +1,23 @@
+.publishing-dialog { width: min(620px, calc(100vw - 32px)); padding: 0; border: 0; color: var(--ink); background: transparent; }
+.publishing-dialog::backdrop, .publishing-delete-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(6px); }
+.publishing-panel { display: grid; gap: 13px; padding: 18px; border: 1px solid var(--line-bright); border-radius: 6px; background: var(--panel-raised); box-shadow: 0 22px 80px var(--shadow); }
+.publishing-panel > header { display: flex; align-items: flex-start; justify-content: space-between; }
+.publishing-panel h2, .publishing-delete-panel h2 { margin: 3px 0 0; font-size: 1.2rem; }
+.publishing-panel p { margin: 0; color: var(--muted); }
+.publishing-project { display: grid; gap: 2px; padding: 10px; border: 1px solid var(--line-strong); background: var(--surface); }
+.publishing-project span { color: var(--muted); }
+.publishing-panel > label { display: grid; gap: 5px; }
+.publishing-panel > label small { color: var(--muted); }
+.publishing-actions { display: flex; justify-content: flex-end; }
+.publishing-link { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--accent); background: var(--bg-1); }
+.publishing-link > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; }
+.publishing-link a { display: grid; min-height: 34px; place-items: center; padding: 4px 11px; border: 1px solid var(--line-strong); color: var(--ink); text-decoration: none; }
+.publishing-link .neutral-action { justify-self: start; }
+.publishing-message { min-height: 1.2em; }
+.publishing-message.error { color: var(--danger); }
+.publishing-delete-dialog { width: min(450px, calc(100vw - 32px)); padding: 0; border: 0; color: var(--ink); background: transparent; }
+.publishing-delete-panel { display: grid; gap: 12px; padding: 20px; border: 1px solid var(--line-bright); border-radius: 6px; background: var(--panel-raised); box-shadow: 0 20px 70px var(--shadow); }
+.publishing-delete-panel p { margin: 0; color: var(--muted); }
+.publishing-delete-panel > div { display: flex; justify-content: space-between; gap: 8px; }
+.publishing-delete-panel .safe-action { border-color: var(--accent); color: var(--black); background: var(--accent); }
+@media (max-width: 560px) { .publishing-link > div { grid-template-columns: 1fr 1fr; } .publishing-link input { grid-column: 1 / -1; } }

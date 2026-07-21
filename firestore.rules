@@ -1,0 +1,90 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function hasVerifiedEmail() {
+      return request.auth != null
+        && request.auth.token.email_verified == true;
+    }
+
+    function ownsUserSpace(userId) {
+      return hasVerifiedEmail() && request.auth.uid == userId;
+    }
+
+    function validProjectRecord(userId, projectId) {
+      return request.resource.data.cloudFormat == "chiptune-workstation-cloud"
+        && request.resource.data.cloudVersion == 1
+        && request.resource.data.ownerId == userId
+        && request.resource.data.projectId == projectId
+        && request.resource.data.cloudRevision is int
+        && request.resource.data.cloudRevision > 0
+        && request.resource.data.title is string
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string
+        && request.resource.data.document is map
+        && request.resource.data.document.format == "chiptune-workstation"
+        && request.resource.data.document.documentVersion == 1
+        && request.resource.data.document.id == projectId
+        && request.resource.data.document.revision is int
+        && request.resource.data.document.project is map;
+    }
+
+    function validPublication(publicationId) {
+      return request.resource.data.publicationFormat == "chiptune-workstation-publication"
+        && request.resource.data.publicationVersion == 1
+        && request.resource.data.publicationId == publicationId
+        && request.resource.data.publicationRevision is int
+        && request.resource.data.publicationRevision > 0
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.sourceProjectId is string
+        && request.resource.data.title is string
+        && request.resource.data.creatorName is string
+        && request.resource.data.creatorName.size() > 0
+        && request.resource.data.creatorName.size() <= 48
+        && request.resource.data.publishedAt is string
+        && request.resource.data.updatedAt is string
+        && request.resource.data.document is map
+        && request.resource.data.document.format == "chiptune-workstation"
+        && request.resource.data.document.documentVersion == 1
+        && request.resource.data.document.id == request.resource.data.sourceProjectId
+        && request.resource.data.document.project is map;
+    }
+
+    match /users/{userId} {
+      allow read, delete: if ownsUserSpace(userId);
+      allow create, update: if ownsUserSpace(userId)
+        && request.resource.data.uid == userId;
+
+      match /projects/{projectId} {
+        allow read, delete: if ownsUserSpace(userId);
+        allow create: if ownsUserSpace(userId)
+          && validProjectRecord(userId, projectId)
+          && request.resource.data.cloudRevision == 1;
+        allow update: if ownsUserSpace(userId)
+          && validProjectRecord(userId, projectId)
+          && request.resource.data.cloudRevision == resource.data.cloudRevision + 1;
+      }
+    }
+
+    match /publications/{publicationId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if hasVerifiedEmail()
+        && validPublication(publicationId)
+        && request.resource.data.publicationRevision == 1;
+      allow update: if hasVerifiedEmail()
+        && resource.data.ownerId == request.auth.uid
+        && validPublication(publicationId)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.sourceProjectId == resource.data.sourceProjectId
+        && request.resource.data.publishedAt == resource.data.publishedAt
+        && request.resource.data.publicationRevision == resource.data.publicationRevision + 1;
+      allow delete: if hasVerifiedEmail()
+        && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

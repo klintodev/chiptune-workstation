@@ -1,5 +1,10 @@
 import { instrumentDefaults } from "./instrument-state.js";
 import {
+  createDefaultVisualiser,
+  normalizeVisualiser,
+  validateVisualiser,
+} from "../visualiser/visualiser-config.js?v=20260721-3";
+import {
   DEFAULT_PATTERN_LENGTH,
   DEFAULT_PATTERN_ROOT_OCTAVE,
   MAX_PATTERN_NOTE,
@@ -10,7 +15,7 @@ import {
   SUPPORTED_PATTERN_LENGTHS,
 } from "./pattern-state.js";
 
-export const PROJECT_SCHEMA_VERSION = 3;
+export const PROJECT_SCHEMA_VERSION = 4;
 export const DEFAULT_PATTERN_ID = "pattern-1";
 export const DEFAULT_TRACK_ID = "track-1";
 export const MAX_PROJECT_HISTORY = 100;
@@ -39,6 +44,12 @@ function cloneTrack(track) {
 
 function freezeProject(project) {
   Object.freeze(project.metadata);
+  for (const layer of project.visualiser.layers) {
+    Object.freeze(layer.mapping);
+    Object.freeze(layer);
+  }
+  Object.freeze(project.visualiser.layers);
+  Object.freeze(project.visualiser);
   Object.freeze(project.transport.loop);
   Object.freeze(project.transport);
   for (const pattern of project.patterns) {
@@ -174,6 +185,7 @@ export function validateProject(candidate) {
     throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
   }
   validateName(candidate.metadata?.title, "Project");
+  validateVisualiser(candidate.visualiser);
   validateTransport(candidate.transport);
   if (!Array.isArray(candidate.patterns) || candidate.patterns.length === 0) {
     throw new RangeError("A project must contain at least one pattern.");
@@ -217,10 +229,18 @@ function isPatternEmpty(pattern) {
 
 export function migrateProject(candidate) {
   if (candidate?.schemaVersion === PROJECT_SCHEMA_VERSION) return candidate;
+  if (candidate?.schemaVersion === 3 && Array.isArray(candidate.patterns)) {
+    return {
+      ...candidate,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      visualiser: createDefaultVisualiser(),
+    };
+  }
   if (candidate?.schemaVersion === 2 && Array.isArray(candidate.patterns)) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
+      visualiser: createDefaultVisualiser(),
       patterns: candidate.patterns.map((pattern) => ({
         ...pattern,
         rootOctave: pattern.rootOctave ?? DEFAULT_PATTERN_ROOT_OCTAVE,
@@ -250,6 +270,7 @@ export function migrateProject(candidate) {
   return {
     schemaVersion: PROJECT_SCHEMA_VERSION,
     metadata: { ...candidate.metadata },
+    visualiser: createDefaultVisualiser(),
     transport: {
       bpm: candidate.transport.bpm,
       masterVolume: 0.35,
@@ -266,6 +287,7 @@ function normalizeProject(candidate) {
   return freezeProject({
     ...migrated,
     metadata: { ...migrated.metadata },
+    visualiser: normalizeVisualiser(migrated.visualiser),
     transport: { ...migrated.transport, loop: { ...migrated.transport.loop } },
     patterns: migrated.patterns.map(clonePattern),
     tracks: migrated.tracks.map(cloneTrack),
@@ -276,6 +298,7 @@ export function createDefaultProject() {
   return normalizeProject({
     schemaVersion: PROJECT_SCHEMA_VERSION,
     metadata: { title: "Untitled chiptune" },
+    visualiser: createDefaultVisualiser(),
     transport: {
       bpm: 120,
       masterVolume: 0.35,
@@ -710,6 +733,12 @@ export function createProjectState(initialProject = createDefaultProject()) {
     );
   }
 
+  function setVisualiser(values) {
+    const visualiser = normalizeVisualiser({ ...state.visualiser, ...values });
+    if (Object.keys(values).every((key) => state.visualiser[key] === visualiser[key])) return false;
+    return commit({ ...state, visualiser }, { field: "visualiser", operation: "update-visualiser" });
+  }
+
   function setBpm(bpm) {
     if (!Number.isFinite(bpm) || bpm < 40 || bpm > 240) {
       throw new RangeError("Tempo must be between 40 and 240 BPM.");
@@ -797,6 +826,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
     setLoop,
     setMasterVolume,
     setPatternRootOctave,
+    setVisualiser,
     undo,
     updatePattern,
     updateTrack,

@@ -40,16 +40,16 @@
   --surface-soft: #e4daef;
   --surface-strong: #ded2ea;
   --line: #ddd0ea;
-  --line-strong: #c3b1d9;
-  --line-bright: #b096cc;
+  --line-strong: #ad98c2;
+  --line-bright: #9278ae;
   --ink: #2f2540;
-  --muted: #8a76a3;
-  --label: #75608f;
-  --accent: #dd83af;
-  --accent-bright: #b8689a;
-  --accent-soft: #f1ddef;
-  --selection: #d8755e;
-  --danger: #c45f70;
+  --muted: #665575;
+  --label: #574466;
+  --accent: #9b2f68;
+  --accent-bright: #7d204f;
+  --accent-soft: #ecd5e4;
+  --selection: #a6402e;
+  --danger: #a9354c;
   --black: #f4eefb;
   --key-white: #ffffff;
   --key-white-ink: #3a2b48;
@@ -60,11 +60,12 @@
 }
 
 .theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  width: 36px;
+  min-width: 36px;
+  place-items: center;
   min-height: 34px;
-  padding: 0 10px;
+  padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   color: var(--accent);
@@ -74,6 +75,8 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.theme-toggle [data-theme-label] { display: none; }
 
 .theme-toggle [data-theme-icon] {
   font-family: sans-serif;

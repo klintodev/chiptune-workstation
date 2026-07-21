@@ -9,10 +9,10 @@
 .arrangement-ruler-row, .arrangement-track-row { display: grid; grid-template-columns: var(--track-header-width) 3584px; }
 .arrangement-ruler-row { position: sticky; z-index: 8; top: 0; }
 .arrangement-ruler-label, .track-header { position: sticky; left: 0; z-index: 9; border-right: 2px solid var(--line-strong); background: var(--panel-raised); }
-.arrangement-ruler-label { display: flex; height: var(--ruler-height); align-items: center; justify-content: space-between; padding: 0 8px 0 10px; border-bottom: 1px solid var(--line); color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.48rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.arrangement-ruler-label { display: flex; height: var(--ruler-height); align-items: center; justify-content: space-between; padding: 0 8px 0 10px; border-bottom: 1px solid var(--line); color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase; }
 .arrangement-ruler-meta { display: flex; align-items: center; gap: 8px; }
-.arrangement-ruler-meta small { color: var(--muted); font-size: 0.45rem; }
-.arrangement-ruler-label .add-track { min-height: 22px; padding: 2px 7px; border-color: var(--accent); color: var(--accent); background: var(--surface); font-size: 0.43rem; }
+.arrangement-ruler-meta small { color: var(--muted); font-size: 0.52rem; }
+.arrangement-ruler-label .add-track { min-height: 28px; padding: 3px 8px; border-color: var(--accent); color: var(--accent); background: var(--surface); font-size: 0.54rem; }
 .arrangement-ruler-label .add-track:hover:not(:disabled) { color: var(--black); background: var(--accent); }
 .arrangement-ruler { position: relative; height: var(--ruler-height); border-bottom: 1px solid var(--line); background: var(--surface-soft); cursor: pointer; }
 .arrangement-ruler::after { position: absolute; inset: 100% 0 auto; height: calc(var(--track-height) * 8); pointer-events: none; background: repeating-linear-gradient(90deg, transparent 0 13px, color-mix(in srgb, var(--line) 55%, transparent) 13px 14px); content: ""; }
@@ -23,14 +23,14 @@
 .arrangement-ruler-playhead.playing::before { background: var(--accent); }
 .arrangement-track-row { border-bottom: 1px solid var(--line); }
 .arrangement-track-row.selected .track-header { background: color-mix(in srgb, var(--track-color) 12%, var(--panel-raised)); }
-.track-header { position: sticky; display: grid; height: var(--track-height); grid-template-rows: 17px 20px 17px; gap: 1px; padding: 5px 8px 4px 12px; overflow: hidden; }
+.track-header { position: sticky; display: grid; height: var(--track-height); grid-template-rows: 28px 20px 18px; gap: 1px; padding: 4px 8px 4px 12px; overflow: hidden; }
 .track-header::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--track-color); content: ""; }
 .arrangement-track-row.selected .track-header::before { box-shadow: 0 0 10px var(--track-color); }
 .track-primary, .track-secondary, .track-switches, .track-volume { display: flex; min-width: 0; align-items: center; }
 .track-primary { justify-content: space-between; gap: 5px; }
-.track-channel { color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.4rem; letter-spacing: 0.11em; text-transform: uppercase; }
+.track-channel { color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.5rem; letter-spacing: 0.11em; text-transform: uppercase; }
 .track-switches { margin-left: auto; gap: 3px; }
-.track-switches button, .track-remove { width: 19px; min-width: 19px; height: 17px; min-height: 17px; padding: 0; border-color: var(--line-strong); color: var(--label); background: var(--surface-strong); font-size: 0.42rem; }
+.track-switches button, .track-remove { width: 30px; min-width: 30px; height: 28px; min-height: 28px; padding: 0; border-color: var(--line-strong); color: var(--label); background: var(--surface-strong); font-size: 0.54rem; }
 .track-switches button.active { border-color: var(--accent); color: var(--black); background: var(--accent); }
 .track-remove { font-family: sans-serif; font-size: 0.8rem; line-height: 1; }
 .track-remove:hover:not(:disabled), .track-remove:focus-visible:not(:disabled) { border-color: var(--danger); color: var(--black); background: var(--danger); }
@@ -38,24 +38,24 @@
 .track-name-input:hover { border-color: var(--line-strong); background: var(--surface); }
 .track-name-input:focus { border-color: var(--accent); color: var(--accent-bright); background: var(--surface); outline: 0; }
 .track-secondary { gap: 7px; }
-.track-secondary > small { width: 66px; overflow: hidden; color: var(--muted); font-size: 0.72rem; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.track-secondary > small { width: 66px; overflow: hidden; color: var(--muted); font-size: 0.82rem; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .track-volume { flex: 1; gap: 5px; }
 .track-volume input { width: 100%; min-width: 0; }
-.track-volume-value { width: 29px; color: var(--label); font-size: 0.75rem; text-align: right; }
+.track-volume-value { width: 31px; color: var(--label); font-size: 0.86rem; text-align: right; }
 .track-lane { position: relative; height: var(--track-height); background: repeating-linear-gradient(90deg, transparent 0 13px, color-mix(in srgb, var(--line) 35%, transparent) 13px 14px), repeating-linear-gradient(90deg, transparent 0 223px, color-mix(in srgb, var(--line-bright) 35%, transparent) 223px 224px), var(--surface); cursor: crosshair; }
 .track-lane:hover { background: repeating-linear-gradient(90deg, transparent 0 13px, color-mix(in srgb, var(--track-color) 14%, transparent) 13px 14px), repeating-linear-gradient(90deg, transparent 0 223px, color-mix(in srgb, var(--track-color) 28%, transparent) 223px 224px), color-mix(in srgb, var(--track-color) 4%, var(--surface)); }
 .arrangement-clip { position: absolute; top: 9px; display: grid; min-width: 42px; height: 46px; align-content: center; gap: 2px; overflow: hidden; padding: 5px 28px 5px 7px; border: 1px solid var(--ink); border-left: 3px solid var(--ink); border-radius: 3px; color: var(--ink); background: color-mix(in srgb, var(--ink) 5%, var(--panel-raised)); text-align: left; }
 .arrangement-clip strong, .arrangement-clip small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.arrangement-clip strong { font-family: "Silkscreen", monospace; font-size: 0.48rem; letter-spacing: 0.04em; }
+.arrangement-clip strong { font-family: "Silkscreen", monospace; font-size: 0.56rem; letter-spacing: 0.04em; }
 .arrangement-clip small { color: var(--label); font-size: 0.78rem; }
 .arrangement-clip.selected { border-color: var(--accent); color: var(--accent-bright); background: color-mix(in srgb, var(--accent) 18%, var(--panel-raised)); box-shadow: inset 0 0 0 1px var(--accent), 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent); }
 
 .track-menu { position: relative; margin-left: auto; }
-.track-menu summary { display: grid; min-height: 28px; place-items: center; padding: 4px 9px; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--label); background: var(--surface-strong); font-family: "Silkscreen", monospace; font-size: 0.45rem; list-style: none; }
+.track-menu summary { display: grid; min-height: 30px; place-items: center; padding: 4px 9px; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--label); background: var(--surface-strong); font-family: "Silkscreen", monospace; font-size: 0.54rem; list-style: none; }
 .track-menu summary::-webkit-details-marker, .pattern-menu summary::-webkit-details-marker { display: none; }
 .track-menu[open] summary { border-color: var(--accent); color: var(--accent); }
 .track-menu-panel { position: absolute; z-index: 50; top: calc(100% + 6px); right: 0; display: grid; min-width: 270px; gap: 9px; padding: 10px; border: 1px solid var(--line-bright); border-radius: 4px; background: var(--panel-raised); box-shadow: 0 14px 40px var(--shadow); }
-.track-menu-panel label { display: grid; gap: 4px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.45rem; text-transform: uppercase; }
+.track-menu-panel label { display: grid; gap: 4px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.54rem; text-transform: uppercase; }
 .track-menu-panel input { min-height: 32px; padding: 4px 7px; }
 .track-menu-panel > div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .track-menu-panel button { min-height: 30px; }

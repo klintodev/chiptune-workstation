@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Listen to a chiptune shared from Klinto Studio." />
+    <title>Shared chiptune - Klinto Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./player.css" />
+  </head>
+  <body>
+    <main class="player-shell">
+      <header><a href="./">Klinto Studio</a><span>Published snapshot</span></header>
+      <section class="player-card" aria-labelledby="player-title">
+        <div class="player-heading"><div><span class="eyebrow">Shared chiptune</span><h1 id="player-title">Loading...</h1><p>by <strong id="player-creator">...</strong></p></div><span id="player-revision"></span></div>
+        <div class="player-visual"><canvas id="player-canvas" aria-label="Audio reactive visualiser"></canvas></div>
+        <div class="player-controls">
+          <button id="player-restart" type="button" disabled aria-label="Restart">&#9198;</button>
+          <button id="player-play" class="primary" type="button" disabled>Enable and play</button>
+          <button id="player-pause" type="button" disabled>Pause</button>
+          <label><span>Volume</span><input id="player-volume" type="range" min="0" max="100" step="1" value="100" disabled /></label>
+        </div>
+        <div class="player-progress"><span id="player-position">Step 001</span><span id="player-status" role="status">Loading publication...</span></div>
+        <p id="player-error" class="player-error" role="alert" hidden></p>
+      </section>
+      <footer>This is a read-only published snapshot. <a href="./">Create your own in Klinto Studio.</a></footer>
+    </main>
+    <script type="module" src="./src/player.js?v=20260721-1"></script>
+  </body>
+</html>

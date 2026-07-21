@@ -3,26 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="A browser-based chiptune workstation built with the Web Audio API." />
-    <title>Chiptune Workstation</title>
+    <meta name="description" content="Create, arrange, visualise and share chiptune tracks in your browser—no installation required." />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#211b28" />
+    <link rel="canonical" href="https://studio.klinto.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Klinto Studio" />
+    <meta property="og:title" content="Klinto Studio — Make Chiptunes in Your Browser" />
+    <meta property="og:description" content="Create, arrange, visualise and share chiptune tracks in your browser—no installation required." />
+    <meta property="og:url" content="https://studio.klinto.dev/" />
+    <meta property="og:image" content="https://studio.klinto.dev/assets/brand/social-preview.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Klinto Studio chiptune sequencer and keyboard" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Klinto Studio — Make Chiptunes in Your Browser" />
+    <meta name="twitter:description" content="Create, arrange, visualise and share chiptune tracks in your browser—no installation required." />
+    <meta name="twitter:image" content="https://studio.klinto.dev/assets/brand/social-preview.png" />
+    <meta name="twitter:image:alt" content="Klinto Studio chiptune sequencer and keyboard" />
+    <title>Klinto Studio — Make Chiptunes in Your Browser</title>
+    <link rel="icon" href="/assets/brand/klinto-mark.svg" type="image/svg+xml" />
+    <link rel="icon" href="/assets/brand/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png" />
+    <link rel="manifest" href="/assets/brand/site.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260721-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260721-3" />
   </head>
   <body>
     <main class="shell">
       <header class="global-bar">
         <div class="project-cluster">
-          <div class="studio-badge"><span aria-hidden="true"></span><strong>Klinto Studio</strong></div>
+          <div class="studio-badge"><span aria-hidden="true"></span><h1>Klinto Studio</h1></div>
           <button id="project-library-open" class="project-summary" type="button" aria-haspopup="dialog">
-            <span><span>Project</span><output id="project-save-status">Saved</output></span>
-            <output id="project-title">Untitled chiptune</output>
+            <span class="project-summary-icon" aria-hidden="true">&#9656;</span>
+            <span class="project-summary-copy"><span>Project</span><output id="project-title">Untitled chiptune</output></span>
+            <span class="project-save-pill"><span aria-hidden="true"></span><output id="project-save-status">Saved</output></span>
           </button>
-          <div class="global-history" aria-label="Project history">
-            <button id="pattern-undo" type="button" aria-label="Undo" title="Undo (Ctrl+Z)">&#8630;</button>
-            <button id="pattern-redo" type="button" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">&#8631;</button>
-          </div>
         </div>
 
         <div class="global-transport" aria-label="Transport and mix controls">
@@ -33,23 +51,25 @@
             <button id="transport-loop" type="button" disabled aria-label="Loop arrangement" aria-pressed="false">&#8635;</button>
           </div>
           <label class="tempo-control"><span>Tempo</span><span><input id="tempo" type="number" min="40" max="240" step="1" value="120" inputmode="numeric" aria-label="Tempo in BPM" /><output id="tempo-value" for="tempo">120</output><small>BPM</small></span></label>
-          <label class="master-control"><span>Master <output id="master-volume-value" for="master-volume">35%</output></span><input id="master-volume" type="range" min="0" max="100" step="1" value="35" /></label>
+          <label class="master-control"><span>Master <output id="master-volume-value" for="master-volume">35%</output></span><input id="master-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Master output volume" /></label>
         </div>
 
         <div class="global-status">
-          <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false"><span data-theme-icon aria-hidden="true">&#9790;</span><span data-theme-label>Dark</span></button>
-          <label class="mode-control"><span>Mode</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
           <div class="status-cluster" aria-live="polite"><span id="status-light" class="status-light" aria-hidden="true"></span><div><span class="status-label">Audio</span><strong id="audio-state">Not started</strong></div></div>
+          <div id="global-tools" class="global-tools" aria-label="Workstation tools"></div>
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" title="Toggle theme"><span data-theme-icon aria-hidden="true">&#9790;</span><span data-theme-label>Dark</span></button>
+          <div id="account-slot" class="account-slot"></div>
+          <label class="mode-control"><span>Mode</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
           <output id="transport-status" class="transport-status" aria-live="polite">Arrangement / Stopped step 001</output>
         </div>
       </header>
 
       <section id="audio-setup" class="audio-setup" aria-labelledby="setup-title">
         <div class="audio-setup-card">
-          <div><p class="eyebrow">Audio setup</p><h2 id="setup-title">Enable the workstation</h2><p id="status-description" class="lede">Your browser needs one gesture before it can play sound.</p></div>
-          <button id="audio-action" class="primary-action" type="button"><span>Enable audio</span><span aria-hidden="true">&#8599;</span></button>
+          <div><p class="eyebrow">Browser chiptune workstation</p><h2 id="setup-title">Klinto Studio</h2><p id="status-description" class="lede">Create, arrange, visualise and share chiptune tracks in your browser—no installation required.</p></div>
+          <button id="audio-action" class="primary-action" type="button"><span>Start making music</span><span aria-hidden="true">&#8599;</span></button>
           <div id="error-panel" class="error-panel" role="alert" hidden><strong>Audio could not start</strong><p id="error-message"></p></div>
-          <div class="meters" aria-label="Audio engine information"><div><span>Context</span><strong id="context-state">&mdash;</strong></div><div><span>Sample rate</span><strong id="sample-rate">&mdash;</strong></div><div><span>Audio time</span><strong id="audio-time">&mdash;</strong></div></div>
+          <details class="audio-diagnostics"><summary>Audio diagnostics</summary><div class="meters" aria-label="Audio engine information"><div><span>Context</span><strong id="context-state">&mdash;</strong></div><div><span>Sample rate</span><strong id="sample-rate">&mdash;</strong></div><div><span>Audio time</span><strong id="audio-time">&mdash;</strong></div></div></details>
         </div>
       </section>
 
@@ -67,7 +87,7 @@
 
         <section id="editor-dock" class="editor-dock" aria-label="Editing workspace">
           <div class="editor-tabbar">
-            <div class="dock-context"><span id="dock-context-dot" aria-hidden="true"></span><span id="dock-context-kicker">Pattern</span><strong id="dock-context-title">Pattern 1</strong></div>
+            <button id="dock-context-locate" class="dock-context" type="button" title="Locate in arrangement"><span id="dock-context-dot" aria-hidden="true"></span><span id="dock-context-kicker">Pattern</span><strong id="dock-context-title">Pattern 1</strong><span class="dock-locate-icon" aria-hidden="true">&#9678;</span></button>
             <div class="dock-actions">
               <button id="workspace-keyboard-toggle" type="button" aria-label="Open keyboard" aria-pressed="false" title="Keyboard">
                 <svg width="19" height="14" viewBox="0 0 19 14" aria-hidden="true"><rect x="0.6" y="0.6" width="17.8" height="12.8" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.2"></rect><path d="M4.8 1v12M9.5 1v12M14.2 1v12" stroke="currentColor" stroke-width="1.2"></path><rect x="3.3" y="1" width="3" height="7" rx="0.6" fill="currentColor"></rect><rect x="8" y="1" width="3" height="7" rx="0.6" fill="currentColor"></rect><rect x="12.7" y="1" width="3" height="7" rx="0.6" fill="currentColor"></rect></svg>
@@ -86,6 +106,8 @@
                 <label><span>Root</span><select id="pattern-root-octave" aria-label="Root octave"><option value="2">C2</option><option value="3">C3</option><option value="4" selected>C4</option><option value="5">C5</option><option value="6">C6</option></select></label>
                 <output id="pattern-usage">0 clips</output>
                 <div class="pattern-toolbar-actions">
+                  <button id="pattern-undo" type="button" aria-label="Undo" title="Undo (Ctrl+Z)">&#8630; Undo</button>
+                  <button id="pattern-redo" type="button" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">&#8631; Redo</button>
                   <input id="place-start" type="hidden" value="1" />
                   <button id="place-pattern" class="place-pattern" type="button">&#9656; Place</button>
                   <details class="pattern-menu"><summary aria-label="More pattern actions">&#8943;</summary><div><button id="pattern-new" type="button">New pattern</button><button id="pattern-variation" type="button">Duplicate variation</button><button id="pattern-duplicate" type="button">Double length</button><button id="pattern-delete" type="button" disabled>Delete pattern</button><button id="pattern-clear" class="danger-action" type="button">Clear pattern</button></div></details>
@@ -102,14 +124,27 @@
                 <div id="selected-step-inspector" class="selected-step-inspector" hidden>
                   <div class="selected-step-title"><span>Edit step</span><strong id="selected-step-number">--</strong><output id="selected-step-summary">Select a step</output><button id="selected-step-clear" class="danger-action" type="button" disabled>Clear</button></div>
                   <div class="pattern-note-picker">
-                    <span>Note</span><label><span class="visually-hidden">Pitch</span><select id="pattern-pitch"><option value="0">C</option><option value="1">C&#9839;</option><option value="2">D</option><option value="3">D&#9839;</option><option value="4">E</option><option value="5">F</option><option value="6">F&#9839;</option><option value="7">G</option><option value="8">G&#9839;</option><option value="9">A</option><option value="10">A&#9839;</option><option value="11">B</option></select></label>
-                    <label><span class="visually-hidden">Octave</span><select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
-                    <label class="pattern-toggle"><input id="pattern-preview" type="checkbox" /> Preview</label><output id="selected-pattern-note">C4</output>
+                    <span>Note</span>
+                    <button id="selected-note-down" type="button" aria-label="Lower selected note by one semitone">&#9664;</button>
+                    <output id="selected-pattern-note">C4</output>
+                    <button id="selected-note-up" type="button" aria-label="Raise selected note by one semitone">&#9654;</button>
+                    <label class="visually-hidden"><span>Pitch</span><select id="pattern-pitch"><option value="0">C</option><option value="1">C&#9839;</option><option value="2">D</option><option value="3">D&#9839;</option><option value="4">E</option><option value="5">F</option><option value="6">F&#9839;</option><option value="7">G</option><option value="8">G&#9839;</option><option value="9">A</option><option value="10">A&#9839;</option><option value="11">B</option></select></label>
+                    <label class="visually-hidden"><span>Octave</span><select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+                    <label class="pattern-toggle"><input id="pattern-preview" type="checkbox" /> Preview</label>
                   </div>
                   <div id="selected-step-gate" class="selected-step-gate" role="radiogroup" aria-label="Selected step gate"><span>Gate</span><button type="button" role="radio" data-gate="0.25">1/4</button><button type="button" role="radio" data-gate="0.5">1/2</button><button type="button" role="radio" data-gate="0.75">3/4</button><button type="button" role="radio" data-gate="1">Full</button></div>
                   <label class="selected-step-volume"><span>Velocity</span><input id="selected-step-volume" type="range" min="0" max="100" step="1" value="70" /><output id="selected-step-volume-value" for="selected-step-volume">70%</output></label>
                 </div>
-                <div class="pattern-help">Select a step, or play a note on the keyboard, to edit its pitch, gate and velocity.</div>
+                <div class="pattern-footer">
+                  <p id="pattern-selection-empty">Select a step, or play a note on the keyboard, to edit its pitch, gate and velocity.</p>
+                  <div id="pattern-selection-summary" hidden>
+                    <span><small>Selected</small><strong>Step <output id="pattern-summary-step">--</output></strong></span>
+                    <span><small>Note</small><output id="pattern-summary-note">Rest</output></span>
+                    <span><small>Gate</small><output id="pattern-summary-gate">--</output></span>
+                    <span><small>Vel</small><output id="pattern-summary-volume">--</output></span>
+                    <em>Edit using the cog on the selected note</em>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -132,10 +167,19 @@
         </section>
       </div>
     </main>
+    <div id="pattern-undo-toast" class="undo-toast" role="status" hidden>
+      <span id="pattern-undo-message"></span>
+      <button id="pattern-undo-action" type="button">&#8617; Undo</button>
+      <button id="pattern-undo-dismiss" type="button" aria-label="Dismiss undo message">&times;</button>
+    </div>
+
     <dialog id="project-library-dialog" class="project-dialog" aria-labelledby="project-library-title">
       <div class="project-dialog-panel">
-        <header><div><span class="panel-context">Local projects</span><h2 id="project-library-title">Project library</h2></div><button id="project-library-close" type="button" aria-label="Close project library">&times;</button></header>
-        <label class="project-title-field"><span>Project name</span><input id="project-name-input" type="text" maxlength="80" /></label>
+        <header><div><span class="panel-context">Local library</span><h2 id="project-library-title">Projects</h2></div><button id="project-library-close" type="button" aria-label="Close project library">&times;</button></header>
+        <div class="project-library-current">
+          <label class="project-title-field"><span>Project name</span><input id="project-name-input" type="text" maxlength="80" /></label>
+          <div class="project-library-current-status"><span>Status</span><output id="project-library-save-status">Saved</output></div>
+        </div>
         <div class="project-dialog-actions">
           <button id="project-new" type="button">New</button>
           <button id="project-duplicate" type="button">Duplicate</button>
@@ -145,6 +189,10 @@
         </div>
         <div class="project-library-heading"><span>Saved in this browser</span><output id="project-library-count">0 projects</output></div>
         <div id="project-list" class="project-list" aria-label="Saved projects"></div>
+        <div class="project-share-render">
+          <div><span class="panel-context">Share &amp; render</span><p>Publish a read-only page or bounce a WAV.</p></div>
+          <div id="project-share-render-actions"></div>
+        </div>
         <p id="project-storage-message" class="project-storage-message" role="status"></p>
         <p id="project-library-error" class="project-library-error" role="alert" hidden></p>
       </div>
@@ -159,6 +207,6 @@
       </div>
     </dialog>
 
-    <script type="module" src="./src/app.js?v=20260721-1"></script>
+    <script type="module" src="./src/app.js?v=20260721-9"></script>
   </body>
 </html>

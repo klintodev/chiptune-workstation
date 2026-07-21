@@ -2,8 +2,8 @@ import { queryRequired } from "../../shared/query-required.js";
 const STATE_CONTENT = Object.freeze({
   idle: {
     title: "Not started",
-    action: "Enable audio",
-    description: "Browsers require a deliberate gesture before they allow sound. Nothing will play until you enable audio.",
+    action: "Start making music",
+    description: "Create, arrange, visualise and share chiptune tracks in your browser\u2014no installation required.",
   },
   running: {
     title: "Ready",

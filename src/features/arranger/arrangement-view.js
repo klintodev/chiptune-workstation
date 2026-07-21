@@ -241,6 +241,7 @@ export function createArrangementView({
       clipElement.classList.toggle("selected", clip.id === selectedClipId);
       clipElement.dataset.action = "select-clip";
       clipElement.dataset.clipId = clip.id;
+      clipElement.dataset.patternId = clip.patternId;
       clipElement.dataset.trackId = track.id;
       clipElement.style.left = `${clip.startStep * STEP_WIDTH}px`;
       clipElement.style.width = `${pattern.steps.length * STEP_WIDTH}px`;
@@ -420,15 +421,23 @@ export function createArrangementView({
     if (trackHeader) {
       const nameInput = event.target.closest('[data-action="rename-track"]');
       const workspace = getWorkspace();
+      const togglesDock = !event.target.closest("button, input")
+        && workspace.selectedTrackId === trackHeader.dataset.trackId
+        && workspace.activeDockPanel === "instrument"
+        && !workspace.detailPanelCollapsed;
       const shouldRestoreNameFocus = nameInput && (
         workspace.selectedTrackId !== trackHeader.dataset.trackId ||
         workspace.activeDockPanel !== "instrument" ||
         workspace.detailPanelCollapsed
       );
-      selectTrack(trackHeader.dataset.trackId, {
-        activeDockPanel: "instrument",
-        selectedClipId: null,
-      });
+      if (togglesDock) {
+        sessionState.setWorkspace({ detailPanelCollapsed: true });
+      } else {
+        selectTrack(trackHeader.dataset.trackId, {
+          activeDockPanel: "instrument",
+          selectedClipId: null,
+        });
+      }
       if (shouldRestoreNameFocus) {
         const replacement = elements.canvas.querySelector(
           `[data-action="rename-track"][data-track-id="${trackHeader.dataset.trackId}"]`,

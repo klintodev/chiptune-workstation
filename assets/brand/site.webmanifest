@@ -1,0 +1,13 @@
+{
+  "name": "Klinto Studio",
+  "short_name": "Klinto",
+  "description": "Create, arrange, visualise and share chiptune tracks in your browser.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#211b28",
+  "theme_color": "#211b28",
+  "icons": [
+    { "src": "/assets/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/brand/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

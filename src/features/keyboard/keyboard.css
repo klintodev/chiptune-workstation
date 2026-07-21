@@ -10,7 +10,7 @@
 .music-key { display: grid; align-content: end; justify-items: center; gap: 5px; padding: 8px 3px 11px; border: 1px solid var(--line-strong); border-radius: 0 0 5px 5px; font-family: "VT323", monospace; touch-action: none; user-select: none; }
 .music-key.white { z-index: 1; min-width: var(--white-key-width); height: var(--white-key-height); border-bottom-width: 5px; color: var(--key-white-ink); background: var(--key-white); }
 .music-key.black { position: absolute; z-index: 2; top: 0; width: var(--black-key-width); height: var(--black-key-height); border-color: color-mix(in srgb, var(--key-black) 70%, black); border-bottom-width: 5px; color: var(--key-black-ink); background: var(--key-black); transform: translateX(-50%); box-shadow: 0 3px 0 color-mix(in srgb, var(--key-black) 70%, black); }
-.music-key span { padding: 3px 6px; border: 1px solid currentColor; border-radius: 3px; font-family: "Silkscreen", monospace; font-size: 0.48rem; font-weight: 700; }
+.music-key span { padding: 3px 6px; border: 1px solid currentColor; border-radius: 3px; font-family: "Silkscreen", monospace; font-size: 0.58rem; font-weight: 700; }
 .music-key small { font-size: 0.88rem; opacity: 0.65; }
 .music-key:hover:not(:disabled) { border-color: var(--accent); }
 .music-key.active, .music-key.black.active { border-color: var(--accent); color: var(--black); background: var(--accent); }

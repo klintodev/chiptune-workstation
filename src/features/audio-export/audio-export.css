@@ -1,0 +1,4 @@
+.audio-export-status { margin: 0; padding: 7px 9px; border: 1px solid var(--line-strong); color: var(--accent); background: var(--surface); font-size: 0.9rem; }
+.audio-export-status.error { border-color: var(--danger); color: var(--danger); }
+#audio-export-wav { border-color: var(--accent); color: var(--accent); }
+#audio-export-wav:disabled { color: var(--muted); }

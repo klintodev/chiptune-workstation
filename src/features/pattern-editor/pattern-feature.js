@@ -19,23 +19,36 @@ export function createPatternFeature({
     duplicate: queryRequired(root, "#pattern-duplicate"),
     grid: queryRequired(root, "#pattern-grid"),
     length: queryRequired(root, "#pattern-length"),
+    noteDown: queryRequired(root, "#selected-note-down"),
+    noteUp: queryRequired(root, "#selected-note-up"),
     octave: queryRequired(root, "#pattern-octave"),
     pitch: queryRequired(root, "#pattern-pitch"),
     preview: queryRequired(root, "#pattern-preview"),
     redo: queryRequired(root, "#pattern-redo"),
     selectedNote: queryRequired(root, "#selected-pattern-note"),
+    selectionEmpty: queryRequired(root, "#pattern-selection-empty"),
+    selectionSummary: queryRequired(root, "#pattern-selection-summary"),
     stepClear: queryRequired(root, "#selected-step-clear"),
     stepGate: queryRequired(root, "#selected-step-gate"),
     stepNumber: queryRequired(root, "#selected-step-number"),
     stepSummary: queryRequired(root, "#selected-step-summary"),
     stepVolume: queryRequired(root, "#selected-step-volume"),
     stepVolumeValue: queryRequired(root, "#selected-step-volume-value"),
+    summaryGate: queryRequired(root, "#pattern-summary-gate"),
+    summaryNote: queryRequired(root, "#pattern-summary-note"),
+    summaryStep: queryRequired(root, "#pattern-summary-step"),
+    summaryVolume: queryRequired(root, "#pattern-summary-volume"),
     transposeDown: queryRequired(root, "#transpose-down"),
     transposeOctaveDown: queryRequired(root, "#transpose-octave-down"),
     transposeOctaveUp: queryRequired(root, "#transpose-octave-up"),
     transposeUp: queryRequired(root, "#transpose-up"),
     undo: queryRequired(root, "#pattern-undo"),
+    undoToast: queryRequired(root, "#pattern-undo-toast"),
+    undoToastAction: queryRequired(root, "#pattern-undo-action"),
+    undoToastDismiss: queryRequired(root, "#pattern-undo-dismiss"),
+    undoToastMessage: queryRequired(root, "#pattern-undo-message"),
   };
+  let undoToastTimer = 0;
 
   function renderLength() {
     elements.length.value = String(patternState.getState().length);
@@ -61,21 +74,42 @@ export function createPatternFeature({
     renderActions();
   }
 
+  function hideUndoToast() {
+    globalThis.clearTimeout(undoToastTimer);
+    elements.undoToast.hidden = true;
+  }
+
+  function showUndoToast(stepIndex) {
+    globalThis.clearTimeout(undoToastTimer);
+    elements.undoToastMessage.textContent = `Step ${String(stepIndex + 1).padStart(2, "0")} cleared`;
+    elements.undoToast.hidden = false;
+    undoToastTimer = globalThis.setTimeout(hideUndoToast, 5000);
+  }
+
   const editor = createPatternEditor({
     clearButton: elements.stepClear,
     gateControl: elements.stepGate,
     getNoteName,
     grid: elements.grid,
     isNoiseTrack,
+    noteDownButton: elements.noteDown,
+    noteUpButton: elements.noteUp,
     octaveSelect: elements.octave,
     onEditAction: disarmClear,
+    onStepCleared: showUndoToast,
     patternState,
     pitchSelect: elements.pitch,
     previewInput: elements.preview,
     previewNote: notePreview.play,
     selectedNoteOutput: elements.selectedNote,
+    selectionEmpty: elements.selectionEmpty,
+    selectionSummary: elements.selectionSummary,
     stepNumberOutput: elements.stepNumber,
     stepSummaryOutput: elements.stepSummary,
+    summaryGate: elements.summaryGate,
+    summaryNote: elements.summaryNote,
+    summaryStep: elements.summaryStep,
+    summaryVolume: elements.summaryVolume,
     volumeInput: elements.stepVolume,
     volumeOutput: elements.stepVolumeValue,
   });
@@ -114,6 +148,11 @@ export function createPatternFeature({
   elements.redo.addEventListener("click", () => {
     restoreHistory(patternState.redo, () => patternState.getState().canRedo);
   }, { signal: lifecycle.signal });
+  elements.undoToastAction.addEventListener("click", () => {
+    restoreHistory(patternState.undo, () => patternState.getState().canUndo);
+    hideUndoToast();
+  }, { signal: lifecycle.signal });
+  elements.undoToastDismiss.addEventListener("click", hideUndoToast, { signal: lifecycle.signal });
   elements.duplicate.addEventListener("click", () => {
     if (patternState.canDuplicate()) runAction(patternState.duplicate, { structural: true });
   }, { signal: lifecycle.signal });
@@ -149,6 +188,7 @@ export function createPatternFeature({
   return Object.freeze({
     dispose() {
       lifecycle.abort();
+      globalThis.clearTimeout(undoToastTimer);
       editor.dispose();
     },
     render,

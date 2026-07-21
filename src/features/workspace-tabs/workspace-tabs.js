@@ -18,6 +18,7 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
   const editorDock = queryRequired(root, "#editor-dock");
   const collapse = queryRequired(root, "#workspace-collapse");
   const keyboardToggle = queryRequired(root, "#workspace-keyboard-toggle");
+  const locate = queryRequired(root, "#dock-context-locate");
   const dockPanels = queryRequired(root, "#dock-panels");
   const contextDot = queryRequired(root, "#dock-context-dot");
   const contextKicker = queryRequired(root, "#dock-context-kicker");
@@ -27,6 +28,7 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
     queryRequired(root, `#dock-panel-${panelId}`),
   ]));
   let previousPanel = "sequencer";
+  let locateTimeout = 0;
 
   function select(panelId) {
     if (!panels.has(panelId)) throw new RangeError(`Unknown workspace panel: ${panelId}`);
@@ -68,6 +70,30 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
     contextTitle.textContent = context.title;
   }
 
+  function findSource() {
+    const workspace = sessionState.getState().workspace;
+    const activePanel = panels.has(workspace.activeDockPanel) ? workspace.activeDockPanel : "sequencer";
+    if (activePanel === "sequencer") {
+      const clips = [...root.querySelectorAll(".arrangement-clip")];
+      return clips.find((clip) => clip.dataset.clipId === workspace.selectedClipId)
+        ?? clips.find((clip) => clip.dataset.patternId === workspace.selectedPatternId)
+        ?? null;
+    }
+    return [...root.querySelectorAll(".arrangement-track-row")]
+      .find((row) => row.querySelector(".track-header")?.dataset.trackId === workspace.selectedTrackId)
+      ?.querySelector(".track-header") ?? null;
+  }
+
+  function locateSource() {
+    const source = findSource();
+    if (!source) return;
+    source.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    source.classList.remove("locate-flash");
+    globalThis.requestAnimationFrame?.(() => source.classList.add("locate-flash"));
+    globalThis.clearTimeout(locateTimeout);
+    locateTimeout = globalThis.setTimeout(() => source.classList.remove("locate-flash"), 1100);
+  }
+
   keyboardToggle.addEventListener("click", () => {
     const { activeDockPanel } = sessionState.getState().workspace;
     select(activeDockPanel === "keyboard" ? previousPanel : "keyboard");
@@ -76,6 +102,7 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
     const { detailPanelCollapsed } = sessionState.getState().workspace;
     sessionState.setWorkspace({ detailPanelCollapsed: !detailPanelCollapsed });
   }, { signal: lifecycle.signal });
+  locate.addEventListener("click", locateSource, { signal: lifecycle.signal });
 
   sessionState.addEventListener("change", (event) => {
     if (event.detail.slice === "workspace") render();
@@ -83,5 +110,12 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
   projectState.addEventListener("change", render, { signal: lifecycle.signal });
   render();
 
-  return Object.freeze({ dispose: () => lifecycle.abort(), render, select });
+  return Object.freeze({
+    dispose() {
+      lifecycle.abort();
+      globalThis.clearTimeout(locateTimeout);
+    },
+    render,
+    select,
+  });
 }

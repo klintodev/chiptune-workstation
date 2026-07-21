@@ -6,6 +6,12 @@ import {
 } from "../../state/pattern-state.js";
 
 const GRID_NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"]);
+const GATE_LABELS = Object.freeze({
+  0.25: "1/4",
+  0.5: "1/2",
+  0.75: "3/4",
+  1: "Full",
+});
 
 export function createPatternEditor({
   clearButton,
@@ -13,15 +19,24 @@ export function createPatternEditor({
   getNoteName,
   grid,
   isNoiseTrack = () => false,
+  noteDownButton,
+  noteUpButton,
   octaveSelect,
   onEditAction,
+  onStepCleared = () => {},
   patternState,
   pitchSelect,
   previewInput,
   previewNote,
   selectedNoteOutput,
+  selectionEmpty,
+  selectionSummary,
   stepNumberOutput,
   stepSummaryOutput,
+  summaryGate,
+  summaryNote,
+  summaryStep,
+  summaryVolume,
   volumeInput,
   volumeOutput,
 }) {
@@ -131,6 +146,7 @@ export function createPatternEditor({
       selectedStepIndex = null;
       onEditAction?.();
       patternState.clearStep(index);
+      onStepCleared(index);
       render();
     }, { signal: lifecycle.signal });
     editButton.addEventListener("click", () => {
@@ -191,6 +207,8 @@ export function createPatternEditor({
     clearButton.disabled = !hasNote;
     gateControl.classList.toggle("disabled", !hasNote);
     volumeInput.disabled = !hasNote;
+    noteDownButton.disabled = !hasNote || getSelectedNote() <= MIN_PATTERN_NOTE;
+    noteUpButton.disabled = !hasNote || getSelectedNote() >= MAX_PATTERN_NOTE;
     for (const { button, gate } of gateButtons) {
       const selected = hasNote && selectedStep.gate === gate;
       button.disabled = !hasNote;
@@ -201,6 +219,14 @@ export function createPatternEditor({
     const volumePercent = Math.round((selectedStep?.volume ?? DEFAULT_PATTERN_VOLUME) * 100);
     if (activeVolumeStepIndex === null) volumeInput.value = String(volumePercent);
     volumeOutput.value = `${volumePercent}%`;
+    selectionEmpty.hidden = hasSelection;
+    selectionSummary.hidden = !hasSelection;
+    if (hasSelection) {
+      summaryStep.value = String(selectedStepIndex + 1).padStart(2, "0");
+      summaryNote.value = hasNote ? (isNoiseTrack() ? "Hit" : getNoteName(selectedStep.note)) : "Rest";
+      summaryGate.value = hasNote ? GATE_LABELS[selectedStep.gate] ?? `${Math.round(selectedStep.gate * 100)}%` : "—";
+      summaryVolume.value = hasNote ? `${volumePercent}%` : "—";
+    }
   }
 
   function render() {
@@ -304,10 +330,20 @@ export function createPatternEditor({
   }
   clearButton.addEventListener("click", () => {
     if (selectedStepIndex === null) return;
+    const clearedIndex = selectedStepIndex;
     onEditAction?.();
     patternState.clearStep(selectedStepIndex);
+    onStepCleared(clearedIndex);
     render();
     focusStep(selectedStepIndex);
+  }, { signal: lifecycle.signal });
+  noteDownButton.addEventListener("click", () => {
+    const note = getSelectedNote();
+    if (note > MIN_PATTERN_NOTE) setSelectedNote(note - 1);
+  }, { signal: lifecycle.signal });
+  noteUpButton.addEventListener("click", () => {
+    const note = getSelectedNote();
+    if (note < MAX_PATTERN_NOTE) setSelectedNote(note + 1);
   }, { signal: lifecycle.signal });
   volumeInput.addEventListener("pointerdown", () => {
     if (selectedStepIndex === null || patternState.getState().steps[selectedStepIndex] === null) return;

@@ -16,6 +16,7 @@ export function createAudioEngine() {
   const events = new EventTarget();
   let context = null;
   let masterGain = null;
+  let analyser = null;
   let masterVolume = DEFAULT_MASTER_GAIN;
   let initialization = null;
   let disposed = false;
@@ -58,8 +59,12 @@ export function createAudioEngine() {
         context = new Context();
         context.addEventListener("statechange", emitState);
         masterGain = context.createGain();
+        analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.72;
         masterGain.gain.setValueAtTime(masterVolume, context.currentTime);
-        masterGain.connect(context.destination);
+        masterGain.connect(analyser);
+        analyser.connect(context.destination);
       }
       if (context.state === "suspended") await context.resume();
       if (context.state !== "running") {
@@ -101,6 +106,11 @@ export function createAudioEngine() {
     return masterGain;
   }
 
+  function getObservationNode() {
+    requireReady();
+    return analyser;
+  }
+
   function getCurrentTime() {
     if (!context || !masterGain) {
       throw createAudioEngineError(
@@ -132,7 +142,9 @@ export function createAudioEngine() {
     const contextToClose = context;
     contextToClose?.removeEventListener("statechange", emitState);
     masterGain?.disconnect();
+    analyser?.disconnect();
     masterGain = null;
+    analyser = null;
     context = null;
     if (contextToClose && contextToClose.state !== "closed") {
       try {
@@ -151,7 +163,7 @@ export function createAudioEngine() {
     getCurrentTime,
     getInputNode,
     getMasterVolume: () => masterVolume,
-    getObservationNode: getInputNode,
+    getObservationNode,
     getSampleRate: () => context?.sampleRate ?? null,
     getState,
     isReady,
