@@ -1,6 +1,6 @@
 import { createAudioExportFeature } from "./features/audio-export/audio-export.js?v=20260721-3";
 import { createAccountFeature } from "./features/account/account.js?v=20260721-5";
-import { createVisualiserFeature } from "./features/visualiser/visualiser.js?v=20260721-7";
+import { createVisualiserFeature } from "./features/visualiser/visualiser.js?v=20260721-10";
 import { createPublishingFeature } from "./features/publishing/publishing.js?v=20260721-4";
 import { createAccountService } from "./firebase/account-service.js?v=20260721-3";
 import { createIndexedDbCloudLinkRepository } from "./firebase/cloud-link-repository.js";
@@ -12,7 +12,13 @@ import {
   createIndexedDbProjectRepository,
   createProjectPreferences,
 } from "./persistence/project-repository.js";
-import { audioEngine, projectPersistence, projectState } from "./workstation-app.js?v=20260721-8";
+import {
+  audioEngine,
+  projectPersistence,
+  projectState,
+  sessionState,
+  trackRuntimes,
+} from "./workstation-app.js?v=20260721-11";
 
 const audioExportFeature = createAudioExportFeature({
   persistence: projectPersistence,
@@ -21,6 +27,8 @@ const audioExportFeature = createAudioExportFeature({
 const visualiserFeature = createVisualiserFeature({
   audioEngine,
   projectState,
+  sessionState,
+  trackRuntimes,
 });
 const accountService = createAccountService({
   loadClient: createFirebaseClient,

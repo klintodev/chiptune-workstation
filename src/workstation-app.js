@@ -4,16 +4,16 @@ import {
   isAudioEngineError,
 } from "./audio/audio-engine.js?v=20260721-3";
 import { createNotePreview } from "./audio/note-preview.js?v=20260721-1";
-import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260721-1";
+import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260721-2";
 import { createAudioStatusFeature } from "./features/audio-status/audio-status.js?v=20260721-2";
-import { createArrangerFeature } from "./features/arranger/arranger-feature.js?v=20260721-3";
+import { createArrangerFeature } from "./features/arranger/arranger-feature.js?v=20260721-4";
 import { createInstrumentFeature } from "./features/instrument/instrument.js";
 import { createInputController } from "./features/keyboard/input-controller.js?v=20260721-1";
 import { createKeyboardFeature } from "./features/keyboard/keyboard.js";
 import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js?v=20260721-3";
 import { createProjectLibraryFeature } from "./features/project-library/project-library.js?v=20260721-3";
 import { createThemeFeature } from "./features/theme/theme.js";
-import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js?v=20260721-2";
+import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js?v=20260721-3";
 import { getNoteName } from "./music/note.js";
 import { createInstrumentState } from "./state/instrument-state.js";
 import { DEFAULT_PATTERN_ROOT_OCTAVE, createPatternState } from "./state/pattern-state.js";
@@ -80,7 +80,7 @@ const patternState = createPatternState(undefined, {
   projectState,
   sessionState,
 });
-const trackRuntimes = createTrackRuntimeRegistry({ audioEngine, projectState });
+export const trackRuntimes = createTrackRuntimeRegistry({ audioEngine, projectState });
 const getSelectedVoiceEngine = () => trackRuntimes.getVoiceEngine(getSelectedTrackId());
 
 const notePreview = createNotePreview({

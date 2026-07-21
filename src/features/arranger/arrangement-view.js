@@ -3,21 +3,10 @@ import {
   MAX_PROJECT_TRACKS,
 } from "../../state/project-state.js";
 import { queryRequired } from "../../shared/query-required.js";
+import { getTrackColour, getVoiceLabel } from "../../shared/track-presentation.js";
 import { createClipDragController, getTimelineStep } from "./clip-drag-controller.js";
 
 const STEP_WIDTH = 14;
-const TRACK_COLOURS = Object.freeze([
-  "var(--accent)", "#f2b8d8", "#b7a9ec", "#f2b48c",
-  "#9fc6ed", "#d6a7ef", "#8fd3c8", "#ef9ca8",
-]);
-const VOICE_LABELS = Object.freeze({
-  pulse12: "pulse 12.5%",
-  pulse25: "pulse 25%",
-  square: "pulse 50%",
-  triangle: "triangle",
-  sawtooth: "saw",
-  noise: "noise",
-});
 
 function createButton(root, label, action, trackId) {
   const button = root.createElement("button");
@@ -221,7 +210,7 @@ export function createArrangementView({
     const secondary = root.createElement("div");
     secondary.className = "track-secondary";
     const voice = root.createElement("small");
-    voice.textContent = VOICE_LABELS[track.instrument.voiceType] ?? track.instrument.voiceType;
+    voice.textContent = getVoiceLabel(track.instrument.voiceType);
     const volume = root.createElement("label");
     volume.className = "track-volume";
     const volumeText = root.createElement("span");
@@ -300,7 +289,7 @@ export function createArrangementView({
     project.tracks.forEach((track, trackIndex) => {
       const row = root.createElement("div");
       row.className = "arrangement-track-row";
-      row.style.setProperty("--track-color", TRACK_COLOURS[trackIndex % TRACK_COLOURS.length]);
+      row.style.setProperty("--track-color", getTrackColour(trackIndex));
       row.classList.toggle("selected", track.id === workspace.selectedTrackId);
       row.append(
         createTrackHeader(track, trackIndex, track.id === workspace.selectedTrackId, project.tracks.length > 1),

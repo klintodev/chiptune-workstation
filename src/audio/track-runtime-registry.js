@@ -1,5 +1,5 @@
 import { isTrackAudible, MAX_TRACK_VOICES } from "../state/project-state.js";
-import { createTrackChannel } from "./track-channel.js";
+import { createTrackChannel } from "./track-channel.js?v=20260721-1";
 import { createVoiceEngine } from "./voice-engine.js?v=20260721-1";
 
 export function createTrackRuntimeRegistry({ audioEngine, projectState }) {
@@ -62,6 +62,10 @@ export function createTrackRuntimeRegistry({ audioEngine, projectState }) {
     return ensureRuntime(trackId).voiceEngine;
   }
 
+  function getObservationNode(trackId) {
+    return ensureRuntime(trackId).channel.getObservationNode();
+  }
+
   function stopTrack(trackId, time) {
     const runtime = runtimes.get(trackId);
     return runtime?.voiceEngine.stopAll(time) ?? false;
@@ -84,5 +88,5 @@ export function createTrackRuntimeRegistry({ audioEngine, projectState }) {
     runtimes.clear();
   }
 
-  return Object.freeze({ dispose, getVoiceEngine, stopAll, stopTrack, sync });
+  return Object.freeze({ dispose, getObservationNode, getVoiceEngine, stopAll, stopTrack, sync });
 }

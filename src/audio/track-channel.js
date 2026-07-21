@@ -7,6 +7,7 @@ export function createTrackChannel({
   initialVolume = 1,
   trackId,
 }) {
+  let analyser = null;
   let channel = null;
   let muted = initialMuted;
   let volume = initialVolume;
@@ -19,9 +20,18 @@ export function createTrackChannel({
     if (channel) return channel;
     const masterOutput = getMasterOutputNode();
     channel = masterOutput.context.createGain();
+    analyser = masterOutput.context.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.68;
     channel.gain.setValueAtTime(getTargetVolume(), masterOutput.context.currentTime);
-    channel.connect(masterOutput);
+    channel.connect(analyser);
+    analyser.connect(masterOutput);
     return channel;
+  }
+
+  function getObservationNode() {
+    getInputNode();
+    return analyser;
   }
 
   function updateGain() {
@@ -52,12 +62,15 @@ export function createTrackChannel({
 
   function dispose() {
     channel?.disconnect();
+    analyser?.disconnect();
     channel = null;
+    analyser = null;
   }
 
   return Object.freeze({
     dispose,
     getInputNode,
+    getObservationNode,
     getState: () => Object.freeze({ muted, trackId, volume }),
     setMuted,
     setVolume,

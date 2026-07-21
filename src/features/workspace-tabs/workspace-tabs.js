@@ -1,16 +1,7 @@
 import { queryRequired } from "../../shared/query-required.js";
+import { getTrackColour } from "../../shared/track-presentation.js";
 
 const PANEL_IDS = Object.freeze(["sequencer", "instrument", "keyboard"]);
-const TRACK_COLOURS = Object.freeze([
-  "var(--accent)",
-  "#f2b8d8",
-  "#b7a9ec",
-  "#f2b48c",
-  "#9fc6ed",
-  "#d6a7ef",
-  "#8fd3c8",
-  "#ef9ca8",
-]);
 
 export function createWorkspaceTabs({ projectState, root = document, sessionState }) {
   const lifecycle = new AbortController();
@@ -41,10 +32,10 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
     const track = project.tracks[trackIndex] ?? project.tracks[0];
     const pattern = project.patterns.find(({ id }) => id === workspace.selectedPatternId) ?? project.patterns[0];
     if (panelId === "keyboard") {
-      return { colour: TRACK_COLOURS[trackIndex], kicker: "Keybed", title: `${track.name} · computer keys mapped` };
+      return { colour: getTrackColour(trackIndex), kicker: "Keybed", title: `${track.name} · computer keys mapped` };
     }
     if (panelId === "instrument") {
-      return { colour: TRACK_COLOURS[trackIndex], kicker: "Instrument", title: track.name };
+      return { colour: getTrackColour(trackIndex), kicker: "Instrument", title: track.name };
     }
     return { colour: "var(--accent)", kicker: "Pattern", title: pattern.name };
   }

@@ -24,14 +24,14 @@ export function analyseAudioFrame(timeDomain, frequencyDomain, sensitivity = 1) 
   });
 }
 
-export function createAudioAnalyserReader(audioEngine) {
+export function createAnalyserReader({ getObservationNode, isReady }) {
   let analyser = null;
   let waveform = new Uint8Array(0);
   let frequencies = new Uint8Array(0);
 
   function ensureBuffers() {
-    if (!audioEngine.isReady()) return false;
-    const nextAnalyser = audioEngine.getObservationNode();
+    if (!isReady()) return false;
+    const nextAnalyser = getObservationNode();
     if (nextAnalyser !== analyser || waveform.length !== nextAnalyser.fftSize) {
       analyser = nextAnalyser;
       waveform = new Uint8Array(analyser.fftSize);
@@ -48,4 +48,11 @@ export function createAudioAnalyserReader(audioEngine) {
   }
 
   return Object.freeze({ read });
+}
+
+export function createAudioAnalyserReader(audioEngine) {
+  return createAnalyserReader({
+    getObservationNode: audioEngine.getObservationNode,
+    isReady: audioEngine.isReady,
+  });
 }
