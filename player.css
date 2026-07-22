@@ -1,6 +1,7 @@
 :root { color-scheme: dark; --bg: #171220; --panel: #2c2537; --line: #65566f; --ink: #fff7ed; --muted: #b7a9b8; --accent: #f39bc4; --lime: #c8ff32; --danger: #ff6b5f; }
 * { box-sizing: border-box; }
-body { min-height: 100vh; margin: 0; color: var(--ink); background: var(--bg); font-family: "VT323", monospace; font-size: 1.2rem; }
+body { min-height: 100vh; margin: 0; visibility: visible; animation: none; color: var(--ink); background: var(--bg); font-family: "VT323", monospace; font-size: 1.2rem; }
+body > * { visibility: visible; animation: none; }
 button, input { font: inherit; }
 button { min-height: 40px; padding: 7px 14px; border: 1px solid var(--line); color: var(--ink); background: #19151f; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.4; }

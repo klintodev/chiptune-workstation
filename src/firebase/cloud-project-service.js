@@ -2,7 +2,7 @@ import {
   copyProjectDocument,
   createProjectIdentifier,
   normalizeProjectDocument,
-} from "../persistence/project-document.js";
+} from "../persistence/project-document.js?v=20260722-1";
 
 const RETRY_DELAYS = Object.freeze([5_000, 15_000, 30_000, 60_000]);
 

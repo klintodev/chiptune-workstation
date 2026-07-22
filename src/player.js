@@ -1,10 +1,12 @@
 import { createAudioEngine } from "./audio/audio-engine.js?v=20260721-3";
-import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
-import { createFirebaseClient } from "./firebase/firebase-client.js";
-import { createProjectState, getArrangementEnd } from "./state/project-state.js?v=20260721-3";
-import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260721-2";
-import { createAudioAnalyserReader } from "./visualiser/audio-features.js";
-import { fitCanvas, renderVisualFrame } from "./visualiser/canvas-renderer.js?v=20260721-3";
+import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260722-1";
+import { createFirebaseClient } from "./firebase/firebase-client.js?v=20260722-1";
+import { getTrackColour } from "./shared/track-presentation.js";
+import { createProjectState, getArrangementEnd } from "./state/project-state.js?v=20260722-1";
+import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260722-1";
+import { fitCanvas } from "./visualiser/canvas-renderer.js?v=20260721-3";
+import { buildCompositionProjection } from "./visualiser/composition-projection.js?v=20260722-1";
+import { renderCompositionFrame } from "./visualiser/signal-stack-renderer.js?v=20260722-1";
 
 const elements = {
   canvas: document.querySelector("#player-canvas"),
@@ -25,7 +27,6 @@ let projectState = null;
 let runtimes = null;
 let scheduler = null;
 let visualFrame = 0;
-let analyserReader = null;
 let visitorVolume = 1;
 let context = null;
 try {
@@ -41,6 +42,34 @@ function showError(message) {
   elements.status.textContent = "Unavailable";
 }
 
+function resolveColour(value, fallback) {
+  if (!value?.startsWith("var(")) return value || fallback;
+  const property = value.slice(4, -1).trim();
+  return getComputedStyle(document.documentElement).getPropertyValue(property).trim() || fallback;
+}
+
+function readTheme() {
+  const styles = getComputedStyle(document.documentElement);
+  const read = (property, fallback) => styles.getPropertyValue(property).trim() || fallback;
+  return Object.freeze({
+    background: read("--bg-0", "#211b28"),
+    grid: read("--line", "#40374d"),
+    ink: read("--ink", "#f3ecf7"),
+    muted: read("--muted", "#a99bbd"),
+  });
+}
+
+function getProjection() {
+  const projection = buildCompositionProjection(projectState.getState(), scheduler.getTimelineSnapshot());
+  return Object.freeze({
+    ...projection,
+    notes: Object.freeze(projection.notes.map((note) => Object.freeze({
+      ...note,
+      colour: resolveColour(getTrackColour(note.trackIndex), "#f0a6c8"),
+    }))),
+  });
+}
+
 function renderTransport() {
   if (!scheduler) return;
   const state = scheduler.getState();
@@ -54,24 +83,24 @@ function renderTransport() {
   elements.position.textContent = `Step ${String(scheduler.getPlayheadStep() + 1).padStart(3, "0")}`;
 }
 
-function renderVisuals(time = 0) {
+function renderVisuals() {
   visualFrame = 0;
   if (!projectState || document.hidden) return;
   if (!context) {
     renderTransport();
     return;
   }
-  const config = projectState.getState().visualiser;
-  const { height, width } = fitCanvas(elements.canvas);
-  const features = analyserReader.read(config.sensitivity);
-  renderVisualFrame(context, features, config, {
+  const { height, ratio, width } = fitCanvas(elements.canvas);
+  renderCompositionFrame(context, getProjection(), {
+    ...readTheme(),
     height,
-    reducedMotion: reducedMotion.matches,
-    time,
+    ratio,
     width,
   });
   renderTransport();
-  if (scheduler?.getState().status === "playing") visualFrame = requestAnimationFrame(renderVisuals);
+  if (scheduler?.getState().status === "playing" && !reducedMotion.matches) {
+    visualFrame = requestAnimationFrame(renderVisuals);
+  }
 }
 
 function scheduleVisuals() {
@@ -109,8 +138,10 @@ function createPlayer(record) {
     getSelectedTrackId: () => project.tracks[0].id,
     getVoiceEngine: runtimes.getVoiceEngine,
   });
-  analyserReader = createAudioAnalyserReader(audioEngine);
-  scheduler.addEventListener("statechange", renderTransport);
+  scheduler.addEventListener("statechange", () => {
+    renderTransport();
+    scheduleVisuals();
+  });
   elements.title.textContent = record.title;
   elements.creator.textContent = record.creatorName;
   elements.revision.textContent = `Revision ${record.publicationRevision}`;
@@ -149,6 +180,7 @@ document.addEventListener("visibilitychange", () => {
     visualFrame = 0;
   } else scheduleVisuals();
 });
+reducedMotion.addEventListener("change", scheduleVisuals);
 window.addEventListener("pagehide", () => {
   scheduler?.stop();
   runtimes?.dispose();

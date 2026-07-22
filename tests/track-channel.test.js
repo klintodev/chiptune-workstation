@@ -6,7 +6,9 @@ import { createTrackChannel } from "../src/audio/track-channel.js";
 test("a track channel is lazy and applies mixer changes through one stable destination", () => {
   let created = 0;
   let createdAnalysers = 0;
+  let createdPanners = 0;
   const events = [];
+  const panEvents = [];
   const connections = [];
   const context = {
     currentTime: 2,
@@ -36,6 +38,22 @@ test("a track channel is lazy and applies mixer changes through one stable desti
         disconnect() {},
       };
     },
+    createStereoPanner() {
+      createdPanners += 1;
+      return {
+        connect: (destination) => connections.push(["panner", destination]),
+        disconnect() {},
+        pan: {
+          value: 0,
+          cancelScheduledValues: (time) => panEvents.push(["cancel", time]),
+          linearRampToValueAtTime: (value, time) => panEvents.push(["ramp", value, time]),
+          setValueAtTime(value, time) {
+            this.value = value;
+            panEvents.push(["set", value, time]);
+          },
+        },
+      };
+    },
   };
   const master = { context };
   const channel = createTrackChannel({
@@ -45,15 +63,21 @@ test("a track channel is lazy and applies mixer changes through one stable desti
   });
 
   channel.setVolume(0.5);
+  channel.setPan(0.25);
   assert.equal(created, 0);
   assert.equal(channel.getInputNode(), channel.getInputNode());
   assert.equal(created, 1);
   assert.equal(createdAnalysers, 1);
+  assert.equal(createdPanners, 1);
   assert.equal(channel.getObservationNode(), connections[0][1]);
-  assert.equal(connections[1][1], master);
+  assert.equal(connections[2][1], master);
   assert.equal(channel.getObservationNode().fftSize, 256);
   assert.deepEqual(events[0], ["set", 0.5, 2]);
+  assert.deepEqual(panEvents[0], ["set", 0.25, 2]);
 
   channel.setMuted(true);
   assert.deepEqual(events.at(-1), ["ramp", 0, 2.015]);
+  channel.setPan(-0.5);
+  assert.deepEqual(panEvents.at(-1), ["ramp", -0.5, 2.015]);
+  assert.equal(channel.getState().pan, -0.5);
 });

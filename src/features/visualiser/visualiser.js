@@ -1,10 +1,7 @@
-import { isTrackAudible } from "../../state/project-state.js";
 import { getTrackColour, getVoiceLabel } from "../../shared/track-presentation.js";
-import { createAnalyserReader } from "../../visualiser/audio-features.js?v=20260721-1";
 import { fitCanvas } from "../../visualiser/canvas-renderer.js?v=20260721-3";
-import { renderSignalStackFrame } from "../../visualiser/signal-stack-renderer.js?v=20260721-2";
-
-const STYLESHEET_ID = "visualiser-styles";
+import { buildCompositionProjection } from "../../visualiser/composition-projection.js?v=20260722-1";
+import { renderCompositionFrame } from "../../visualiser/signal-stack-renderer.js?v=20260722-1";
 
 function resolveColour(root, value, fallback) {
   if (!value?.startsWith("var(")) return value || fallback;
@@ -31,34 +28,24 @@ function transportLabel(session) {
 }
 
 export function createVisualiserFeature({
-  audioEngine,
   projectState,
   root = document,
+  scheduler,
   sessionState,
-  trackRuntimes,
 } = {}) {
-  if (!audioEngine || !projectState || !sessionState || !trackRuntimes) {
-    throw new TypeError("Visualiser requires audio, project, session, and track runtime state.");
+  if (!projectState || !scheduler || !sessionState) {
+    throw new TypeError("Visualiser requires project, scheduler, and session state.");
   }
   const lifecycle = new AbortController();
-  const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
-  const readers = new Map();
+  const reducedMotion = root.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)");
   let animationFrame = 0;
-
-  if (!root.getElementById(STYLESHEET_ID)) {
-    const stylesheet = root.createElement("link");
-    stylesheet.id = STYLESHEET_ID;
-    stylesheet.rel = "stylesheet";
-    stylesheet.href = "./src/features/visualiser/visualiser.css?v=20260721-7";
-    root.head.append(stylesheet);
-  }
 
   const open = root.createElement("button");
   open.id = "visualiser-open";
   open.type = "button";
-  open.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v4M5 5v6M12 12v7M12 5v3M19 16v3M19 5v7"/><circle cx="5" cy="13" r="2"/><circle cx="12" cy="10" r="2"/><circle cx="19" cy="14" r="2"/></svg><span class="visually-hidden">Open signal visualiser</span>`;
-  open.setAttribute("aria-label", "Open signal visualiser");
-  open.title = "Open signal visualiser";
+  open.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15v4M5 5v6M12 12v7M12 5v3M19 16v3M19 5v7"/><circle cx="5" cy="13" r="2"/><circle cx="12" cy="10" r="2"/><circle cx="19" cy="14" r="2"/></svg><span class="visually-hidden">Open composition visualiser</span>`;
+  open.setAttribute("aria-label", "Open composition visualiser");
+  open.title = "Open composition visualiser";
   (root.querySelector("#global-tools") ?? root.querySelector(".global-status"))?.append(open);
 
   const template = root.createElement("template");
@@ -67,9 +54,9 @@ export function createVisualiserFeature({
       <section class="visualiser-panel">
         <header class="visualiser-header">
           <div class="visualiser-heading">
-            <span class="panel-context">Signal stack</span>
-            <h2 id="visualiser-title">Track signals</h2>
-            <p id="visualiser-description" class="visually-hidden">A pixel visualisation with one audio-reactive lane for every project track.</p>
+            <span class="panel-context">Composition field</span>
+            <h2 id="visualiser-title">Upcoming notes</h2>
+            <p id="visualiser-description" class="visually-hidden">A pixel-art perspective projection of upcoming notes in the project arrangement.</p>
           </div>
           <output class="visualiser-status" data-status aria-live="polite"></output>
           <div class="visualiser-actions">
@@ -79,7 +66,7 @@ export function createVisualiserFeature({
           </div>
         </header>
         <div class="visualiser-stage">
-          <canvas aria-label="Signal Stack visualiser"></canvas>
+          <canvas aria-label="Composition note visualiser"></canvas>
           <p data-fallback hidden>Canvas visuals are not supported in this browser. Music playback is unaffected.</p>
         </div>
         <ol class="visually-hidden" data-track-list aria-label="Visualised tracks"></ol>
@@ -101,41 +88,30 @@ export function createVisualiserFeature({
     context = null;
   }
 
-  function getReader(trackId) {
-    let reader = readers.get(trackId);
-    if (reader) return reader;
-    reader = createAnalyserReader({
-      getObservationNode: () => trackRuntimes.getObservationNode(trackId),
-      isReady: audioEngine.isReady,
-    });
-    readers.set(trackId, reader);
-    return reader;
-  }
-
-  function getTrackFrames() {
+  function getProjection() {
     const project = projectState.getState();
-    const sensitivity = project.visualiser?.sensitivity ?? 1;
-    const activeIds = new Set(project.tracks.map(({ id }) => id));
-    for (const trackId of readers.keys()) {
-      if (!activeIds.has(trackId)) readers.delete(trackId);
-    }
-    return project.tracks.map((track, index) => ({
-      audible: isTrackAudible(project, track.id),
-      colour: resolveColour(root, getTrackColour(index), "#f0a6c8"),
-      features: getReader(track.id).read(sensitivity),
-      gain: track.mixer.volume * track.instrument.volume,
-      id: track.id,
-      name: track.name,
-      voiceLabel: getVoiceLabel(track.instrument.voiceType),
-      voiceType: track.instrument.voiceType,
-    }));
+    const workspace = sessionState.getState().workspace;
+    const projection = buildCompositionProjection(project, scheduler.getTimelineSnapshot(), {
+      selectedPatternId: workspace.selectedPatternId,
+      selectedTrackId: workspace.selectedTrackId,
+    });
+    return Object.freeze({
+      ...projection,
+      notes: Object.freeze(projection.notes.map((note) => Object.freeze({
+        ...note,
+        colour: resolveColour(root, getTrackColour(note.trackIndex), "#f0a6c8"),
+      }))),
+    });
   }
 
   function syncTrackDescription() {
     const project = projectState.getState();
     trackList.replaceChildren(...project.tracks.map((track, index) => {
       const item = root.createElement("li");
-      item.textContent = `${track.name}, ${getVoiceLabel(track.instrument.voiceType)}, track ${index + 1}`;
+      const pan = track.mixer.pan === 0
+        ? "centre"
+        : `${Math.round(Math.abs(track.mixer.pan) * 100)}% ${track.mixer.pan < 0 ? "left" : "right"}`;
+      item.textContent = `${track.name}, ${getVoiceLabel(track.instrument.voiceType)}, ${pan}, track ${index + 1}`;
       return item;
     }));
   }
@@ -148,20 +124,20 @@ export function createVisualiserFeature({
     stop.disabled = sourceStop?.disabled ?? true;
   }
 
-  function draw(time = 0) {
+  function draw() {
     animationFrame = 0;
     if (!context || !dialog.open || root.visibilityState === "hidden") return;
     syncTransport();
     const { height, ratio, width } = fitCanvas(canvas);
-    renderSignalStackFrame(context, getTrackFrames(), {
+    renderCompositionFrame(context, getProjection(), {
       ...readTheme(root),
       height,
       ratio,
-      reducedMotion: reducedMotion?.matches === true,
-      time,
       width,
     });
-    if (audioEngine.isReady()) animationFrame = requestAnimationFrame(draw);
+    if (scheduler.getState().status === "playing" && !reducedMotion?.matches) {
+      animationFrame = requestAnimationFrame(draw);
+    }
   }
 
   function scheduleDraw() {
@@ -189,7 +165,8 @@ export function createVisualiserFeature({
     syncTransport();
     scheduleDraw();
   }, { signal: lifecycle.signal });
-  reducedMotion?.addEventListener?.("change", scheduleDraw, { signal: lifecycle.signal });
+  scheduler.addEventListener("statechange", scheduleDraw, { signal: lifecycle.signal });
+  reducedMotion?.addEventListener("change", scheduleDraw, { signal: lifecycle.signal });
   root.addEventListener("visibilitychange", scheduleDraw, { signal: lifecycle.signal });
 
   if (!context) {
@@ -203,10 +180,8 @@ export function createVisualiserFeature({
     dispose() {
       lifecycle.abort();
       cancelAnimationFrame(animationFrame);
-      readers.clear();
       dialog.remove();
       open.remove();
-      root.getElementById(STYLESHEET_ID)?.remove();
     },
     open: () => open.click(),
   });

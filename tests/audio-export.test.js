@@ -22,6 +22,7 @@ test("render plan schedules arrangement notes with project timing and mix", () =
   project.transport.masterVolume = 0.5;
   project.tracks[0].instrument.octaveOffset = 1;
   project.tracks[0].instrument.volume = 0.4;
+  project.tracks[0].mixer.pan = -0.65;
   project.tracks[0].mixer.volume = 0.8;
 
   const plan = createArrangementRenderPlan(project);
@@ -33,6 +34,7 @@ test("render plan schedules arrangement notes with project timing and mix", () =
   assert.equal(plan.stepDurationSeconds, 0.125);
   assert.equal(plan.endStep, 20);
   assert.equal(plan.tracks[0].instrumentVolume, 0.4);
+  assert.equal(plan.tracks[0].pan, -0.65);
   assert.equal(plan.tracks[0].trackVolume, 0.8);
   assert.equal(note.startTime, 0.5);
   assert.equal(note.durationSeconds, 0.09375);
@@ -46,7 +48,7 @@ test("render plan honours mute and solo state", () => {
     id: "track-2",
     name: "Lead",
     clips: [{ id: "clip-2", patternId: "pattern-1", startStep: 4 }],
-    mixer: { muted: false, solo: true, volume: 0.6 },
+    mixer: { muted: false, pan: 0.4, solo: true, volume: 0.6 },
   });
 
   assert.deepEqual(createArrangementRenderPlan(project).tracks.map((track) => track.id), ["track-2"]);

@@ -24,7 +24,7 @@
 .track-header { position: sticky; display: grid; height: var(--track-height); grid-template-rows: 28px 20px 18px; gap: 1px; padding: 4px 8px 4px 12px; overflow: hidden; }
 .track-header::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--track-color); content: ""; }
 .arrangement-track-row.selected .track-header::before { box-shadow: 0 0 10px var(--track-color); }
-.track-primary, .track-secondary, .track-switches, .track-volume { display: flex; min-width: 0; align-items: center; }
+.track-primary, .track-secondary, .track-switches, .track-volume, .track-pan { display: flex; min-width: 0; align-items: center; }
 .track-primary { justify-content: space-between; gap: 5px; }
 .track-channel { color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.5rem; letter-spacing: 0.11em; text-transform: uppercase; }
 .track-switches { margin-left: auto; gap: 3px; }
@@ -36,10 +36,14 @@
 .track-name-input:hover { border-color: var(--line-strong); background: var(--surface); }
 .track-name-input:focus { border-color: var(--accent); color: var(--accent-bright); background: var(--surface); outline: 0; }
 .track-secondary { gap: 7px; }
-.track-secondary > small { width: 66px; overflow: hidden; color: var(--muted); font-size: 0.82rem; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
-.track-volume { flex: 1; gap: 5px; }
-.track-volume input { width: 100%; min-width: 0; accent-color: var(--track-color); }
+.track-secondary > small { width: 52px; overflow: hidden; color: var(--muted); font-size: 0.78rem; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.track-volume { flex: 1.15; gap: 4px; }
+.track-pan { flex: 0.85; gap: 4px; }
+.track-volume input, .track-pan input { width: 100%; min-width: 0; }
+.track-volume input { accent-color: var(--track-color); }
+.track-pan input { accent-color: var(--track-color); }
 .track-volume-value { width: 31px; color: var(--label); font-size: 0.86rem; text-align: right; }
+.track-pan-value { width: 27px; overflow: hidden; color: var(--label); font-size: 0.76rem; text-align: right; white-space: nowrap; }
 .track-lane { position: relative; height: var(--track-height); background: repeating-linear-gradient(90deg, transparent 0 13px, color-mix(in srgb, var(--track-color) 10%, transparent) 13px 14px), repeating-linear-gradient(90deg, transparent 0 223px, color-mix(in srgb, var(--track-color) 24%, transparent) 223px 224px), color-mix(in srgb, var(--track-color) 2%, var(--surface)); cursor: crosshair; }
 .track-lane:hover { background: repeating-linear-gradient(90deg, transparent 0 13px, color-mix(in srgb, var(--track-color) 18%, transparent) 13px 14px), repeating-linear-gradient(90deg, transparent 0 223px, color-mix(in srgb, var(--track-color) 34%, transparent) 223px 224px), color-mix(in srgb, var(--track-color) 5%, var(--surface)); }
 .arrangement-clip { position: absolute; top: 9px; display: grid; min-width: 42px; height: 46px; align-content: center; gap: 2px; overflow: hidden; padding: 5px 28px 5px 7px; border: 1px solid var(--track-color); border-left: 3px solid var(--track-color); border-radius: 3px; color: var(--track-color); background: color-mix(in srgb, var(--track-color) 12%, var(--panel-raised)); text-align: left; }

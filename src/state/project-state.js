@@ -15,7 +15,7 @@ import {
   SUPPORTED_PATTERN_LENGTHS,
 } from "./pattern-state.js";
 
-export const PROJECT_SCHEMA_VERSION = 4;
+export const PROJECT_SCHEMA_VERSION = 5;
 export const DEFAULT_PATTERN_ID = "pattern-1";
 export const DEFAULT_TRACK_ID = "track-1";
 export const MAX_PROJECT_HISTORY = 100;
@@ -100,6 +100,9 @@ function validateMixer(mixer, trackId) {
     !mixer ||
     typeof mixer.muted !== "boolean" ||
     typeof mixer.solo !== "boolean" ||
+    !Number.isFinite(mixer.pan) ||
+    mixer.pan < -1 ||
+    mixer.pan > 1 ||
     !Number.isFinite(mixer.volume) ||
     mixer.volume < 0 ||
     mixer.volume > 1
@@ -229,11 +232,25 @@ function isPatternEmpty(pattern) {
 
 export function migrateProject(candidate) {
   if (candidate?.schemaVersion === PROJECT_SCHEMA_VERSION) return candidate;
+  if (candidate?.schemaVersion === 4 && Array.isArray(candidate.patterns)) {
+    return {
+      ...candidate,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      tracks: candidate.tracks.map((track) => ({
+        ...track,
+        mixer: { ...track.mixer, pan: track.mixer.pan ?? 0 },
+      })),
+    };
+  }
   if (candidate?.schemaVersion === 3 && Array.isArray(candidate.patterns)) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
       visualiser: createDefaultVisualiser(),
+      tracks: candidate.tracks.map((track) => ({
+        ...track,
+        mixer: { ...track.mixer, pan: track.mixer.pan ?? 0 },
+      })),
     };
   }
   if (candidate?.schemaVersion === 2 && Array.isArray(candidate.patterns)) {
@@ -241,6 +258,10 @@ export function migrateProject(candidate) {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
       visualiser: createDefaultVisualiser(),
+      tracks: candidate.tracks.map((track) => ({
+        ...track,
+        mixer: { ...track.mixer, pan: track.mixer.pan ?? 0 },
+      })),
       patterns: candidate.patterns.map((pattern) => ({
         ...pattern,
         rootOctave: pattern.rootOctave ?? DEFAULT_PATTERN_ROOT_OCTAVE,
@@ -261,7 +282,7 @@ export function migrateProject(candidate) {
     id: track.id,
     name: track.name,
     instrument: { ...track.instrument },
-    mixer: { ...track.mixer },
+    mixer: { ...track.mixer, pan: track.mixer.pan ?? 0 },
     clips: isPatternEmpty(patterns[index])
       ? []
       : [{ id: `clip-${index + 1}`, patternId: patterns[index].id, startStep: 0 }],
@@ -314,7 +335,7 @@ export function createDefaultProject() {
       id: DEFAULT_TRACK_ID,
       name: "Pulse 1",
       instrument: { ...instrumentDefaults },
-      mixer: { muted: false, solo: false, volume: 1 },
+      mixer: { muted: false, pan: 0, solo: false, volume: 1 },
       clips: [],
     }],
   });
@@ -600,7 +621,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
         id,
         name: resolvedName,
         instrument: { ...instrumentDefaults },
-        mixer: { muted: false, solo: false, volume: 1 },
+        mixer: { muted: false, pan: 0, solo: false, volume: 1 },
         clips: [],
       }],
     }, { operation: "add-track", trackId: id });

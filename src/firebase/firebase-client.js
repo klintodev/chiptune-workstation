@@ -3,12 +3,12 @@ import {
   createCloudProjectRecord,
   normalizeCloudProjectRecord,
   summarizeCloudProjectRecord,
-} from "./cloud-project.js";
+} from "./cloud-project.js?v=20260722-1";
 import { FIREBASE_CONFIG, isFirebaseConfigured } from "./firebase-config.js";
 import {
   createPublicationRecord,
   normalizePublicationRecord,
-} from "./publication.js?v=20260721-3";
+} from "./publication.js?v=20260722-1";
 
 const FIREBASE_SDK_VERSION = "12.16.0";
 const FIREBASE_SDK_ROOT = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;

@@ -1,4 +1,4 @@
-import { createProjectIdentifier } from "../persistence/project-document.js?v=20260721-3";
+import { createProjectIdentifier } from "../persistence/project-document.js?v=20260722-1";
 
 export function buildPublicationUrl(publicationId, baseUrl = globalThis.location?.href ?? "http://localhost/") {
   const url = new URL("./player.html", baseUrl);

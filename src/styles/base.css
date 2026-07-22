@@ -21,9 +21,13 @@ body {
   min-width: 320px;
   margin: 0;
   padding: 14px;
+  visibility: visible;
+  animation: none;
   color: var(--ink);
   background: radial-gradient(120% 120% at 50% 0%, var(--surface) 0%, var(--bg-0) 70%);
 }
+
+body > * { visibility: visible; animation: none; }
 
 body::before {
   position: fixed;

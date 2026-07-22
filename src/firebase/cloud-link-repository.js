@@ -1,4 +1,4 @@
-import { normalizeProjectDocument } from "../persistence/project-document.js";
+import { normalizeProjectDocument } from "../persistence/project-document.js?v=20260722-1";
 
 const DATABASE_NAME = "chiptune-workstation-cloud";
 const DATABASE_VERSION = 1;

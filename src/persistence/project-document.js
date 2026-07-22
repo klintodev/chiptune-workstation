@@ -1,4 +1,4 @@
-import { createProjectState } from "../state/project-state.js?v=20260721-3";
+import { createProjectState } from "../state/project-state.js?v=20260722-1";
 
 export const PROJECT_DOCUMENT_FORMAT = "chiptune-workstation";
 export const PROJECT_DOCUMENT_VERSION = 1;

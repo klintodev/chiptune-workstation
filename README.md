@@ -1,6 +1,6 @@
 # Chiptune Workstation
 
-A dependency-free browser chiptune instrument and step sequencer built with the Web Audio API and native ES modules.
+A browser chiptune workstation built with the Web Audio API and native ES modules. The app has no runtime framework; esbuild is used only to prepare production assets.
 
 The current product includes a playable keyboard, editable single-track patterns, per-note gate and volume, tempo and transport controls, bulk pattern actions, and undo/redo.
 
@@ -16,11 +16,28 @@ Then open <http://localhost:4173>.
 
 ## Test
 
-Node 22 or later is required. The test suite uses only Node's built-in test runner.
+Node 22 or later is required.
 
 ```powershell
 npm test
 ```
+
+Run the full production build and test gate with:
+
+```powershell
+npm run check
+```
+
+## Production build
+
+Install the development dependency and build the deployable site:
+
+```powershell
+npm install
+npm run build
+```
+
+The build bundles and minifies each page's JavaScript and CSS, fingerprints the filenames, and writes the Firebase-ready site to `dist/`. Generated output is not committed.
 
 ## Architecture
 

@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Listen to a chiptune shared from Klinto Studio." />
     <title>Shared chiptune - Klinto Studio</title>
+    <style id="critical-startup">
+      :root { color-scheme: dark; background: #171220; }
+      html, body { width: 100%; min-width: 320px; min-height: 100%; margin: 0; background: #171220; }
+      body { color: #fff7ed; font-family: "Courier New", monospace; }
+      body > * { visibility: hidden; animation: critical-reveal 0s 3s forwards; }
+      @keyframes critical-reveal { to { visibility: visible; } }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet" />
@@ -27,6 +34,6 @@
       </section>
       <footer>This is a read-only published snapshot. <a href="./">Create your own in Klinto Studio.</a></footer>
     </main>
-    <script type="module" src="./src/player.js?v=20260721-2"></script>
+    <script type="module" src="./src/player.js?v=20260722-1"></script>
   </body>
 </html>

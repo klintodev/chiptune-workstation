@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { renderSignalStackFrame } from "../src/visualiser/signal-stack-renderer.js";
+import {
+  getProjectedNoteGeometry,
+  renderCompositionFrame,
+} from "../src/visualiser/signal-stack-renderer.js";
 
 function createContext() {
   const commands = [];
@@ -21,55 +24,68 @@ function createContext() {
   };
 }
 
-const tracks = Object.freeze([
-  {
-    audible: true,
+const notes = Object.freeze([
+  Object.freeze({
+    active: true,
     colour: "#f0a6c8",
-    features: {
-      amplitude: 0.5,
-      frequencies: new Uint8Array([20, 100, 220, 60]),
-      treble: 0.2,
-      waveform: new Uint8Array([128, 190, 80, 140]),
-    },
-    gain: 0.8,
-    name: "Lead",
-    voiceLabel: "pulse 50%",
+    depth: 0,
+    life: 0.8,
+    note: 60,
+    noteLabel: "C4",
+    pan: -0.75,
+    pitch: 0.32,
+    trackIndex: 0,
+    trackName: "Lead",
+    velocity: 0.8,
     voiceType: "square",
-  },
-  {
-    audible: true,
+  }),
+  Object.freeze({
+    active: false,
     colour: "#f2b48c",
-    features: {
-      amplitude: 0.6,
-      frequencies: new Uint8Array([30, 60, 180, 230]),
-      treble: 0.8,
-      waveform: new Uint8Array([128, 150, 110, 128]),
-    },
-    gain: 0.7,
-    name: "Drums",
-    voiceLabel: "noise",
+    depth: 0.32,
+    life: 1,
+    note: 48,
+    noteLabel: "C3",
+    pan: 0.7,
+    pitch: 0.16,
+    trackIndex: 1,
+    trackName: "Drums",
+    velocity: 0.7,
     voiceType: "noise",
-  },
+  }),
 ]);
 
-test("signal stack renders one deterministic, labelled lane per track", () => {
+test("composition field renders deterministic, labelled note objects", () => {
   const first = createContext();
   const second = createContext();
-  const options = { height: 240, ratio: 1, reducedMotion: true, time: 900, width: 480 };
-  const layout = renderSignalStackFrame(first, tracks, options);
-  renderSignalStackFrame(second, tracks, options);
+  const projection = { notes };
+  const options = { height: 300, ratio: 1, width: 520 };
+  const layout = renderCompositionFrame(first, projection, options);
+  renderCompositionFrame(second, projection, options);
 
-  assert.equal(layout.laneCount, 2);
-  assert.equal(layout.laneHeight, 120);
+  assert.equal(layout.noteCount, 2);
   assert.deepEqual(first.commands, second.commands);
-  assert.ok(first.commands.some((command) => command[0] === "text" && command[3] === "Lead"));
-  assert.ok(first.commands.some((command) => command[0] === "text" && command[3] === "NOISE"));
-  assert.ok(first.commands.filter((command) => command[0] === "rect").length > 20);
+  assert.ok(first.commands.some((command) => command[0] === "text" && command[3] === "LEAD"));
+  assert.ok(first.commands.some((command) => command[0] === "text" && command[3] === "C4"));
+  assert.ok(first.commands.filter((command) => command[0] === "rect").length > 100);
 });
 
-test("signal stack keeps an informative empty state", () => {
+test("track pan maps directly to horizontal visual position", () => {
+  const base = { depth: 0.2, pan: 0, pitch: 0.5, velocity: 0.7 };
+  const options = { height: 300, width: 600 };
+  const left = getProjectedNoteGeometry({ ...base, pan: -1 }, options);
+  const centre = getProjectedNoteGeometry(base, options);
+  const right = getProjectedNoteGeometry({ ...base, pan: 1 }, options);
+
+  assert.ok(left.x < centre.x);
+  assert.ok(centre.x < right.x);
+  assert.equal(centre.y, left.y);
+  assert.equal(centre.radius, right.radius);
+});
+
+test("composition field keeps an informative empty state", () => {
   const context = createContext();
-  const layout = renderSignalStackFrame(context, [], { height: 120, width: 320 });
-  assert.equal(layout.laneCount, 0);
-  assert.ok(context.commands.some((command) => command.includes("ADD A TRACK TO BUILD A SIGNAL STACK")));
+  const layout = renderCompositionFrame(context, { notes: [] }, { height: 120, width: 320 });
+  assert.equal(layout.noteCount, 0);
+  assert.ok(context.commands.some((command) => command.includes("PROGRAM NOTES TO BUILD THE VISUAL FIELD")));
 });

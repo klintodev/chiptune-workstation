@@ -129,3 +129,25 @@ test("arrangement playback starts from the selected timeline step", () => {
   assert.equal(harness.triggered.length, 1);
   assert.equal(harness.triggered[0].options.frequency > 390, true);
 });
+
+test("timeline snapshots follow the scheduler's audio clock", () => {
+  const harness = createHarness();
+  addNote(harness.project, DEFAULT_PATTERN_ID);
+  harness.project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+
+  harness.scheduler.play("arrangement");
+  harness.setAudioTime(10.1125);
+  const playing = harness.scheduler.getTimelineSnapshot();
+
+  assert.equal(playing.mode, "arrangement");
+  assert.equal(playing.status, "playing");
+  assert.equal(playing.stepIndex, 0);
+  assert.ok(Math.abs(playing.stepProgress - 0.5) < 0.0001);
+  assert.equal(playing.stepDurationSeconds, 0.125);
+
+  harness.scheduler.pause();
+  const paused = harness.scheduler.getTimelineSnapshot();
+  assert.equal(paused.audioTime, null);
+  assert.equal(paused.status, "paused");
+  assert.equal(paused.stepProgress, 0);
+});

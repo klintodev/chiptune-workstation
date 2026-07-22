@@ -358,6 +358,40 @@ export function createArrangementScheduler({
     return current;
   }
 
+  function getTimelineSnapshot(audioTime) {
+    const activeSession = session;
+    if (status !== "playing" || !activeSession) {
+      return Object.freeze({
+        ...getState(),
+        audioTime: null,
+        patternId: null,
+        stepDurationSeconds: currentStepDurationSeconds,
+        stepIndex: retainedStepIndex,
+        stepProgress: 0,
+        trackId: null,
+      });
+    }
+    const now = audioTime ?? getAudioTime();
+    let position = activeSession.positions[0] ?? {
+      duration: activeSession.stepDurationSeconds,
+      startTime: activeSession.nextStepTime,
+      stepIndex: retainedStepIndex,
+    };
+    for (const candidate of activeSession.positions) {
+      if (candidate.startTime > now) break;
+      position = candidate;
+    }
+    return Object.freeze({
+      ...getState(),
+      audioTime: now,
+      patternId: activeSession.patternId,
+      stepDurationSeconds: position.duration,
+      stepIndex: position.stepIndex,
+      stepProgress: Math.max(-1, Math.min(1, (now - position.startTime) / position.duration)),
+      trackId: activeSession.trackId,
+    });
+  }
+
   function pause() {
     const activeSession = session;
     if (status !== "playing" || !activeSession) return false;
@@ -440,6 +474,7 @@ export function createArrangementScheduler({
     getPlayheadStep,
     getScheduledVoiceCount: () => session?.voices.size ?? 0,
     getState,
+    getTimelineSnapshot,
     pause,
     play,
     releaseInvalidOwnership,

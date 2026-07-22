@@ -1,4 +1,4 @@
-import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js";
+import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js?v=20260722-1";
 import { queryRequired } from "../../shared/query-required.js";
 
 const STATUS_LABELS = Object.freeze({

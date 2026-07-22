@@ -1,5 +1,5 @@
 import { isTrackAudible, MAX_TRACK_VOICES } from "../state/project-state.js";
-import { createTrackChannel } from "./track-channel.js?v=20260721-1";
+import { createTrackChannel } from "./track-channel.js?v=20260722-1";
 import { createVoiceEngine } from "./voice-engine.js?v=20260721-1";
 
 export function createTrackRuntimeRegistry({ audioEngine, projectState }) {
@@ -10,6 +10,7 @@ export function createTrackRuntimeRegistry({ audioEngine, projectState }) {
       getAudioTime: audioEngine.getCurrentTime,
       getMasterOutputNode: audioEngine.getInputNode,
       initialMuted: track.mixer.muted,
+      initialPan: track.mixer.pan,
       initialVolume: track.mixer.volume,
       trackId: track.id,
     });
@@ -47,6 +48,7 @@ export function createTrackRuntimeRegistry({ audioEngine, projectState }) {
       const runtime = ensureRuntime(track.id);
       const audible = isTrackAudible(project, track.id);
       runtime.channel.setMuted(!audible);
+      runtime.channel.setPan(track.mixer.pan);
       runtime.channel.setVolume(track.mixer.volume);
       runtime.voiceEngine.setVolume(track.instrument.volume);
     }

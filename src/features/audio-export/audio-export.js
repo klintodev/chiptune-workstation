@@ -1,7 +1,5 @@
-import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js?v=20260721-1";
+import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js?v=20260722-1";
 import { encodePcm16Wave } from "../../audio/wav-encoder.js";
-
-const STYLESHEET_ID = "audio-export-styles";
 
 function safeFilename(title) {
   const base = title.trim().toLowerCase()
@@ -22,14 +20,6 @@ export function createAudioExportFeature({
   if (!persistence || !projectState) throw new TypeError("Audio export requires persistence and project state.");
   const lifecycle = new AbortController();
   let busy = false;
-
-  if (!root.getElementById(STYLESHEET_ID)) {
-    const stylesheet = root.createElement("link");
-    stylesheet.id = STYLESHEET_ID;
-    stylesheet.rel = "stylesheet";
-    stylesheet.href = "./src/features/audio-export/audio-export.css?v=20260721-2";
-    root.head.append(stylesheet);
-  }
 
   const actions = root.querySelector("#project-share-render-actions")
     ?? root.querySelector(".project-dialog-actions");
@@ -90,7 +80,6 @@ export function createAudioExportFeature({
       lifecycle.abort();
       button.remove();
       status.remove();
-      root.getElementById(STYLESHEET_ID)?.remove();
     },
     exportWave,
   });

@@ -6,7 +6,7 @@ import {
   parseProjectDocument,
   reviseProjectDocument,
   serializeProjectDocument,
-} from "./project-document.js";
+} from "./project-document.js?v=20260722-1";
 import { createDefaultProject } from "../state/project-state.js";
 
 function uniqueTitle(base, summaries) {

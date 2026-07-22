@@ -29,7 +29,7 @@ test("project state owns reusable patterns, tracks, transport, and mixer data", 
   assert.equal(snapshot.metadata.title, "Untitled chiptune");
   assert.equal(snapshot.transport.bpm, 120);
   assert.equal(snapshot.transport.masterVolume, 0.35);
-  assert.deepEqual(project.getTrack(DEFAULT_TRACK_ID).mixer, { muted: false, solo: false, volume: 1 });
+  assert.deepEqual(project.getTrack(DEFAULT_TRACK_ID).mixer, { muted: false, pan: 0, solo: false, volume: 1 });
   assert.equal(project.getPattern(DEFAULT_PATTERN_ID).steps.length, 16);
   assert.equal(project.getPattern(DEFAULT_PATTERN_ID).rootOctave, 4);
   assert.deepEqual(project.getTrack(DEFAULT_TRACK_ID).clips, []);
@@ -128,6 +128,17 @@ test("schema two projects gain a default pattern root octave", () => {
   assert.throws(() => migrated.setPatternRootOctave(DEFAULT_PATTERN_ID, 7), RangeError);
 });
 
+test("schema four projects gain centred track panning", () => {
+  const legacy = structuredClone(createProjectState().getState());
+  legacy.schemaVersion = 4;
+  delete legacy.tracks[0].mixer.pan;
+
+  const migrated = createProjectState(legacy);
+
+  assert.equal(migrated.getState().schemaVersion, PROJECT_SCHEMA_VERSION);
+  assert.equal(migrated.getTrack(DEFAULT_TRACK_ID).mixer.pan, 0);
+});
+
 test("legacy single-track projects migrate into a pattern library and clip lane", () => {
   const legacy = {
     schemaVersion: 1,
@@ -183,4 +194,26 @@ test("project-backed range edits collapse into one history entry", () => {
 
   pattern.undo();
   assert.equal(pattern.getState().steps[0].volume, 0.7);
+});
+
+test("track pan is validated, persisted, and undoable", () => {
+  const project = createProjectState();
+  project.beginHistoryGroup();
+  project.updateTrack(DEFAULT_TRACK_ID, (track) => ({
+    ...track,
+    mixer: { ...track.mixer, pan: -0.25 },
+  }), { field: "mixer.pan" });
+  project.updateTrack(DEFAULT_TRACK_ID, (track) => ({
+    ...track,
+    mixer: { ...track.mixer, pan: -0.75 },
+  }), { field: "mixer.pan" });
+  project.endHistoryGroup();
+
+  assert.equal(project.getTrack(DEFAULT_TRACK_ID).mixer.pan, -0.75);
+  project.undo();
+  assert.equal(project.getTrack(DEFAULT_TRACK_ID).mixer.pan, 0);
+
+  const invalid = structuredClone(project.getState());
+  invalid.tracks[0].mixer.pan = 1.1;
+  assert.throws(() => createProjectState(invalid), /invalid mixer/);
 });

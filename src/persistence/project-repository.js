@@ -1,7 +1,7 @@
 import {
   normalizeProjectDocument,
   summarizeProjectDocument,
-} from "./project-document.js";
+} from "./project-document.js?v=20260722-1";
 
 const DATABASE_NAME = "chiptune-workstation";
 const DATABASE_VERSION = 1;

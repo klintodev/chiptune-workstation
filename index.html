@@ -22,6 +22,13 @@
     <meta name="twitter:image" content="https://studio.klinto.dev/assets/brand/social-preview.png" />
     <meta name="twitter:image:alt" content="Klinto Studio chiptune sequencer and keyboard" />
     <title>Klinto Studio — Make Chiptunes in Your Browser</title>
+    <style id="critical-startup">
+      :root { color-scheme: dark; background: #211b28; }
+      html, body { width: 100%; min-width: 320px; min-height: 100%; margin: 0; background: #211b28; }
+      body { color: #f3ecf7; font-family: "Courier New", monospace; }
+      body > * { visibility: hidden; animation: critical-reveal 0s 3s forwards; }
+      @keyframes critical-reveal { to { visibility: visible; } }
+    </style>
     <link rel="icon" href="/assets/brand/klinto-mark.svg" type="image/svg+xml" />
     <link rel="icon" href="/assets/brand/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png" />
@@ -29,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260721-5" />
+    <link rel="stylesheet" href="./styles.css?v=20260722-1" />
   </head>
   <body>
     <main class="shell">
@@ -209,6 +216,6 @@
       </div>
     </dialog>
 
-    <script type="module" src="./src/app.js?v=20260721-15"></script>
+    <script type="module" src="./src/app.js?v=20260722-1"></script>
   </body>
 </html>

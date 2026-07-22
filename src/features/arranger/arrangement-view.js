@@ -8,6 +8,12 @@ import { createClipDragController, getTimelineStep } from "./clip-drag-controlle
 
 const STEP_WIDTH = 14;
 
+function formatPan(value) {
+  const amount = Math.round(Math.abs(value) * 100);
+  if (amount === 0) return "C";
+  return `${value < 0 ? "L" : "R"}${amount}`;
+}
+
 function createButton(root, label, action, trackId) {
   const button = root.createElement("button");
   button.type = "button";
@@ -226,7 +232,23 @@ export function createArrangementView({
     range.dataset.trackId = track.id;
     range.setAttribute("aria-label", `${track.name} volume`);
     volume.append(range, volumeText);
-    secondary.append(voice, volume);
+    const pan = root.createElement("label");
+    pan.className = "track-pan";
+    const panText = root.createElement("span");
+    panText.className = "track-pan-value";
+    panText.textContent = formatPan(track.mixer.pan);
+    const panRange = root.createElement("input");
+    panRange.type = "range";
+    panRange.min = "-100";
+    panRange.max = "100";
+    panRange.step = "1";
+    panRange.value = String(track.mixer.pan * 100);
+    panRange.dataset.action = "track-pan";
+    panRange.dataset.trackId = track.id;
+    panRange.setAttribute("aria-label", `${track.name} pan`);
+    panRange.title = `${track.name} pan: ${formatPan(track.mixer.pan)}`;
+    pan.append(panRange, panText);
+    secondary.append(voice, volume, pan);
     header.append(primary, name, secondary);
     return header;
   }
@@ -510,24 +532,35 @@ export function createArrangementView({
   }
 
   elements.canvas.addEventListener("pointerdown", (event) => {
-    if (event.target.dataset.action !== "track-volume") return;
+    if (!["track-volume", "track-pan"].includes(event.target.dataset.action)) return;
     activeRangeTrackId = event.target.dataset.trackId;
     projectState.beginHistoryGroup();
   }, { signal: lifecycle.signal });
   elements.canvas.addEventListener("input", (event) => {
-    if (event.target.dataset.action !== "track-volume") return;
+    const action = event.target.dataset.action;
+    if (!["track-volume", "track-pan"].includes(action)) return;
     const trackId = event.target.dataset.trackId;
-    const volume = Number(event.target.value) / 100;
-    event.target.closest(".track-volume").querySelector(".track-volume-value").textContent = `${Math.round(volume * 100)}%`;
-    projectState.updateTrack(trackId, (track) => ({
-      ...track,
-      mixer: { ...track.mixer, volume },
-    }), { field: "mixer.volume" });
+    const value = Number(event.target.value) / 100;
+    if (action === "track-volume") {
+      event.target.closest(".track-volume").querySelector(".track-volume-value").textContent = `${Math.round(value * 100)}%`;
+      projectState.updateTrack(trackId, (track) => ({
+        ...track,
+        mixer: { ...track.mixer, volume: value },
+      }), { field: "mixer.volume" });
+    } else {
+      const formatted = formatPan(value);
+      event.target.closest(".track-pan").querySelector(".track-pan-value").textContent = formatted;
+      event.target.title = `${projectState.getTrack(trackId).name} pan: ${formatted}`;
+      projectState.updateTrack(trackId, (track) => ({
+        ...track,
+        mixer: { ...track.mixer, pan: value },
+      }), { field: "mixer.pan" });
+    }
   }, { signal: lifecycle.signal });
   elements.canvas.addEventListener("pointerup", finishRangeEdit, { signal: lifecycle.signal });
   elements.canvas.addEventListener("pointercancel", finishRangeEdit, { signal: lifecycle.signal });
   elements.canvas.addEventListener("change", (event) => {
-    if (event.target.dataset.action === "track-volume") {
+    if (["track-volume", "track-pan"].includes(event.target.dataset.action)) {
       finishRangeEdit();
       return;
     }
@@ -706,7 +739,13 @@ export function createArrangementView({
     }
   }, { signal: lifecycle.signal });
 
-  const handleProjectChange = () => render();
+  const handleProjectChange = (event) => {
+    if (
+      activeRangeTrackId !== null &&
+      ["mixer.volume", "mixer.pan"].includes(event.detail.field)
+    ) return;
+    render();
+  };
   const handleSessionChange = (event) => {
     if (event.detail.slice === "workspace") render();
   };

@@ -2,3 +2,5 @@
 firebase-debug.log
 firebase-debug.*.log
 site-audit/
+dist/
+node_modules/

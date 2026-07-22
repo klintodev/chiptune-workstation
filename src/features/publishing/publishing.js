@@ -1,5 +1,3 @@
-const STYLESHEET_ID = "publishing-styles";
-
 export function createPublishingFeature({
   accountService,
   persistence,
@@ -12,14 +10,6 @@ export function createPublishingFeature({
   const lifecycle = new AbortController();
   let currentPublication = null;
   let busy = false;
-
-  if (!root.getElementById(STYLESHEET_ID)) {
-    const stylesheet = root.createElement("link");
-    stylesheet.id = STYLESHEET_ID;
-    stylesheet.rel = "stylesheet";
-    stylesheet.href = "./src/features/publishing/publishing.css?v=20260721-2";
-    root.head.append(stylesheet);
-  }
 
   const open = root.createElement("button");
   open.id = "project-publish";
@@ -198,7 +188,6 @@ export function createPublishingFeature({
       quickOpen.remove();
       dialog.remove();
       confirmDialog.remove();
-      root.getElementById(STYLESHEET_ID)?.remove();
     },
   });
 }

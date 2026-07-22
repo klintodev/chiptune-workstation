@@ -3,7 +3,7 @@ import {
   createProjectState,
   getArrangementEnd,
   isTrackAudible,
-} from "../state/project-state.js?v=20260721-3";
+} from "../state/project-state.js?v=20260722-1";
 import { getSixteenthNoteDuration } from "../transport/step-scheduler.js?v=20260721-1";
 
 export const EXPORT_SAMPLE_RATE = 44_100;
@@ -46,6 +46,7 @@ export function createArrangementRenderPlan(project, {
       id: track.id,
       instrumentVolume: track.instrument.volume,
       notes: Object.freeze(notes),
+      pan: track.mixer.pan,
       trackVolume: track.mixer.volume,
     }));
   }
@@ -99,8 +100,11 @@ export async function renderArrangementOffline(project, {
 
   for (const track of plan.tracks) {
     const channel = context.createGain();
+    const panner = context.createStereoPanner?.() ?? null;
     channel.gain.setValueAtTime(track.trackVolume, 0);
-    channel.connect(master);
+    panner?.pan.setValueAtTime(track.pan, 0);
+    channel.connect(panner ?? master);
+    panner?.connect(master);
     const voiceEngine = createVoiceEngine({
       getAudioTime: () => 0,
       getOutputNode: () => channel,

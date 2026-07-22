@@ -1,5 +1,3 @@
-const ACCOUNT_STYLESHEET_ID = "account-feature-styles";
-
 const SYNC_LABELS = Object.freeze({
   "local-only": "Local only",
   pending: "Waiting to sync",
@@ -18,14 +16,6 @@ function formatUpdatedAt(value) {
 }
 
 function createInterface(root) {
-  if (!root.getElementById(ACCOUNT_STYLESHEET_ID)) {
-    const stylesheet = root.createElement("link");
-    stylesheet.id = ACCOUNT_STYLESHEET_ID;
-    stylesheet.rel = "stylesheet";
-    stylesheet.href = "./src/features/account/account.css?v=20260721-6";
-    root.head.append(stylesheet);
-  }
-
   const template = root.createElement("template");
   template.innerHTML = `
     <button id="account-open" class="account-summary" type="button" aria-haspopup="dialog">
@@ -405,7 +395,6 @@ export function createAccountFeature({
       elements.deleteDialog.remove();
       elements.dialog.remove();
       elements.open.remove();
-      root.getElementById(ACCOUNT_STYLESHEET_ID)?.remove();
     },
     render,
   });

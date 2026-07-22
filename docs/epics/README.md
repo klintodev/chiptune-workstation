@@ -16,3 +16,6 @@ Epics translate product requirements into independently deliverable implementati
 - [PRD 13 - Email Verification](./prd-13-email-verification.md)
 - [PRD 14 - Composition Workflow Polish](./prd-14-workflow-polish.md)
 - [PRD 15 - Signal Stack Visualiser](./prd-15-signal-stack-visualiser.md)
+- [PRD 16 - Composition-Projected Visualiser](./prd-16-composition-projected-visualiser.md)
+- [PRD 17 - Track Panning](./prd-17-track-panning.md)
+- [PRD 18 - Production Loading and Asset Build](./prd-18-production-loading-and-build.md)
