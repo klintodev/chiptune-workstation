@@ -11,49 +11,150 @@ service cloud.firestore {
       return hasVerifiedEmail() && request.auth.uid == userId;
     }
 
+    function validText(value, minimum, maximum) {
+      return value is string
+        && value.size() >= minimum
+        && value.size() <= maximum;
+    }
+
+    function validSlotId(slotId) {
+      return slotId in [
+        "01", "02", "03", "04", "05",
+        "06", "07", "08", "09", "10",
+        "11", "12", "13", "14", "15",
+        "16", "17", "18", "19", "20"
+      ];
+    }
+
+    function validProject(project) {
+      return project is map
+        && project.keys().hasOnly([
+          "schemaVersion", "metadata", "visualiser", "transport", "patterns", "tracks"
+        ])
+        && project.schemaVersion == 5
+        && project.metadata is map
+        && project.metadata.keys().hasOnly(["title"])
+        && validText(project.metadata.title, 1, 100)
+        && project.visualiser is map
+        && project.transport is map
+        && project.transport.keys().hasOnly(["bpm", "masterVolume", "loop"])
+        && project.transport.bpm is number
+        && project.transport.bpm >= 40
+        && project.transport.bpm <= 240
+        && project.transport.masterVolume is number
+        && project.transport.masterVolume >= 0
+        && project.transport.masterVolume <= 1
+        && project.transport.loop is map
+        && project.transport.loop.keys().hasOnly(["enabled", "startStep", "endStep"])
+        && project.transport.loop.enabled is bool
+        && project.transport.loop.startStep is int
+        && project.transport.loop.startStep >= 0
+        && project.transport.loop.endStep is int
+        && project.transport.loop.endStep > project.transport.loop.startStep
+        && project.transport.loop.endStep <= 256
+        && project.patterns is list
+        && project.patterns.size() >= 1
+        && project.patterns.size() <= 64
+        && project.tracks is list
+        && project.tracks.size() >= 1
+        && project.tracks.size() <= 8;
+    }
+
+    function validProjectDocument(document, projectId) {
+      return document is map
+        && document.keys().hasOnly([
+          "format", "documentVersion", "id", "revision", "createdAt", "updatedAt", "project"
+        ])
+        && document.format == "chiptune-workstation"
+        && document.documentVersion == 1
+        && document.id == projectId
+        && validText(document.id, 1, 100)
+        && document.revision is int
+        && document.revision >= 0
+        && validText(document.createdAt, 1, 64)
+        && validText(document.updatedAt, 1, 64)
+        && validProject(document.project);
+    }
+
+    function validUserProfile(userId) {
+      return request.resource.data.keys().hasOnly(["uid", "email", "displayName", "lastSeenAt"])
+        && request.resource.data.uid == userId
+        && validText(request.resource.data.email, 3, 320)
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100
+        && request.resource.data.lastSeenAt is timestamp;
+    }
+
     function validProjectRecord(userId, projectId) {
-      return request.resource.data.cloudFormat == "chiptune-workstation-cloud"
+      return request.resource.data.keys().hasOnly([
+          "cloudFormat", "cloudVersion", "ownerId", "projectId", "cloudRevision",
+          "title", "createdAt", "updatedAt", "document", "serverUpdatedAt"
+        ])
+        && request.resource.data.cloudFormat == "chiptune-workstation-cloud"
         && request.resource.data.cloudVersion == 1
         && request.resource.data.ownerId == userId
         && request.resource.data.projectId == projectId
         && request.resource.data.cloudRevision is int
         && request.resource.data.cloudRevision > 0
-        && request.resource.data.title is string
-        && request.resource.data.createdAt is string
-        && request.resource.data.updatedAt is string
-        && request.resource.data.document is map
-        && request.resource.data.document.format == "chiptune-workstation"
-        && request.resource.data.document.documentVersion == 1
-        && request.resource.data.document.id == projectId
-        && request.resource.data.document.revision is int
-        && request.resource.data.document.project is map;
+        && validText(request.resource.data.title, 1, 100)
+        && validText(request.resource.data.createdAt, 1, 64)
+        && validText(request.resource.data.updatedAt, 1, 64)
+        && request.resource.data.serverUpdatedAt is timestamp
+        && validProjectDocument(request.resource.data.document, projectId)
+        && request.resource.data.title == request.resource.data.document.project.metadata.title;
     }
 
     function validPublication(publicationId) {
-      return request.resource.data.publicationFormat == "chiptune-workstation-publication"
-        && request.resource.data.publicationVersion == 1
+      return request.resource.data.keys().hasOnly([
+          "publicationFormat", "publicationVersion", "publicationId", "publicationRevision",
+          "ownerSlot", "sourceProjectId", "title", "creatorName", "publishedAt", "updatedAt",
+          "document", "serverUpdatedAt"
+        ])
+        && request.resource.data.publicationFormat == "chiptune-workstation-publication"
+        && request.resource.data.publicationVersion == 2
         && request.resource.data.publicationId == publicationId
+        && validText(request.resource.data.publicationId, 1, 100)
         && request.resource.data.publicationRevision is int
         && request.resource.data.publicationRevision > 0
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.sourceProjectId is string
-        && request.resource.data.title is string
-        && request.resource.data.creatorName is string
-        && request.resource.data.creatorName.size() > 0
-        && request.resource.data.creatorName.size() <= 48
-        && request.resource.data.publishedAt is string
-        && request.resource.data.updatedAt is string
-        && request.resource.data.document is map
-        && request.resource.data.document.format == "chiptune-workstation"
-        && request.resource.data.document.documentVersion == 1
-        && request.resource.data.document.id == request.resource.data.sourceProjectId
-        && request.resource.data.document.project is map;
+        && validSlotId(request.resource.data.ownerSlot)
+        && validText(request.resource.data.sourceProjectId, 1, 100)
+        && validText(request.resource.data.title, 1, 100)
+        && validText(request.resource.data.creatorName, 1, 48)
+        && validText(request.resource.data.publishedAt, 1, 64)
+        && validText(request.resource.data.updatedAt, 1, 64)
+        && request.resource.data.serverUpdatedAt is timestamp
+        && validProjectDocument(request.resource.data.document, request.resource.data.sourceProjectId)
+        && request.resource.data.title == request.resource.data.document.project.metadata.title;
+    }
+
+    function slotMatchesAfter(userId, slotId, publicationId) {
+      return existsAfter(/databases/$(database)/documents/users/$(userId)/publicationSlots/$(slotId))
+        && getAfter(/databases/$(database)/documents/users/$(userId)/publicationSlots/$(slotId)).data.publicationId == publicationId;
+    }
+
+    function slotMatchesBefore(userId, slotId, publicationId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/publicationSlots/$(slotId))
+        && get(/databases/$(database)/documents/users/$(userId)/publicationSlots/$(slotId)).data.publicationId == publicationId;
+    }
+
+    function validPublicationSlot(slotId) {
+      return validSlotId(slotId)
+        && request.resource.data.keys().hasOnly([
+          "publicationId", "sourceProjectId", "createdAt", "updatedAt"
+        ])
+        && validText(request.resource.data.publicationId, 1, 100)
+        && validText(request.resource.data.sourceProjectId, 1, 100)
+        && validText(request.resource.data.createdAt, 1, 64)
+        && validText(request.resource.data.updatedAt, 1, 64)
+        && existsAfter(/databases/$(database)/documents/publications/$(request.resource.data.publicationId))
+        && getAfter(/databases/$(database)/documents/publications/$(request.resource.data.publicationId)).data.ownerSlot == slotId
+        && getAfter(/databases/$(database)/documents/publications/$(request.resource.data.publicationId)).data.sourceProjectId == request.resource.data.sourceProjectId;
     }
 
     match /users/{userId} {
       allow read, delete: if ownsUserSpace(userId);
       allow create, update: if ownsUserSpace(userId)
-        && request.resource.data.uid == userId;
+        && validUserProfile(userId);
 
       match /projects/{projectId} {
         allow read, delete: if ownsUserSpace(userId);
@@ -64,23 +165,65 @@ service cloud.firestore {
           && validProjectRecord(userId, projectId)
           && request.resource.data.cloudRevision == resource.data.cloudRevision + 1;
       }
+
+      match /publicationSlots/{slotId} {
+        allow read: if ownsUserSpace(userId);
+        allow create: if ownsUserSpace(userId)
+          && validPublicationSlot(slotId)
+          && (
+            !exists(/databases/$(database)/documents/publications/$(request.resource.data.publicationId))
+            || (
+              get(/databases/$(database)/documents/publications/$(request.resource.data.publicationId)).data.publicationVersion == 1
+              && get(/databases/$(database)/documents/publications/$(request.resource.data.publicationId)).data.ownerId == userId
+            )
+          );
+        allow update: if ownsUserSpace(userId)
+          && validPublicationSlot(slotId)
+          && (
+            request.resource.data.publicationId == resource.data.publicationId
+            || (
+              !exists(/databases/$(database)/documents/publications/$(request.resource.data.publicationId))
+              && !existsAfter(/databases/$(database)/documents/publications/$(resource.data.publicationId))
+            )
+          );
+        allow delete: if ownsUserSpace(userId)
+          && !existsAfter(/databases/$(database)/documents/publications/$(resource.data.publicationId));
+      }
     }
 
     match /publications/{publicationId} {
       allow get: if true;
-      allow list: if false;
+      allow list: if hasVerifiedEmail()
+        && request.query.limit <= 100
+        && resource.data.publicationVersion == 1
+        && resource.data.ownerId == request.auth.uid;
       allow create: if hasVerifiedEmail()
         && validPublication(publicationId)
-        && request.resource.data.publicationRevision == 1;
+        && request.resource.data.publicationRevision == 1
+        && slotMatchesAfter(request.auth.uid, request.resource.data.ownerSlot, publicationId);
       allow update: if hasVerifiedEmail()
-        && resource.data.ownerId == request.auth.uid
+        && (
+          (resource.data.publicationVersion == 1 && resource.data.ownerId == request.auth.uid)
+          || (
+            resource.data.publicationVersion == 2
+            && slotMatchesBefore(request.auth.uid, resource.data.ownerSlot, publicationId)
+            && request.resource.data.ownerSlot == resource.data.ownerSlot
+          )
+        )
         && validPublication(publicationId)
-        && request.resource.data.ownerId == resource.data.ownerId
         && request.resource.data.sourceProjectId == resource.data.sourceProjectId
         && request.resource.data.publishedAt == resource.data.publishedAt
-        && request.resource.data.publicationRevision == resource.data.publicationRevision + 1;
+        && request.resource.data.publicationRevision == resource.data.publicationRevision + 1
+        && slotMatchesAfter(request.auth.uid, request.resource.data.ownerSlot, publicationId);
       allow delete: if hasVerifiedEmail()
-        && resource.data.ownerId == request.auth.uid;
+        && (
+          (resource.data.publicationVersion == 1 && resource.data.ownerId == request.auth.uid)
+          || (
+            resource.data.publicationVersion == 2
+            && slotMatchesBefore(request.auth.uid, resource.data.ownerSlot, publicationId)
+            && !existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/publicationSlots/$(resource.data.ownerSlot))
+          )
+        );
     }
 
     match /{document=**} {

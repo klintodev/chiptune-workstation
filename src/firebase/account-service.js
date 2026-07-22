@@ -7,14 +7,18 @@ const INITIAL_STATE = Object.freeze({
 function friendlyError(error) {
   const code = error?.code || "";
   if (code.includes("invalid-credential")) return "The email or password is incorrect.";
-  if (code.includes("email-already-in-use")) return "An account already uses that email address.";
+  if (code.includes("email-already-in-use")) return "If this address is new, check your inbox. Otherwise, sign in or reset your password.";
   if (code.includes("invalid-email")) return "Enter a valid email address.";
-  if (code.includes("weak-password")) return "Use a password with at least six characters.";
+  if (code.includes("weak-password")) return "Use at least 12 characters and meet the password requirements shown by Firebase.";
+  if (code.includes("missing-password")) return "Enter your password to continue.";
+  if (code.includes("requires-recent-login")) return "Confirm your sign-in again before deleting the account.";
+  if (code.includes("publication/quota-exceeded")) return "This account already has 20 published projects. Unpublish one before sharing another.";
   if (code.includes("popup-closed-by-user")) return "Google sign-in was cancelled.";
   if (code.includes("popup-blocked")) return "The browser blocked the Google sign-in window.";
   if (code.includes("too-many-requests")) return "Too many account requests were made. Wait a moment before trying again.";
   if (code.includes("network-request-failed")) return "Firebase is currently unreachable. Local projects still work.";
-  return error?.message || "The account action could not be completed.";
+  console.error("Unexpected Firebase account error.", error);
+  return "The account action could not be completed. Local projects remain available.";
 }
 
 export function createAccountService({ loadClient } = {}) {
@@ -95,6 +99,22 @@ export function createAccountService({ loadClient } = {}) {
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
     createEmailAccount: (email, password) => run((firebase) => firebase.createEmailAccount(email, password)),
+    async deleteAccount(password = "") {
+      if (disposed || state.status === "busy") return;
+      setState({ error: null, status: "busy" });
+      try {
+        const firebase = await getClient();
+        await firebase.deleteAccount(password);
+        if (!disposed) setState({ account: null, error: null, status: "anonymous" });
+      } catch (error) {
+        if (!disposed) setState({
+          account: state.account,
+          error: friendlyError(error),
+          status: state.account ? "authenticated" : "anonymous",
+        });
+        throw error;
+      }
+    },
     dispose() {
       disposed = true;
       unsubscribe?.();

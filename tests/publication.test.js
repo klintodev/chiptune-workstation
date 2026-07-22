@@ -22,7 +22,7 @@ test("publication records contain a validated immutable playback snapshot", () =
   const record = createPublicationRecord({
     creatorName: "Chip Artist",
     document: createDocument(),
-    ownerId: "user-1",
+    ownerSlot: "01",
     publicationId: "publication-1",
     publicationRevision: 1,
     publishedAt: "2026-07-20T12:00:00.000Z",
@@ -30,8 +30,13 @@ test("publication records contain a validated immutable playback snapshot", () =
   });
   assert.equal(record.title, "Untitled chiptune");
   assert.equal(record.sourceProjectId, "project-song");
+  assert.equal(record.ownerSlot, "01");
+  assert.equal("ownerId" in record, false);
   assert.equal(normalizePublicationRecord(record).publicationId, "publication-1");
-  assert.throws(() => normalizePublicationRecord(record, { ownerId: "another-user" }), /owner/);
+  const { ownerSlot, ...legacyBase } = record;
+  const legacy = { ...legacyBase, publicationVersion: 1, ownerId: "user-1" };
+  assert.equal(normalizePublicationRecord(legacy, { ownerId: "user-1" }).ownerId, "user-1");
+  assert.throws(() => normalizePublicationRecord(legacy, { ownerId: "another-user" }), /owner/);
 });
 
 test("republishing preserves one stable URL and advances snapshot revision", async () => {
@@ -43,6 +48,7 @@ test("republishing preserves one stable URL and advances snapshot revision", asy
       assert.equal(values.expectedRevision, remote?.publicationRevision ?? 0);
       remote = createPublicationRecord({
         ...values,
+        ownerSlot: "01",
         publicationRevision: (remote?.publicationRevision ?? 0) + 1,
         publishedAt: remote?.publishedAt ?? values.publishedAt,
       });
@@ -107,12 +113,14 @@ test("publishing remains optional and requires a signed-in owner", async () => {
   await assert.rejects(() => service.publish("Artist"), /Sign in/);
 });
 
-test("Firestore rules allow public document reads but deny discovery lists and foreign writes", async () => {
+test("Firestore rules allow public reads while restricting legacy ownership discovery", async () => {
   const rules = await readFile(new URL("../firestore.rules", import.meta.url), "utf8");
   assert.match(rules, /match \/publications\/\{publicationId\}/);
   assert.match(rules, /allow get: if true/);
-  assert.match(rules, /allow list: if false/);
+  assert.match(rules, /allow list: if hasVerifiedEmail\(\)[\s\S]*resource\.data\.publicationVersion == 1/);
   assert.match(rules, /request\.auth\.token\.email_verified == true/);
   assert.match(rules, /resource\.data\.ownerId == request\.auth\.uid/);
+  assert.match(rules, /match \/publicationSlots\/\{slotId\}/);
+  assert.match(rules, /validSlotId\(request\.resource\.data\.ownerSlot\)/);
   assert.match(rules, /publicationRevision == resource\.data\.publicationRevision \+ 1/);
 });

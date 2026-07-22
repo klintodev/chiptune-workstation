@@ -33,9 +33,6 @@
     <link rel="icon" href="/assets/brand/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png" />
     <link rel="manifest" href="/assets/brand/site.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css?v=20260722-1" />
   </head>
   <body>
@@ -108,7 +105,7 @@
               <div class="pattern-toolbar">
                 <span class="panel-context">Pattern</span>
                 <label><span class="visually-hidden">Pattern</span><select id="pattern-select"><option value="pattern-1">Pattern 1</option></select></label>
-                <label class="pattern-name-field"><span>Name</span><input id="pattern-name" type="text" maxlength="40" value="Pattern 1" /></label>
+                <label class="pattern-name-field"><span>Name</span><input id="pattern-name" type="text" maxlength="32" value="Pattern 1" /></label>
                 <label><span>Length</span><select id="pattern-length"><option value="4">4</option><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option></select></label>
                 <label><span>Root</span><select id="pattern-root-octave" aria-label="Root octave"><option value="2">C2</option><option value="3">C3</option><option value="4" selected>C4</option><option value="5">C5</option><option value="6">C6</option></select></label>
                 <output id="pattern-usage">0 clips</output>
@@ -187,7 +184,7 @@
       <div class="project-dialog-panel">
         <header><div><span class="panel-context">Local library</span><h2 id="project-library-title">Projects</h2></div><button id="project-library-close" type="button" aria-label="Close project library">&times;</button></header>
         <div class="project-library-current">
-          <label class="project-title-field"><span>Project name</span><input id="project-name-input" type="text" maxlength="80" /></label>
+          <label class="project-title-field"><span>Project name</span><input id="project-name-input" type="text" maxlength="100" /></label>
           <div class="project-library-current-status"><span>Status</span><output id="project-library-save-status">Saved</output></div>
         </div>
         <div class="project-dialog-actions">

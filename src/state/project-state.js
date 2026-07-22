@@ -19,9 +19,13 @@ export const PROJECT_SCHEMA_VERSION = 5;
 export const DEFAULT_PATTERN_ID = "pattern-1";
 export const DEFAULT_TRACK_ID = "track-1";
 export const MAX_PROJECT_HISTORY = 100;
+export const MAX_PROJECT_PATTERNS = 64;
 export const MAX_PROJECT_TRACKS = 8;
 export const MAX_ARRANGEMENT_STEPS = 256;
 export const MAX_TRACK_VOICES = 16;
+export const MAX_PROJECT_TITLE_LENGTH = 100;
+export const MAX_PATTERN_NAME_LENGTH = 32;
+export const MAX_TRACK_NAME_LENGTH = 32;
 
 const VOICE_TYPES = new Set(["pulse12", "pulse25", "square", "triangle", "sawtooth", "noise"]);
 
@@ -71,9 +75,9 @@ function freezeProject(project) {
   return Object.freeze(project);
 }
 
-function validateName(value, label) {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new TypeError(`${label} must have a name.`);
+function validateName(value, label, maximum) {
+  if (typeof value !== "string" || value.trim() === "" || value.trim().length > maximum) {
+    throw new TypeError(`${label} must contain 1 to ${maximum} characters.`);
   }
 }
 
@@ -110,7 +114,7 @@ function validateMixer(mixer, trackId) {
 }
 
 function validatePattern(pattern) {
-  validateName(pattern?.name, `Pattern ${pattern?.id ?? "unknown"}`);
+  validateName(pattern?.name, `Pattern ${pattern?.id ?? "unknown"}`, MAX_PATTERN_NAME_LENGTH);
   if (
     !Number.isInteger(pattern.rootOctave) ||
     pattern.rootOctave < MIN_PATTERN_ROOT_OCTAVE ||
@@ -187,11 +191,15 @@ export function validateProject(candidate) {
   if (candidate.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
   }
-  validateName(candidate.metadata?.title, "Project");
+  validateName(candidate.metadata?.title, "Project", MAX_PROJECT_TITLE_LENGTH);
   validateVisualiser(candidate.visualiser);
   validateTransport(candidate.transport);
-  if (!Array.isArray(candidate.patterns) || candidate.patterns.length === 0) {
-    throw new RangeError("A project must contain at least one pattern.");
+  if (
+    !Array.isArray(candidate.patterns)
+    || candidate.patterns.length === 0
+    || candidate.patterns.length > MAX_PROJECT_PATTERNS
+  ) {
+    throw new RangeError(`A project must contain between one and ${MAX_PROJECT_PATTERNS} patterns.`);
   }
   if (
     !Array.isArray(candidate.tracks) ||
@@ -216,7 +224,7 @@ export function validateProject(candidate) {
     if (!track || typeof track.id !== "string" || track.id === "" || trackIds.has(track.id)) {
       throw new RangeError("Every track must have a unique identifier.");
     }
-    validateName(track.name, `Track ${track.id}`);
+    validateName(track.name, `Track ${track.id}`, MAX_TRACK_NAME_LENGTH);
     validateInstrument(track.instrument, track.id);
     validateMixer(track.mixer, track.id);
     if (!Array.isArray(track.clips)) throw new TypeError(`Track ${track.id} must contain a clip collection.`);
@@ -539,7 +547,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
 
   function renameProject(name) {
     const resolvedName = name.trim();
-    validateName(resolvedName, "Project");
+    validateName(resolvedName, "Project", MAX_PROJECT_TITLE_LENGTH);
     if (state.metadata.title === resolvedName) return false;
     return commit(
       { ...state, metadata: { ...state.metadata, title: resolvedName } },
@@ -549,7 +557,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
 
   function renamePattern(patternId, name) {
     const resolvedName = name.trim();
-    validateName(resolvedName, "Pattern");
+    validateName(resolvedName, "Pattern", MAX_PATTERN_NAME_LENGTH);
     return updatePattern(
       patternId,
       (pattern) => pattern.name === resolvedName ? pattern : { ...pattern, name: resolvedName },
@@ -630,7 +638,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
 
   function renameTrack(trackId, name) {
     const resolvedName = name.trim();
-    validateName(resolvedName, "Track");
+    validateName(resolvedName, "Track", MAX_TRACK_NAME_LENGTH);
     return updateTrack(
       trackId,
       (track) => track.name === resolvedName ? track : { ...track, name: resolvedName },

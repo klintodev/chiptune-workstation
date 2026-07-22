@@ -58,12 +58,14 @@ await mkdir(outputDirectory, { recursive: true });
 
 const result = await build({
   absWorkingDir: root,
+  assetNames: "fonts/[name]-[hash]",
   bundle: true,
   entryNames: "[name]-[hash]",
   entryPoints: absoluteEntries,
   format: "esm",
   legalComments: "none",
   logLevel: "info",
+  loader: { ".woff2": "file" },
   metafile: true,
   minify: true,
   outdir: outputDirectory,

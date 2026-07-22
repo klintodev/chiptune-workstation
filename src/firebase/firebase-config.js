@@ -12,6 +12,13 @@ export const FIREBASE_CONFIG = Object.freeze({
   storageBucket: "klinto-studio.firebasestorage.app",
 });
 
+// App Check site keys are public identifiers. Leave this empty until the web
+// app is registered with reCAPTCHA Enterprise; do not enable console
+// enforcement before the configured build has been deployed and monitored.
+export const FIREBASE_APP_CHECK_CONFIG = Object.freeze({
+  siteKey: "",
+});
+
 export function isFirebaseConfigured(config = FIREBASE_CONFIG) {
   return Boolean(
     config?.apiKey

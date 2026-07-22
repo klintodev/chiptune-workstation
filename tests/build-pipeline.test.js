@@ -34,7 +34,7 @@ test("production build bundles pages and Firebase serves only generated output",
   assert.equal(packageFile.scripts.build, "node scripts/build.mjs");
   assert.match(packageFile.scripts.check, /^npm run build/);
   assert.equal(configuration.hosting.public, "dist");
-  const immutable = configuration.hosting.headers.find(({ source }) => source === "**/*.@(js|css)");
+  const immutable = configuration.hosting.headers.find(({ source }) => source === "**/*.@(js|css|woff2)");
   assert.match(immutable.headers[0].value, /immutable/);
 
   for (const stylesheet of ["account", "audio-export", "publishing", "visualiser"]) {

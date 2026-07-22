@@ -50,7 +50,7 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
     editorDock.classList.toggle("collapsed", collapsed);
     dockPanels.hidden = collapsed;
     collapse.setAttribute("aria-expanded", String(!collapsed));
-    collapse.innerHTML = collapsed ? "Expand &#9652;" : "Collapse &#9662;";
+    collapse.textContent = collapsed ? "Expand ▴" : "Collapse ▾";
     keyboardToggle.setAttribute("aria-pressed", String(activePanel === "keyboard"));
     keyboardToggle.setAttribute("aria-label", activePanel === "keyboard" ? "Close keyboard" : "Open keyboard");
     keyboardToggle.classList.toggle("active", activePanel === "keyboard");

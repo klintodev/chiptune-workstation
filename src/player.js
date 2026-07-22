@@ -2,6 +2,7 @@ import { createAudioEngine } from "./audio/audio-engine.js?v=20260721-3";
 import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260722-1";
 import { createFirebaseClient } from "./firebase/firebase-client.js?v=20260722-1";
 import { getTrackColour } from "./shared/track-presentation.js";
+import { publicErrorMessage } from "./shared/public-error.js";
 import { createProjectState, getArrangementEnd } from "./state/project-state.js?v=20260722-1";
 import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260722-1";
 import { fitCanvas } from "./visualiser/canvas-renderer.js?v=20260721-3";
@@ -121,7 +122,10 @@ async function play() {
     renderTransport();
     scheduleVisuals();
   } catch (error) {
-    showError(error.message || "Playback could not start.");
+    showError(publicErrorMessage(error, {
+      context: "Shared playback failed to start.",
+      fallback: "Playback could not start. Try reloading the page.",
+    }));
   }
 }
 
@@ -197,6 +201,9 @@ if (!publicationId || publicationId.length > 100) {
     if (!publication) showError("This published project does not exist or has been unpublished.");
     else createPlayer(publication);
   } catch (error) {
-    showError(error.message || "The published project could not be loaded.");
+    showError(publicErrorMessage(error, {
+      context: "Published project failed to load.",
+      fallback: "The published project could not be loaded.",
+    }));
   }
 }

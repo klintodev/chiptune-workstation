@@ -22,18 +22,19 @@ test("cloud records bind a validated project to one owner and revision", () => {
   assert.throws(() => normalizeCloudProjectRecord(record, { ownerId: "user-two" }), /owner/);
 });
 
-test("cloud records reject projects too large for a Firestore document", () => {
+test("cloud records reject projects with excessive collection counts", () => {
   const project = JSON.parse(JSON.stringify(createDefaultProject()));
   const source = project.patterns[0];
-  project.patterns = Array.from({ length: 10_000 }, (_, index) => ({
+  project.patterns = Array.from({ length: 65 }, (_, index) => ({
     ...source,
     id: `pattern-${index}`,
     name: `Pattern ${index}`,
     steps: source.steps.map((step) => step === null ? null : { ...step }),
   }));
-  const document = createProjectDocument(project, { id: "large-project", now: NOW });
-
-  assert.throws(() => createCloudProjectRecord("user-one", document, 1), /too large/);
+  assert.throws(
+    () => createProjectDocument(project, { id: "large-project", now: NOW }),
+    /between one and 64 patterns/,
+  );
 });
 
 test("checked-in Firestore rules are owner-scoped and deny unmatched documents", async () => {

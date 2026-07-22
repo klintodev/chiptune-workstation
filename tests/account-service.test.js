@@ -5,6 +5,7 @@ import { createAccountService } from "../src/firebase/account-service.js";
 
 function createFirebaseDouble() {
   let authListener = null;
+  let deleteAccountCount = 0;
   let passwordResetCount = 0;
   let unsubscribeCount = 0;
   let verificationEmailCount = 0;
@@ -12,6 +13,9 @@ function createFirebaseDouble() {
     client: {
       async createEmailAccount(email) {
         return { uid: "email-user", email, emailVerified: false, displayName: "" };
+      },
+      async deleteAccount() {
+        deleteAccountCount += 1;
       },
       onAuthStateChanged(listener) {
         authListener = listener;
@@ -41,6 +45,7 @@ function createFirebaseDouble() {
       authListener(account);
     },
     getPasswordResetCount: () => passwordResetCount,
+    getDeleteAccountCount: () => deleteAccountCount,
     getUnsubscribeCount: () => unsubscribeCount,
     getVerificationEmailCount: () => verificationEmailCount,
   };
@@ -105,6 +110,19 @@ test("account service converts Firebase credential errors into useful UI state",
   service.dispose();
 });
 
+test("account deletion clears authenticated service state", async () => {
+  const firebase = createFirebaseDouble();
+  const service = createAccountService({ loadClient: async () => firebase.client });
+  await service.start();
+  firebase.emitAccount({ uid: "email-user", email: "chip@example.com", emailVerified: true });
+
+  await service.deleteAccount("a-secure-password");
+
+  assert.equal(firebase.getDeleteAccountCount(), 1);
+  assert.equal(service.getState().account, null);
+  assert.equal(service.getState().status, "anonymous");
+});
+
 test("a missing Firebase configuration degrades only the account feature", async () => {
   const service = createAccountService({
     loadClient: async () => { throw new Error("Firebase web app configuration has not been completed yet."); },
@@ -112,6 +130,6 @@ test("a missing Firebase configuration degrades only the account feature", async
 
   await service.start();
   assert.equal(service.getState().status, "unavailable");
-  assert.match(service.getState().error, /configuration has not been completed/);
+  assert.equal(service.getState().error, "The account action could not be completed. Local projects remain available.");
   service.dispose();
 });

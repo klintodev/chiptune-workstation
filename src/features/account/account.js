@@ -1,3 +1,5 @@
+import { publicErrorMessage } from "../../shared/public-error.js";
+
 const SYNC_LABELS = Object.freeze({
   "local-only": "Local only",
   pending: "Waiting to sync",
@@ -32,7 +34,7 @@ function createInterface(root) {
           <p>Keep creating locally without an account. Sign in only when you want private cloud projects and sharing.</p>
           <form id="account-email-form" class="account-email-form">
             <label><span>Email</span><input id="account-email" type="email" autocomplete="email" required /></label>
-            <label><span>Password</span><input id="account-password" type="password" autocomplete="current-password" minlength="6" required /></label>
+            <label><span>Password</span><input id="account-password" type="password" autocomplete="current-password" minlength="12" required /><small>New accounts require at least 12 characters.</small></label>
             <button id="account-password-reset" class="account-password-reset" type="button">Forgot password?</button>
             <div><button class="safe-action" type="submit">Sign in</button><button id="account-email-create" type="button">Create account</button></div>
           </form>
@@ -62,7 +64,7 @@ function createInterface(root) {
           <div class="account-cloud-heading"><div><span class="panel-context">Cloud projects</span><p>Open a private project from this account. Cloud removal never removes the local copy.</p></div><button id="account-refresh" type="button">Refresh</button></div>
           <div id="account-cloud-list" class="account-cloud-list" aria-label="Cloud projects"></div>
           </div>
-          <div class="account-signed-in-actions"><button id="account-sign-out" type="button">Sign out</button></div>
+          <div class="account-signed-in-actions"><button id="account-delete-account" class="neutral-action" type="button">Delete account</button><button id="account-sign-out" type="button">Sign out</button></div>
         </section>
         <p id="account-message" class="account-message" role="status"></p>
       </div>
@@ -75,14 +77,30 @@ function createInterface(root) {
         <div><button id="account-delete-cancel" class="safe-action" type="button">Keep cloud copy</button><button id="account-delete-confirm" class="neutral-action" type="button">Remove cloud copy</button></div>
       </div>
     </dialog>
+    <dialog id="account-erasure-dialog" class="account-delete-dialog" aria-labelledby="account-erasure-title">
+      <div class="account-delete-panel account-erasure-panel">
+        <span class="panel-context">Permanent account deletion</span>
+        <h2 id="account-erasure-title">Delete cloud account?</h2>
+        <p>Your Firebase account, private cloud projects and public share pages will be permanently removed. Projects stored in this browser will remain local.</p>
+        <label><span>Type DELETE to confirm</span><input id="account-erasure-confirmation" type="text" autocomplete="off" spellcheck="false" /></label>
+        <label id="account-erasure-password-field"><span>Current password</span><input id="account-erasure-password" type="password" autocomplete="current-password" /></label>
+        <p id="account-erasure-message" class="account-message" role="status"></p>
+        <div><button id="account-erasure-cancel" class="safe-action" type="button">Keep account</button><button id="account-erasure-confirm" class="neutral-action" type="button" disabled>Delete account</button></div>
+      </div>
+    </dialog>
   `;
   const fragment = template.content;
   const open = fragment.querySelector("#account-open");
   (root.querySelector("#account-slot") ?? root.querySelector(".global-status"))?.append(open);
-  root.body.append(fragment.querySelector("#account-dialog"), fragment.querySelector("#account-cloud-delete-dialog"));
+  root.body.append(
+    fragment.querySelector("#account-dialog"),
+    fragment.querySelector("#account-cloud-delete-dialog"),
+    fragment.querySelector("#account-erasure-dialog"),
+  );
 
   const dialog = root.querySelector("#account-dialog");
   const deleteDialog = root.querySelector("#account-cloud-delete-dialog");
+  const erasureDialog = root.querySelector("#account-erasure-dialog");
   return Object.freeze({
     backup: dialog.querySelector("#account-backup"),
     close: dialog.querySelector("#account-close"),
@@ -94,10 +112,18 @@ function createInterface(root) {
     deleteConfirm: deleteDialog.querySelector("#account-delete-confirm"),
     deleteDialog,
     deleteMessage: deleteDialog.querySelector("#account-delete-message"),
+    deleteAccount: dialog.querySelector("#account-delete-account"),
     dialog,
     email: dialog.querySelector("#account-email"),
     emailForm: dialog.querySelector("#account-email-form"),
     emailLabel: dialog.querySelector("#account-email-label"),
+    erasureCancel: erasureDialog.querySelector("#account-erasure-cancel"),
+    erasureConfirm: erasureDialog.querySelector("#account-erasure-confirm"),
+    erasureConfirmation: erasureDialog.querySelector("#account-erasure-confirmation"),
+    erasureDialog,
+    erasureMessage: erasureDialog.querySelector("#account-erasure-message"),
+    erasurePassword: erasureDialog.querySelector("#account-erasure-password"),
+    erasurePasswordField: erasureDialog.querySelector("#account-erasure-password-field"),
     google: dialog.querySelector("#account-google-sign-in"),
     message: dialog.querySelector("#account-message"),
     name: dialog.querySelector("#account-name"),
@@ -147,6 +173,12 @@ export function createAccountFeature({
     elements.deleteConfirm.disabled = value;
   }
 
+  function setErasureBusy(value) {
+    for (const control of elements.erasureDialog.querySelectorAll("button, input")) control.disabled = value;
+    elements.erasureCancel.disabled = value;
+    elements.erasureConfirm.disabled = value || elements.erasureConfirmation.value !== "DELETE";
+  }
+
   function createCloudRow(summary) {
     const row = root.createElement("div");
     row.className = "account-cloud-project";
@@ -191,7 +223,13 @@ export function createAccountFeature({
     try {
       currentCloudState = await cloudProjectService.getProjectStatus();
     } catch (error) {
-      currentCloudState = Object.freeze({ status: "failed", link: { error: error.message } });
+      currentCloudState = Object.freeze({
+        status: "failed",
+        link: { error: publicErrorMessage(error, {
+          context: "Cloud project status failed.",
+          fallback: "Cloud project status is temporarily unavailable.",
+        }) },
+      });
     }
     renderCloudStatus();
   }
@@ -220,7 +258,10 @@ export function createAccountFeature({
     } catch (error) {
       if (generation !== cloudGeneration) return;
       elements.cloudList.replaceChildren();
-      showMessage(error.message, { error: true });
+      showMessage(publicErrorMessage(error, {
+        context: "Cloud project listing failed.",
+        fallback: "Cloud projects could not be loaded. Local projects remain available.",
+      }), { error: true });
     }
   }
 
@@ -259,7 +300,10 @@ export function createAccountFeature({
       if (successMessage) showMessage(successMessage);
     } catch (error) {
       const serviceError = accountService.getState().error;
-      showMessage(serviceError || error.message, { error: true });
+      showMessage(serviceError || publicErrorMessage(error, {
+        context: "Cloud account action failed.",
+        fallback: "The cloud action could not be completed. Local projects remain available.",
+      }), { error: true });
     } finally {
       setBusy(false);
       render();
@@ -289,6 +333,29 @@ export function createAccountFeature({
     if (reopen) openAccount();
   }
 
+  function openErasureDialog() {
+    const account = accountService.getState().account;
+    if (!account) return;
+    const passwordRequired = account.providerIds?.includes("password") ?? true;
+    elements.erasureConfirmation.value = "";
+    elements.erasurePassword.value = "";
+    elements.erasurePassword.required = passwordRequired;
+    elements.erasurePasswordField.hidden = !passwordRequired;
+    elements.erasureMessage.textContent = passwordRequired
+      ? "Re-enter your password, then type DELETE."
+      : "Google will ask you to confirm your identity, then the deletion will begin.";
+    elements.erasureMessage.classList.remove("error");
+    setErasureBusy(false);
+    if (elements.dialog.open) elements.dialog.close();
+    elements.erasureDialog.showModal();
+    elements.erasureConfirmation.focus();
+  }
+
+  function closeErasureDialog({ reopen = true } = {}) {
+    if (elements.erasureDialog.open) elements.erasureDialog.close();
+    if (reopen) openAccount();
+  }
+
   elements.open.addEventListener("click", openAccount, { signal: lifecycle.signal });
   elements.close.addEventListener("click", () => elements.dialog.close(), { signal: lifecycle.signal });
   elements.dialog.addEventListener("cancel", () => elements.dialog.close(), { signal: lifecycle.signal });
@@ -311,6 +378,33 @@ export function createAccountFeature({
     );
   }, { signal: lifecycle.signal });
   elements.google.addEventListener("click", () => void run(accountService.signInWithGoogle), { signal: lifecycle.signal });
+  elements.deleteAccount.addEventListener("click", openErasureDialog, { signal: lifecycle.signal });
+  elements.erasureConfirmation.addEventListener("input", () => {
+    elements.erasureConfirm.disabled = busy || elements.erasureConfirmation.value !== "DELETE";
+  }, { signal: lifecycle.signal });
+  elements.erasureCancel.addEventListener("click", () => closeErasureDialog(), { signal: lifecycle.signal });
+  elements.erasureDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    if (!busy) closeErasureDialog();
+  }, { signal: lifecycle.signal });
+  elements.erasureConfirm.addEventListener("click", () => {
+    if (busy || elements.erasureConfirmation.value !== "DELETE") return;
+    busy = true;
+    setErasureBusy(true);
+    elements.erasureMessage.textContent = "Removing cloud data and account...";
+    elements.erasureMessage.classList.remove("error");
+    void accountService.deleteAccount(elements.erasurePassword.value).then(() => {
+      closeErasureDialog({ reopen: false });
+      openAccount();
+      showMessage("Cloud account and remote data removed. Local browser projects remain available.");
+    }).catch(() => {
+      elements.erasureMessage.textContent = accountService.getState().error || "The account could not be deleted.";
+      elements.erasureMessage.classList.add("error");
+    }).finally(() => {
+      busy = false;
+      setErasureBusy(false);
+    });
+  }, { signal: lifecycle.signal });
   elements.verificationResend.addEventListener("click", () => {
     void run(
       accountService.sendVerificationEmail,
@@ -370,7 +464,10 @@ export function createAccountFeature({
       showMessage("Cloud copy removed. Local projects were not changed.");
     }).catch((error) => {
       closeDeleteDialog();
-      showMessage(error.message, { error: true });
+      showMessage(publicErrorMessage(error, {
+        context: "Cloud project deletion failed.",
+        fallback: "The cloud copy could not be removed.",
+      }), { error: true });
     }).finally(() => setBusy(false));
   }, { signal: lifecycle.signal });
 
@@ -393,6 +490,7 @@ export function createAccountFeature({
     dispose() {
       lifecycle.abort();
       elements.deleteDialog.remove();
+      elements.erasureDialog.remove();
       elements.dialog.remove();
       elements.open.remove();
     },

@@ -10,6 +10,7 @@ function createSdkDouble() {
     profileWrites: 0,
     reloads: 0,
     verificationEmails: 0,
+    passwordValidations: 0,
   };
   const user = {
     displayName: "",
@@ -53,6 +54,12 @@ function createSdkDouble() {
           assert.equal(candidate, user);
           calls.verificationEmails += 1;
         },
+        async validatePassword(candidateAuth, password) {
+          assert.equal(candidateAuth, auth);
+          assert.equal(password, "a-secure-password");
+          calls.passwordValidations += 1;
+          return { isValid: true };
+        },
       },
       firestore: {
         doc: (_database, ...segments) => segments.join("/"),
@@ -84,10 +91,11 @@ test("email account verification and private password recovery use Firebase Auth
   await client.requestPasswordReset("missing@example.com");
   assert.equal(firebase.calls.passwordResetEmails, 2);
 
-  const created = await client.createEmailAccount("chip@example.com", "password");
+  const created = await client.createEmailAccount("chip@example.com", "a-secure-password");
   assert.equal(created.emailVerified, false);
   assert.equal(firebase.calls.verificationEmails, 1);
   assert.equal(firebase.calls.profileWrites, 0);
+  assert.equal(firebase.calls.passwordValidations, 1);
 
   await client.sendVerificationEmail();
   assert.equal(firebase.calls.verificationEmails, 2);
@@ -100,4 +108,40 @@ test("email account verification and private password recovery use Firebase Auth
 
   await client.sendVerificationEmail();
   assert.equal(firebase.calls.verificationEmails, 2);
+});
+
+test("App Check initialises before Auth and Firestore when configured", async () => {
+  const order = [];
+  const app = { name: "[DEFAULT]" };
+  let loadOptions = null;
+  await createFirebaseClient({
+    appCheckConfig: { siteKey: "public-enterprise-site-key" },
+    config: {
+      apiKey: "public-key",
+      appId: "web-app",
+      authDomain: "example.firebaseapp.com",
+      projectId: "example",
+    },
+    loadSdk: async (options) => {
+      loadOptions = options;
+      return {
+        app: { getApps: () => [], initializeApp: () => app },
+        appCheck: {
+          initializeAppCheck(candidate, options) {
+            assert.equal(candidate, app);
+            assert.equal(options.isTokenAutoRefreshEnabled, true);
+            order.push("app-check");
+          },
+          ReCaptchaEnterpriseProvider: class {
+            constructor(siteKey) { assert.equal(siteKey, "public-enterprise-site-key"); }
+          },
+        },
+        auth: { getAuth: () => { order.push("auth"); return {}; } },
+        firestore: { getFirestore: () => { order.push("firestore"); return {}; } },
+      };
+    },
+  });
+
+  assert.deepEqual(loadOptions, { includeAppCheck: true });
+  assert.deepEqual(order, ["app-check", "auth", "firestore"]);
 });

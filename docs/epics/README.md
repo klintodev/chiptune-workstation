@@ -19,3 +19,4 @@ Epics translate product requirements into independently deliverable implementati
 - [PRD 16 - Composition-Projected Visualiser](./prd-16-composition-projected-visualiser.md)
 - [PRD 17 - Track Panning](./prd-17-track-panning.md)
 - [PRD 18 - Production Loading and Asset Build](./prd-18-production-loading-and-build.md)
+- [PRD 19 - Security Hardening](./prd-19-security-hardening.md)

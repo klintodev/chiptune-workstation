@@ -1,3 +1,5 @@
+import { publicErrorMessage } from "../../shared/public-error.js";
+
 export function createPublishingFeature({
   accountService,
   persistence,
@@ -108,7 +110,10 @@ export function createPublishingFeature({
     try {
       currentPublication = await publicationService.getCurrentPublication();
     } catch (error) {
-      showMessage(error.message, { error: true });
+      showMessage(publicErrorMessage(error, {
+        context: "Publication status failed.",
+        fallback: "Sharing status could not be loaded.",
+      }), { error: true });
     }
     render();
   }
@@ -121,7 +126,14 @@ export function createPublishingFeature({
       await action();
       if (success) showMessage(success);
     } catch (error) {
-      showMessage(error.message || "The publishing action failed.", { error: true });
+      showMessage(publicErrorMessage(error, {
+        context: "Publishing action failed.",
+        fallback: "The publishing action could not be completed.",
+        messages: {
+          "publication/quota-exceeded": "This account already has 20 published projects. Unpublish one before sharing another.",
+          "publication/revision-conflict": "This public page changed elsewhere. Reopen sharing and try again.",
+        },
+      }), { error: true });
     } finally {
       setBusy(false);
       render();
@@ -148,11 +160,17 @@ export function createPublishingFeature({
       currentPublication = await publicationService.publish(creatorName);
     }, currentPublication ? "Public snapshot updated." : "Public playback page created.");
   }, { signal: lifecycle.signal });
-  elements.copy.addEventListener("click", () => void run(async () => {
+  elements.copy.addEventListener("click", () => {
     if (!currentPublication) return;
-    if (!globalThis.navigator?.clipboard?.writeText) throw new Error("Copy is unavailable. Select and copy the link manually.");
-    await globalThis.navigator.clipboard.writeText(currentPublication.url);
-  }, "Share link copied."), { signal: lifecycle.signal });
+    if (!globalThis.navigator?.clipboard?.writeText) {
+      showMessage("Copy is unavailable. Select and copy the link manually.", { error: true });
+      return;
+    }
+    void run(
+      () => globalThis.navigator.clipboard.writeText(currentPublication.url),
+      "Share link copied.",
+    );
+  }, { signal: lifecycle.signal });
   elements.unpublish.addEventListener("click", () => {
     dialog.close();
     confirmDialog.showModal();

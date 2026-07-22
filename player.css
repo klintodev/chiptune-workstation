@@ -1,3 +1,5 @@
+@import url("./src/styles/fonts.css?v=20260722-1");
+
 :root { color-scheme: dark; --bg: #171220; --panel: #2c2537; --line: #65566f; --ink: #fff7ed; --muted: #b7a9b8; --accent: #f39bc4; --lime: #c8ff32; --danger: #ff6b5f; }
 * { box-sizing: border-box; }
 body { min-height: 100vh; margin: 0; visibility: visible; animation: none; color: var(--ink); background: var(--bg); font-family: "VT323", monospace; font-size: 1.2rem; }
