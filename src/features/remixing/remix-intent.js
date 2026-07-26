@@ -15,7 +15,6 @@ export function buildRemixStudioUrl({
   url.searchParams.set("revision", String(publicationRevision));
   return url.href;
 }
-
 export function parseRemixIntent(url = globalThis.location?.href ?? "http://localhost/") {
   const parsed = new URL(url);
   const publicationId = parsed.searchParams.get("remix");
@@ -30,4 +29,3 @@ export function parseRemixIntent(url = globalThis.location?.href ?? "http://loca
   ) throw new RangeError("This remix request is invalid. Return to the shared player and try again.");
   return Object.freeze({ publicationId, publicationRevision });
 }
-
