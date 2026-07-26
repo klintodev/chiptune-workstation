@@ -1,7 +1,6 @@
 import { createAudioEngine } from "./audio/audio-engine.js";
 import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
 import { createFirebaseClient } from "./firebase/firebase-client.js";
-import { getTrackColour } from "./shared/track-presentation.js";
 import { publicErrorMessage } from "./shared/public-error.js";
 import { buildRemixStudioUrl } from "./features/remixing/remix-intent.js";
 import { setTextIfChanged } from "./shared/status-announcer.js";
@@ -10,6 +9,10 @@ import { createArrangementScheduler } from "./transport/arrangement-scheduler.js
 import { fitCanvas } from "./visualiser/canvas-renderer.js";
 import { buildCompositionProjection } from "./visualiser/composition-projection.js";
 import { renderCompositionFrame } from "./visualiser/signal-stack-renderer.js";
+import {
+  getVisualiserPalette,
+  getVisualiserTrackColour,
+} from "./visualiser/visualiser-palette.js";
 
 const elements = {
   canvas: document.querySelector("#player-canvas"),
@@ -51,30 +54,24 @@ function showError(message) {
   setTextIfChanged(elements.status, "Unavailable");
 }
 
-function resolveColour(value, fallback) {
-  if (!value?.startsWith("var(")) return value || fallback;
-  const property = value.slice(4, -1).trim();
-  return getComputedStyle(document.documentElement).getPropertyValue(property).trim() || fallback;
-}
-
 function readTheme() {
-  const styles = getComputedStyle(document.documentElement);
-  const read = (property, fallback) => styles.getPropertyValue(property).trim() || fallback;
+  const palette = getVisualiserPalette(projectState?.getState().visualiser.palette);
   return Object.freeze({
-    background: read("--bg-0", "#211b28"),
-    grid: read("--line", "#40374d"),
-    ink: read("--ink", "#f3ecf7"),
-    muted: read("--muted", "#a99bbd"),
+    background: palette.background,
+    grid: palette.grid,
+    ink: palette.ink,
+    muted: palette.muted,
   });
 }
 
 function getProjection() {
+  const paletteId = projectState.getState().visualiser.palette;
   const projection = buildCompositionProjection(projectState.getState(), scheduler.getTimelineSnapshot());
   return Object.freeze({
     ...projection,
     notes: Object.freeze(projection.notes.map((note) => Object.freeze({
       ...note,
-      colour: resolveColour(getTrackColour(note.trackIndex), "#f0a6c8"),
+      colour: getVisualiserTrackColour(paletteId, note.trackIndex),
     }))),
   });
 }

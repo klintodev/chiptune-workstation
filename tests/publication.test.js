@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { createProjectDocument } from "../src/persistence/project-document.js";
-import { createDefaultProject } from "../src/state/project-state.js";
+import { createProjectState } from "../src/state/project-state.js";
 import {
   createPublicationRecord,
   normalizePublicationRecord,
@@ -11,8 +11,10 @@ import {
 import { createMemoryPublicationLinkRepository } from "../src/firebase/publication-link-repository.js";
 import { createPublicationService } from "../src/firebase/publication-service.js";
 
-function createDocument() {
-  return createProjectDocument(createDefaultProject(), {
+function createDocument({ palette = "arcade" } = {}) {
+  const project = createProjectState();
+  project.setVisualiser({ palette });
+  return createProjectDocument(project.getState(), {
     id: "project-song",
     now: "2026-07-20T12:00:00.000Z",
   });
@@ -21,7 +23,7 @@ function createDocument() {
 test("publication records contain a validated immutable playback snapshot", () => {
   const record = createPublicationRecord({
     creatorName: "Chip Artist",
-    document: createDocument(),
+    document: createDocument({ palette: "ocean" }),
     ownerSlot: "01",
     publicationId: "publication-1",
     publicationRevision: 1,
@@ -37,6 +39,7 @@ test("publication records contain a validated immutable playback snapshot", () =
     scale: "major",
     lock: false,
   });
+  assert.equal(record.document.project.visualiser.palette, "ocean");
   assert.equal("ownerId" in record, false);
   assert.equal(normalizePublicationRecord(record).publicationId, "publication-1");
   const { ownerSlot, ...legacyBase } = record;

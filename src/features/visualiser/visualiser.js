@@ -1,8 +1,12 @@
-import { getTrackColour } from "../../shared/track-presentation.js";
 import { setTextIfChanged } from "../../shared/status-announcer.js";
 import { fitCanvas } from "../../visualiser/canvas-renderer.js";
 import { buildCompositionProjection } from "../../visualiser/composition-projection.js";
 import { renderCompositionFrame } from "../../visualiser/signal-stack-renderer.js";
+import {
+  getVisualiserPalette,
+  getVisualiserTrackColour,
+} from "../../visualiser/visualiser-palette.js";
+import { createVisualiserPalettePicker } from "./visualiser-palette-picker.js";
 import {
   buildProjectionSummary,
   getProjectedNoteAccessibleName,
@@ -13,21 +17,14 @@ import {
 
 const PREFERENCE_KEY = "klinto-visual-learning-preferences";
 
-function resolveColour(root, value, fallback) {
-  if (!value?.startsWith("var(")) return value || fallback;
-  const property = value.slice(4, -1).trim();
-  return root.defaultView?.getComputedStyle(root.documentElement).getPropertyValue(property).trim() || fallback;
-}
-
-function readTheme(root, highContrast) {
-  const styles = root.defaultView?.getComputedStyle(root.documentElement);
-  const read = (property, fallback) => styles?.getPropertyValue(property).trim() || fallback;
+function readTheme(paletteId, highContrast) {
+  const palette = getVisualiserPalette(paletteId);
   return Object.freeze({
-    background: read("--bg-0", "#211b28"),
-    grid: highContrast ? read("--ink", "#f3ecf7") : read("--line", "#40374d"),
+    background: palette.background,
+    grid: highContrast ? palette.ink : palette.grid,
     highContrast,
-    ink: read("--ink", "#f3ecf7"),
-    muted: read("--muted", "#a99bbd"),
+    ink: palette.ink,
+    muted: palette.muted,
   });
 }
 
@@ -66,6 +63,7 @@ function legendMarkup() {
         <div><dt>Bright marks</dt><dd>A note sounding now</dd></div>
       </dl>
       <p data-mode-explanation>Track lanes group notes by track for learning; they do not show stereo position.</p>
+      <p data-palette-explanation>The Studio palette changes the scene and track hues, not the music.</p>
     </details>`;
 }
 
@@ -161,6 +159,7 @@ export function createVisualiserFeature({
         <output data-dock-status aria-live="off"></output>
         <div class="visualiser-dock-actions">
           <label>View <select data-presentation><option value="lanes">Track lanes</option><option value="stereo">Stereo</option></select></label>
+          <button type="button" data-palette-open><span>Colours</span><small data-palette-label>Studio</small></button>
           <button type="button" data-resize>Expand</button>
           <button type="button" data-fullscreen>Performance view</button>
         </div>
@@ -184,6 +183,7 @@ export function createVisualiserFeature({
             <label>View <select data-presentation><option value="lanes">Track lanes</option><option value="stereo">Stereo</option></select></label>
             <label><input type="checkbox" data-reduced-motion /> Reduced motion</label>
             <label><input type="checkbox" data-high-contrast /> High contrast</label>
+            <button type="button" data-palette-open><span>Colours</span><small data-palette-label>Studio</small></button>
             <button type="button" data-announce>Announce current view</button>
             <button type="button" data-play>Play</button>
             <button type="button" data-stop>Stop</button>
@@ -217,6 +217,22 @@ export function createVisualiserFeature({
   const play = dialog.querySelector("[data-play]");
   const stop = dialog.querySelector("[data-stop]");
   let announcedTransportStatus = null;
+  let previewPaletteId = null;
+
+  function getActivePaletteId() {
+    return previewPaletteId ?? projectState.getState().visualiser.palette;
+  }
+
+  function syncPaletteMetadata() {
+    const palette = getVisualiserPalette(getActivePaletteId());
+    for (const label of root.querySelectorAll("[data-palette-label]")) label.textContent = palette.name;
+    for (const button of root.querySelectorAll("[data-palette-open]")) {
+      button.setAttribute("aria-label", `Choose visualiser colours. Current palette: ${palette.name}.`);
+    }
+    for (const explanation of root.querySelectorAll("[data-palette-explanation]")) {
+      explanation.textContent = `${palette.name} changes the scene and track hues, not the music.`;
+    }
+  }
 
   function setPreferences(values) {
     preferences = normalizeVisualPreferences({ ...preferences, ...values });
@@ -236,6 +252,7 @@ export function createVisualiserFeature({
 
   function getProjection() {
     const project = projectState.getState();
+    const paletteId = getActivePaletteId();
     const workspace = sessionState.getState().workspace;
     const projection = buildCompositionProjection(project, scheduler.getTimelineSnapshot(), {
       horizonSteps: dockSize === "expanded" || dialog.open ? 16 : 10,
@@ -246,7 +263,7 @@ export function createVisualiserFeature({
       ...projection,
       notes: Object.freeze(projection.notes.map((note) => Object.freeze({
         ...note,
-        colour: resolveColour(root, getTrackColour(note.trackIndex), "#f0a6c8"),
+        colour: getVisualiserTrackColour(paletteId, note.trackIndex),
       }))),
     });
   }
@@ -321,7 +338,7 @@ export function createVisualiserFeature({
     if (!surface.context || surface.canvas.hidden) return;
     const { height, ratio, width } = fitCanvas(surface.canvas);
     surface.lastLayout = renderCompositionFrame(surface.context, projection, {
-      ...readTheme(root, preferences.contrast === "high"),
+      ...readTheme(getActivePaletteId(), preferences.contrast === "high"),
       height,
       motion: preferences.motion,
       presentationMode: preferences.presentation,
@@ -472,6 +489,19 @@ export function createVisualiserFeature({
       setPreferences({ presentation: event.currentTarget.value });
     }, { signal: lifecycle.signal });
   }
+  const palettePicker = createVisualiserPalettePicker({
+    getPaletteId: () => projectState.getState().visualiser.palette,
+    onApply: (palette) => projectState.setVisualiser({ palette }),
+    onPreview: (palette) => {
+      previewPaletteId = palette;
+      syncPaletteMetadata();
+      scheduleDraw();
+    },
+    root,
+  });
+  for (const trigger of root.querySelectorAll("[data-palette-open]")) {
+    trigger.addEventListener("click", () => palettePicker.open(trigger), { signal: lifecycle.signal });
+  }
   dialog.addEventListener("close", () => {
     window.cancelAnimationFrame(animationFrame);
     animationFrame = 0;
@@ -480,6 +510,7 @@ export function createVisualiserFeature({
   }, { signal: lifecycle.signal });
   projectState.addEventListener("change", () => {
     if (selectedNoteId && !getProjection().notes.some((note) => note.id === selectedNoteId)) selectedNoteId = null;
+    syncPaletteMetadata();
     scheduleDraw();
   }, { signal: lifecycle.signal });
   sessionState.addEventListener("change", scheduleDraw, { signal: lifecycle.signal });
@@ -491,12 +522,14 @@ export function createVisualiserFeature({
   window.addEventListener?.("resize", scheduleDraw, { signal: lifecycle.signal });
   syncDockSize(dockSize);
   setPreferences(preferences);
+  syncPaletteMetadata();
 
   return Object.freeze({
     dispose() {
       lifecycle.abort();
       window.cancelAnimationFrame(animationFrame);
       dialog.remove();
+      palettePicker.dispose();
       dock.remove();
       announcement.remove();
       open.remove();

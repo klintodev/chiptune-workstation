@@ -1,8 +1,12 @@
-const PALETTES = Object.freeze({
-  arcade: Object.freeze({ background: "#080b08", primary: "#c8ff32", secondary: "#ff5f87", grid: "#24301f" }),
-  ice: Object.freeze({ background: "#081016", primary: "#8ae8ff", secondary: "#b8a8ff", grid: "#19303a" }),
-  sunset: Object.freeze({ background: "#160914", primary: "#ffb454", secondary: "#ff5f87", grid: "#3d1d36" }),
-});
+import { getVisualiserPalette } from "./visualiser-palette.js";
+
+function getLegacyPalette(paletteId) {
+  return getVisualiserPalette(paletteId);
+}
+
+function getLegacyColour(paletteId, role) {
+  return getLegacyPalette(paletteId).tracks[role === "secondary" ? 1 : 0];
+}
 
 function clear(context, width, height, palette) {
   context.fillStyle = palette.background;
@@ -28,7 +32,7 @@ function drawSpectrum(context, features, config, width, height) {
   const bars = Math.min(48, values.length || 24);
   const gap = 3;
   const barWidth = Math.max(2, (width - gap * (bars - 1)) / bars);
-  context.fillStyle = PALETTES[config.palette].primary;
+  context.fillStyle = getLegacyColour(config.palette, "primary");
   for (let bar = 0; bar < bars; bar += 1) {
     const value = values.length ? values[Math.floor(bar * values.length / bars)] / 255 : 0.08;
     const barHeight = Math.max(3, value * height * config.intensity);
@@ -38,10 +42,10 @@ function drawSpectrum(context, features, config, width, height) {
 
 function drawScope(context, features, config, width, height) {
   const values = features.waveform;
-  const palette = PALETTES[config.palette];
-  context.strokeStyle = palette.secondary;
+  const palette = getLegacyPalette(config.palette);
+  context.strokeStyle = palette.tracks[1];
   context.lineWidth = 2 + config.intensity * 3;
-  context.shadowColor = palette.secondary;
+  context.shadowColor = palette.tracks[1];
   context.shadowBlur = 4 + config.intensity * 12;
   context.beginPath();
   const count = values.length || 64;
@@ -56,7 +60,7 @@ function drawScope(context, features, config, width, height) {
 }
 
 function drawPixelPulse(context, features, config, width, height, time, reducedMotion) {
-  const palette = PALETTES[config.palette];
+  const palette = getLegacyPalette(config.palette);
   const pulse = 0.18 + features.amplitude * config.intensity * 0.82;
   const rotation = reducedMotion ? 0 : time * 0.0002 * config.motion;
   context.save();
@@ -64,7 +68,7 @@ function drawPixelPulse(context, features, config, width, height, time, reducedM
   context.rotate(rotation);
   for (let ring = 5; ring >= 1; ring -= 1) {
     const size = Math.min(width, height) * pulse * (0.25 + ring * 0.13);
-    context.strokeStyle = ring % 2 ? palette.primary : palette.secondary;
+    context.strokeStyle = palette.tracks[ring % 2 ? 0 : 1];
     context.lineWidth = Math.max(2, config.intensity * 5);
     context.globalAlpha = 0.25 + ring * 0.12;
     context.strokeRect(-size / 2, -size / 2, size, size);
@@ -87,7 +91,7 @@ function drawCustomBars(context, features, config, layer, width, height) {
   const drive = layerDrive(features, layer.mapping);
   context.save();
   context.globalAlpha = layer.opacity;
-  context.fillStyle = PALETTES[config.palette][layer.colour];
+  context.fillStyle = getLegacyColour(config.palette, layer.colour);
   for (let bar = 0; bar < bars; bar += 1) {
     const value = values.length ? values[Math.floor(bar * values.length / bars)] / 255 : 0.08;
     const barHeight = Math.min(height, Math.max(3, value * height * config.intensity * layer.size * drive));
@@ -98,7 +102,7 @@ function drawCustomBars(context, features, config, layer, width, height) {
 
 function drawCustomWaveform(context, features, config, layer, width, height) {
   const values = features.waveform;
-  const colour = PALETTES[config.palette][layer.colour];
+  const colour = getLegacyColour(config.palette, layer.colour);
   const drive = layerDrive(features, layer.mapping);
   context.save();
   context.globalAlpha = layer.opacity;
@@ -119,7 +123,7 @@ function drawCustomWaveform(context, features, config, layer, width, height) {
 }
 
 function drawCustomPulse(context, features, config, layer, width, height, time, reducedMotion) {
-  const colour = PALETTES[config.palette][layer.colour];
+  const colour = getLegacyColour(config.palette, layer.colour);
   const drive = layerDrive(features, layer.mapping);
   const size = Math.min(width, height) * 0.2 * layer.size * drive;
   const rotation = reducedMotion ? 0 : time * 0.0002 * config.motion * layer.mapping.direction;
@@ -153,7 +157,7 @@ export function renderVisualFrame(context, features, config, {
   time = 0,
   width,
 }) {
-  const palette = PALETTES[config.palette] ?? PALETTES.arcade;
+  const palette = getLegacyPalette(config.palette);
   clear(context, width, height, palette);
   if (!config.enabled) return;
   if (config.mode === "custom") {

@@ -46,6 +46,8 @@ Validated project documents enter through creation, import, local persistence, c
 
 Transient selection, playback, focus, and dialog state belongs in session or feature-owned state and is not serialized into project documents.
 
+Visualiser palette definitions live in `src/visualiser/visualiser-palette.js` as immutable named roles. Renderers consume those roles through palette helpers rather than maintaining private colour tables. Curated palette identifiers are validated project state; picker previews remain feature-owned transient state until the user applies one project-history command. A future custom palette must extend this data boundary and must not introduce arbitrary CSS or executable rendering content.
+
 ## Test layers
 
 - `npm test` runs deterministic Node coverage for domain, persistence, cloud, audio, transport, projection, security, and build contracts.

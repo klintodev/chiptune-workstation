@@ -1,5 +1,10 @@
+import {
+  DEFAULT_VISUALISER_PALETTE,
+  VISUALISER_PALETTE_IDS,
+} from "./visualiser-palette.js";
+
 export const VISUALISER_PRESETS = Object.freeze(["spectrum", "scope", "pixel-pulse"]);
-export const VISUALISER_PALETTES = Object.freeze(["arcade", "ice", "sunset"]);
+export const VISUALISER_PALETTES = VISUALISER_PALETTE_IDS;
 export const VISUALISER_MODES = Object.freeze(["preset", "custom"]);
 export const VISUALISER_LAYER_TYPES = Object.freeze(["bars", "waveform", "pulse"]);
 export const VISUALISER_SIGNALS = Object.freeze(["amplitude", "bass", "mid", "treble"]);
@@ -49,7 +54,7 @@ export function createDefaultVisualiser() {
     enabled: true,
     mode: "preset",
     preset: "spectrum",
-    palette: "arcade",
+    palette: DEFAULT_VISUALISER_PALETTE,
     intensity: 0.75,
     sensitivity: 1,
     motion: 1,
