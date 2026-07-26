@@ -1,4 +1,4 @@
-import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js?v=20260722-1";
+import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js";
 import { encodePcm16Wave } from "../../audio/wav-encoder.js";
 
 function safeFilename(title) {

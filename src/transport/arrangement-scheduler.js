@@ -1,4 +1,4 @@
-import { midiNoteToFrequency } from "../audio/voice-engine.js?v=20260721-1";
+import { midiNoteToFrequency } from "../audio/voice-engine.js";
 import { getArrangementEnd, MAX_ARRANGEMENT_STEPS } from "../state/project-state.js";
 import {
   DEFAULT_BPM,

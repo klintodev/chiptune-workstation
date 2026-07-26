@@ -2,7 +2,7 @@
 
 A browser chiptune workstation built with the Web Audio API and native ES modules. The app has no runtime framework; esbuild is used only to prepare production assets.
 
-The current product includes a playable keyboard, editable single-track patterns, per-note gate and volume, tempo and transport controls, bulk pattern actions, and undo/redo.
+The current product includes a playable keyboard, reusable patterns, a multi-track clip arrangement, per-note expression, mixer controls, transport and looping, bounded undo/redo, local project persistence, JSON recovery, WAV export, optional accounts and cloud backup, public sharing, and a composition-projected visualiser.
 
 ## Run locally
 
@@ -41,15 +41,21 @@ The build bundles and minifies each page's JavaScript and CSS, fingerprints the 
 
 ## Architecture
 
-- `src/app.js` constructs the application and connects feature interfaces.
+- `src/app.js` is the workstation browser entry and connects optional account, cloud, publishing, export, and visualisation features.
+- `src/workstation-app.js` owns the local composition root: project/session state, audio, transport, persistence, and editing features.
+- `src/player.js` owns the read-only public-player composition root.
 - `src/state/` owns the serializable project model and separate transient session state.
+- `src/persistence/` owns validated project documents and replaceable local repositories.
 - `src/audio/` owns Web Audio lifecycle and voice creation.
 - `src/transport/` owns the shared audio-clock scheduler.
 - `src/features/` contains UI factories with their colocated CSS.
+- `src/firebase/` translates optional hosted services into serializable application contracts.
+- `src/visualiser/` derives deterministic visual projections from project and transport snapshots.
 - `styles.css` is the single stylesheet entry point and imports shared and feature styles.
-- `tests/` protects domain behaviour and scheduler timing with deterministic fakes.
+- `tests/` protects domain, persistence, cloud, audio, projection, build, and scheduler behaviour with deterministic fakes.
 
 State never imports UI. Feature rendering is a projection of state snapshots, and user interactions issue commands through injected state interfaces.
+See [the architecture conventions](./docs/architecture.md) for dependency, lifecycle, and module-identity rules.
 
 ## Documentation
 
