@@ -2,7 +2,7 @@ import {
   getEffectiveMidiNote,
   midiNoteToFrequency,
 } from "../../audio/pitch-policy.js";
-import { isGlobalShortcutEligible } from "../../shared/keyboard-policy.js";
+import { isMusicalKeyboardEligible } from "../../shared/keyboard-policy.js";
 import { KEY_BY_CODE } from "./keyboard-layout.js";
 
 export function createInputController({
@@ -102,7 +102,7 @@ export function createInputController({
   }
 
   function handleKeyDown(event) {
-    if (!isGlobalShortcutEligible(event, root)) return;
+    if (!isMusicalKeyboardEligible(event, root)) return;
     const key = KEY_BY_CODE.get(event.code);
     if (!key) return;
     event.preventDefault();

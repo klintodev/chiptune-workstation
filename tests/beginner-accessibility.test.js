@@ -7,8 +7,10 @@ import { createOneShotPreview } from "../src/features/keyboard/keyboard.js";
 import { getPatternBankRange } from "../src/features/pattern-editor/pattern-editor.js";
 import { getAdjacentWorkspacePanel } from "../src/features/workspace-tabs/workspace-tabs.js";
 import {
+  hasOpenShortcutBlockingSurface,
   isGlobalShortcutEligible,
   isInteractiveShortcutTarget,
+  isMusicalKeyboardEligible,
 } from "../src/shared/keyboard-policy.js";
 import { setTextIfChanged } from "../src/shared/status-announcer.js";
 import {
@@ -75,6 +77,42 @@ test("global shortcuts leave focused controls and open dialogs alone", () => {
     repeat: true,
     target: plainTarget,
   }, closedRoot), false);
+});
+
+test("hidden disclosure content does not disable musical keyboard input", () => {
+  const buttonTarget = {
+    closest(selector) {
+      return selector.split(", ").includes("button") ? this : null;
+    },
+  };
+  const editableTarget = {
+    closest(selector) {
+      return selector.split(", ").includes("input") ? this : null;
+    },
+  };
+  const hiddenDisclosure = {
+    closest(selector) {
+      return selector.includes("dialog:not([open])") ? { open: false } : null;
+    },
+  };
+  const visibleDialog = { closest: () => null };
+  const hiddenRoot = { querySelectorAll: () => [hiddenDisclosure] };
+  const dialogRoot = { querySelectorAll: () => [visibleDialog] };
+  const closedRoot = { querySelectorAll: () => [] };
+  const event = {
+    altKey: false,
+    ctrlKey: false,
+    defaultPrevented: false,
+    metaKey: false,
+    repeat: false,
+    target: buttonTarget,
+  };
+
+  assert.equal(hasOpenShortcutBlockingSurface(hiddenRoot), false);
+  assert.equal(isMusicalKeyboardEligible(event, closedRoot), true);
+  assert.equal(isMusicalKeyboardEligible({ ...event, target: editableTarget }, closedRoot), false);
+  assert.equal(isMusicalKeyboardEligible({ ...event, ctrlKey: true }, closedRoot), false);
+  assert.equal(isMusicalKeyboardEligible(event, dialogRoot), false);
 });
 
 test("responsive pattern banks clamp and describe the visible step range", () => {
