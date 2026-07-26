@@ -132,11 +132,13 @@ test("schema four projects gain centred track panning", () => {
   const legacy = structuredClone(createProjectState().getState());
   legacy.schemaVersion = 4;
   delete legacy.tracks[0].mixer.pan;
+  delete legacy.transport.loop.mode;
 
   const migrated = createProjectState(legacy);
 
   assert.equal(migrated.getState().schemaVersion, PROJECT_SCHEMA_VERSION);
   assert.equal(migrated.getTrack(DEFAULT_TRACK_ID).mixer.pan, 0);
+  assert.equal(migrated.getState().transport.loop.mode, "custom");
 });
 
 test("legacy single-track projects migrate into a pattern library and clip lane", () => {
@@ -163,6 +165,7 @@ test("legacy single-track projects migrate into a pattern library and clip lane"
 
   const migrated = createProjectState(legacy).getState();
   assert.equal(migrated.schemaVersion, PROJECT_SCHEMA_VERSION);
+  assert.equal(migrated.transport.loop.mode, "custom");
   assert.equal(migrated.patterns[0].steps[0].note, 60);
   assert.deepEqual(migrated.tracks[0].clips, [{ id: "clip-1", patternId: "pattern-1", startStep: 0 }]);
 });
@@ -216,4 +219,8 @@ test("track pan is validated, persisted, and undoable", () => {
   const invalid = structuredClone(project.getState());
   invalid.tracks[0].mixer.pan = 1.1;
   assert.throws(() => createProjectState(invalid), /invalid mixer/);
+
+  const fractionalOctave = structuredClone(project.getState());
+  fractionalOctave.tracks[0].instrument.octaveOffset = 0.5;
+  assert.throws(() => createProjectState(fractionalOctave), /instrument octaveOffset/);
 });

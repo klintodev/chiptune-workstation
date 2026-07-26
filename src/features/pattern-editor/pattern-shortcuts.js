@@ -1,14 +1,11 @@
-function isEditableControl(target) {
-  return Boolean(target?.closest?.("input, select, textarea, [contenteditable='true']"));
-}
+import { isGlobalShortcutEligible } from "../../shared/keyboard-policy.js";
 
-export function createPatternHistoryShortcut({ undo, redo }) {
+export function createPatternHistoryShortcut({ undo, redo, root = globalThis.document }) {
   return function handlePatternHistoryShortcut(event) {
     if (
-      event.repeat ||
       event.altKey ||
       (!event.ctrlKey && !event.metaKey) ||
-      isEditableControl(event.target)
+      !isGlobalShortcutEligible(event, root)
     ) {
       return false;
     }

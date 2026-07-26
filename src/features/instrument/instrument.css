@@ -5,9 +5,11 @@
 .device-rack-header strong { color: var(--accent); }
 .device-rack { display: flex; width: max-content; max-width: 100%; align-items: stretch; gap: 12px; }
 .device { min-width: 0; min-height: 178px; margin: 0; padding: 10px 12px 12px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel-raised); }
-.device legend { padding: 0 6px; color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; }
-.device label { display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.56rem; text-transform: uppercase; }
+.device legend { padding: 0 6px; color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.device label { display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.64rem; text-transform: uppercase; }
 .device label + label { margin-top: 14px; }
+.device-term-help { display: flex; gap: 6px; margin-bottom: 9px; }
+.device-help-button { min-height: 30px; flex: 1; padding: 4px 6px; color: var(--label); background: var(--surface-strong); font-size: 0.58rem; }
 .device button { min-height: 29px; padding: 5px 8px; }
 .device label input { width: 100%; grid-column: 1 / -1; }
 .device output { color: var(--ink); font-family: "VT323", monospace; font-size: 0.95rem; }
@@ -22,6 +24,9 @@
 #reset-instrument { border-color: var(--line-bright); color: var(--label); background: var(--surface-strong); }
 
 @media (max-width: 900px) {
-  .voice-lab { overflow-x: auto; }
-  .device-rack { min-width: 820px; }
+  .voice-lab { overflow: visible; padding: 10px; }
+  .device-rack { display: grid; width: 100%; min-width: 0; max-width: none; grid-template-columns: 1fr; }
+  .device, .device-oscillator, .device-envelope, .device-output { width: 100%; min-height: 0; }
+  .device button, .device select { min-height: 44px; }
+  .voice-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

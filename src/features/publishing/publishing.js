@@ -144,6 +144,8 @@ export function createPublishingFeature({
 
   async function refresh() {
     publicationContextReady = false;
+    currentPublication = null;
+    currentProvenance = null;
     setBusy(true);
     try {
       [currentPublication, currentProvenance] = await Promise.all([
@@ -191,10 +193,15 @@ export function createPublishingFeature({
     render();
     void refresh();
     if (!dialog.open) dialog.showModal();
+    elements.close.focus();
   }
   open.addEventListener("click", openPublishing, { signal: lifecycle.signal });
   quickOpen.addEventListener("click", openPublishing, { signal: lifecycle.signal });
   elements.close.addEventListener("click", () => dialog.close(), { signal: lifecycle.signal });
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    dialog.close();
+  }, { signal: lifecycle.signal });
   elements.publish.addEventListener("click", () => {
     const creatorName = elements.creator.value.trim();
     if (!creatorName) {

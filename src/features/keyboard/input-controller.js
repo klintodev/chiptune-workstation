@@ -1,17 +1,9 @@
-import { midiNoteToFrequency } from "../../audio/voice-engine.js?v=20260721-1";
+import {
+  getEffectiveMidiNote,
+  midiNoteToFrequency,
+} from "../../audio/pitch-policy.js";
+import { isGlobalShortcutEligible } from "../../shared/keyboard-policy.js";
 import { KEY_BY_CODE } from "./keyboard-layout.js";
-
-function isTextEntry(target) {
-  if (!(target instanceof Element)) return false;
-  if (target.matches("textarea") || target.isContentEditable) return true;
-  if (!(target instanceof HTMLInputElement)) return false;
-  return !["range", "button", "checkbox", "radio", "submit", "reset"].includes(target.type);
-}
-
-function releaseControlFocus(target) {
-  if (target instanceof HTMLSelectElement) target.blur();
-  if (target instanceof HTMLInputElement && target.type === "range") target.blur();
-}
 
 export function createInputController({
   getInstrumentConfig,
@@ -36,7 +28,7 @@ export function createInputController({
     const keyboardNoteOffset = getKeyboardNoteOffset();
     const proposedNote = baseNote + keyboardNoteOffset * 12;
     const previewPatternNote = resolvePatternNote(proposedNote, { consumeBypass: false });
-    const playedNote = previewPatternNote + config.octaveOffset * 12;
+    const playedNote = getEffectiveMidiNote(previewPatternNote, config.octaveOffset);
     const activeVoiceEngine = resolveVoiceEngine();
     const voice = activeVoiceEngine.trigger({
       type: config.voiceType,
@@ -110,10 +102,9 @@ export function createInputController({
   }
 
   function handleKeyDown(event) {
-    if (event.repeat || isTextEntry(event.target)) return;
+    if (!isGlobalShortcutEligible(event, root)) return;
     const key = KEY_BY_CODE.get(event.code);
     if (!key) return;
-    releaseControlFocus(event.target);
     event.preventDefault();
     start(`keyboard:${event.code}`, key.note);
   }
@@ -121,8 +112,7 @@ export function createInputController({
   function handleKeyUp(event) {
     const key = KEY_BY_CODE.get(event.code);
     if (!key) return;
-    event.preventDefault();
-    stop(`keyboard:${event.code}`);
+    if (stop(`keyboard:${event.code}`)) event.preventDefault();
   }
 
   function handlePointerDown(event) {

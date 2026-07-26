@@ -14,8 +14,26 @@ const GATE_LABELS = Object.freeze({
   1: "Full",
 });
 
+export function getPatternBankRange(length, bankIndex, bankSize) {
+  const count = Math.max(1, Math.ceil(length / bankSize));
+  const index = Math.min(count - 1, Math.max(0, bankIndex));
+  const start = index * bankSize;
+  return Object.freeze({
+    count,
+    end: Math.min(length, start + bankSize),
+    index,
+    start,
+  });
+}
+
 export function createPatternEditor({
+  addButton,
+  bankNext,
+  bankPrevious,
+  bankRange,
   clearButton,
+  closeButton,
+  doneButton,
   gateControl,
   getNoteName,
   getScaleGuide,
@@ -24,6 +42,7 @@ export function createPatternEditor({
   noteUpButton,
   octaveSelect,
   onEditAction,
+  onSelectionChange = () => {},
   onStepCleared = () => {},
   patternState,
   pitchSelect,
@@ -45,7 +64,6 @@ export function createPatternEditor({
   const lifecycle = new AbortController();
   const stepElements = [];
   const inspector = clearButton.closest(".selected-step-inspector");
-  const inspectorWorkspace = inspector?.closest(".pattern-workspace");
   const gridScroll = grid.closest(".pattern-grid-scroll");
   const gateButtons = [...gateControl.querySelectorAll("[data-gate]")].map((button) => ({
     button,
@@ -54,7 +72,11 @@ export function createPatternEditor({
   const gateOutput = gateControl.querySelector("output");
   let activePatternId = patternState.getState().patternId;
   let activeVolumeStepIndex = null;
+  let bankIndex = 0;
+  let dialogReturnFocus = null;
   let inspectorOpen = false;
+  let playbackStatus = "stopped";
+  let playheadStepIndex = null;
   let selectedStepIndex = null;
 
   function getSelectedNote() {
@@ -104,6 +126,11 @@ export function createPatternEditor({
   function selectStep(index, shouldPreview = false) {
     onEditAction?.();
     selectedStepIndex = index;
+    onSelectionChange(index);
+    if ((globalThis.innerWidth ?? 1280) <= 900) {
+      const bankSize = (globalThis.innerWidth ?? 1280) <= 560 ? 4 : 8;
+      bankIndex = Math.floor(index / bankSize);
+    }
     const step = patternState.getState().steps[index];
     if (step !== null) {
       loadStepControls(step);
@@ -114,6 +141,19 @@ export function createPatternEditor({
 
   function focusStep(index) {
     stepElements[index]?.setButton.focus();
+  }
+
+  function closeInspector({ restoreFocus = true } = {}) {
+    inspectorOpen = false;
+    if (inspector?.open) inspector.close();
+    if (restoreFocus && dialogReturnFocus?.isConnected) dialogReturnFocus.focus();
+    dialogReturnFocus = null;
+  }
+
+  function openInspector(index, invoker) {
+    dialogReturnFocus = invoker ?? stepElements[index]?.editButton ?? null;
+    inspectorOpen = true;
+    selectStep(index);
   }
 
   function createStep(index) {
@@ -140,21 +180,28 @@ export function createPatternEditor({
     editButton.textContent = "\u2699";
     editButton.title = "Edit note";
     setButton.addEventListener("click", () => {
-      inspectorOpen = false;
-      selectStep(index);
+      closeInspector({ restoreFocus: false });
+      const step = patternState.getState().steps[index];
+      selectStep(index, step !== null);
+      if (step === null) {
+        const note = getSelectedNote();
+        patternState.setStep(index, note);
+        previewSelectedNote(note, patternState.getState().steps[index].volume);
+        render();
+      }
     }, { signal: lifecycle.signal });
     setButton.addEventListener("contextmenu", (event) => {
       event.preventDefault();
-      inspectorOpen = false;
+      closeInspector({ restoreFocus: false });
       selectedStepIndex = null;
+      onSelectionChange(null);
       onEditAction?.();
       patternState.clearStep(index);
       onStepCleared(index);
       render();
     }, { signal: lifecycle.signal });
     editButton.addEventListener("click", () => {
-      inspectorOpen = true;
-      selectStep(index);
+      openInspector(index, editButton);
     }, { signal: lifecycle.signal });
     container.append(setButton, editButton);
     grid.append(container);
@@ -167,39 +214,21 @@ export function createPatternEditor({
     if (selectedStepIndex !== null && selectedStepIndex >= length) {
       inspectorOpen = false;
       selectedStepIndex = null;
+      onSelectionChange(null);
     }
 
     grid.setAttribute("aria-label", `${length}-step pattern`);
     grid.style.setProperty("--pattern-step-count", String(length));
   }
-  function positionInspector() {
-    if (!inspector || !inspectorWorkspace || selectedStepIndex === null) return;
-    const selectedStep = stepElements[selectedStepIndex]?.container;
-    if (!selectedStep) return;
-
-    const workspaceBounds = inspectorWorkspace.getBoundingClientRect();
-    const stepBounds = selectedStep.getBoundingClientRect();
-    const inspectorWidth = inspector.offsetWidth || 320;
-    const edgeGap = 8;
-    const targetX = stepBounds.left + (stepBounds.width / 2) - workspaceBounds.left;
-    const minimumCenter = (inspectorWidth / 2) + edgeGap;
-    const maximumCenter = workspaceBounds.width - (inspectorWidth / 2) - edgeGap;
-    const popoverCenter = maximumCenter < minimumCenter
-      ? workspaceBounds.width / 2
-      : Math.min(maximumCenter, Math.max(minimumCenter, targetX));
-    const popoverLeft = popoverCenter - (inspectorWidth / 2);
-    const arrowLeft = Math.min(inspectorWidth - 14, Math.max(14, targetX - popoverLeft));
-
-    inspector.style.setProperty("--step-popover-left", `${popoverCenter}px`);
-    inspector.style.setProperty("--step-arrow-left", `${arrowLeft}px`);
-  }
   function renderInspector(pattern) {
     const selectedStep = selectedStepIndex === null ? null : pattern.steps[selectedStepIndex];
     const hasSelection = selectedStepIndex !== null;
     const hasNote = selectedStep !== null;
-    if (inspector) {
-      inspector.hidden = !hasSelection || !inspectorOpen;
-      if (hasSelection && inspectorOpen) positionInspector();
+    if (inspector && hasSelection && inspectorOpen && !inspector.open) {
+      inspector.showModal();
+      (hasNote ? noteDownButton : addButton).focus();
+    } else if (inspector?.open && (!hasSelection || !inspectorOpen)) {
+      inspector.close();
     }
     stepNumberOutput.textContent = hasSelection
       ? String(selectedStepIndex + 1).padStart(2, "0")
@@ -207,11 +236,13 @@ export function createPatternEditor({
     stepSummaryOutput.value = !hasSelection
       ? "Select a step"
       : hasNote ? getNoteName(selectedStep.note) : "Rest";
+    addButton.hidden = hasNote;
+    addButton.textContent = `Add ${getNoteName(getSelectedNote())}`;
     clearButton.disabled = !hasNote;
     gateControl.classList.toggle("disabled", !hasNote);
     volumeInput.disabled = !hasNote;
-    noteDownButton.disabled = !hasNote || getSelectedNote() <= MIN_PATTERN_NOTE;
-    noteUpButton.disabled = !hasNote || getSelectedNote() >= MAX_PATTERN_NOTE;
+    noteDownButton.disabled = getSelectedNote() <= MIN_PATTERN_NOTE;
+    noteUpButton.disabled = getSelectedNote() >= MAX_PATTERN_NOTE;
     for (const { button, gate } of gateButtons) {
       const selected = hasNote && selectedStep.gate === gate;
       button.disabled = !hasNote;
@@ -237,16 +268,35 @@ export function createPatternEditor({
     }
   }
 
+  function renderBank(length) {
+    const bankSize = (globalThis.innerWidth ?? 1280) <= 560 ? 4 : 8;
+    const range = getPatternBankRange(length, bankIndex, bankSize);
+    bankIndex = range.index;
+    bankRange.value = `Steps ${range.start + 1}\u2013${range.end} of ${length}`;
+    bankPrevious.disabled = range.index === 0;
+    bankNext.disabled = range.index === range.count - 1;
+    if ((globalThis.innerWidth ?? 1280) <= 900) {
+      grid.style.width = `${range.count * 100}%`;
+      grid.style.setProperty("--pattern-bank-size", String(bankSize));
+    } else {
+      grid.style.removeProperty("width");
+      grid.style.removeProperty("--pattern-bank-size");
+    }
+  }
+
   function render() {
     constrainPitchSelection();
     const pattern = patternState.getState();
     if (pattern.patternId !== activePatternId) {
       activePatternId = pattern.patternId;
-      inspectorOpen = false;
+      closeInspector({ restoreFocus: false });
       selectedStepIndex = null;
+      onSelectionChange(null);
       activeVolumeStepIndex = null;
+      bankIndex = 0;
     }
     syncStepElements(pattern.steps.length);
+    renderBank(pattern.steps.length);
     selectedNoteOutput.value = getNoteName(getSelectedNote());
     pattern.steps.forEach((step, index) => {
       const elements = stepElements[index];
@@ -261,13 +311,25 @@ export function createPatternEditor({
         ? ""
         : scale?.tonic ? "Tonic" : scale?.inScale ? "In scale" : "Outside scale";
       elements.container.classList.toggle("selected", index === selectedStepIndex);
-      elements.editButton.hidden = !hasNote;
-      elements.editButton.setAttribute("aria-label", `Edit step ${index + 1}, ${noteLabel}`);
+      const isPlayhead = index === playheadStepIndex;
+      elements.container.classList.toggle("playback-step", isPlayhead);
+      elements.container.dataset.playbackState = isPlayhead ? playbackStatus : "";
+      elements.editButton.textContent = hasNote ? "\u2699" : "+";
+      elements.editButton.title = hasNote ? "Edit note" : "Add or choose a note";
+      elements.editButton.setAttribute(
+        "aria-label",
+        hasNote ? `Edit step ${index + 1}, ${noteLabel}` : `Choose a note for empty step ${index + 1}`,
+      );
 
       elements.setButton.tabIndex = index === (selectedStepIndex ?? 0) ? 0 : -1;
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
+      if (isPlayhead && playbackStatus !== "stopped") {
+        elements.setButton.setAttribute("aria-current", "step");
+      } else {
+        elements.setButton.removeAttribute("aria-current");
+      }
       elements.setButton.title = hasNote ? "Right-click to clear this note." : "";
-      elements.value.textContent = noteLabel;
+      elements.value.textContent = hasNote ? noteLabel : "+ Note";
       elements.meter.style.width = hasNote ? `${Math.round(step.volume * 100)}%` : "0%";
       elements.detail.title = hasNote
         ? `${Math.round(step.gate * 100)}% gate · ${Math.round(step.volume * 100)}% velocity`
@@ -304,6 +366,7 @@ export function createPatternEditor({
       return;
     }
     selectedStepIndex = currentIndex;
+    onSelectionChange(currentIndex);
     onEditAction?.();
     if (isAssign) {
       const current = patternState.getState().steps[currentIndex];
@@ -336,6 +399,19 @@ export function createPatternEditor({
     render();
   }
 
+  function showBank(index, { focus = false } = {}) {
+    const { length } = patternState.getState();
+    const bankSize = (globalThis.innerWidth ?? 1280) <= 560 ? 4 : 8;
+    const range = getPatternBankRange(length, index, bankSize);
+    bankIndex = range.index;
+    renderBank(length);
+    const target = stepElements[range.start]?.container;
+    const reduceMotion = grid.ownerDocument?.defaultView
+      ?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    gridScroll?.scrollTo?.({ behavior: reduceMotion ? "auto" : "smooth", left: target?.offsetLeft ?? 0 });
+    if (focus) focusStep(range.start);
+  }
+
   function handlePreviewChange() {
     if (!previewInput.checked || selectedStepIndex === null) return;
     const step = patternState.getState().steps[selectedStepIndex];
@@ -352,6 +428,19 @@ export function createPatternEditor({
   for (const { button, gate } of gateButtons) {
     button.addEventListener("click", () => selectGate(gate), { signal: lifecycle.signal });
   }
+  addButton.addEventListener("click", () => {
+    if (selectedStepIndex === null) return;
+    const note = resolveNewNote(getSelectedNote());
+    patternState.setStep(selectedStepIndex, note);
+    previewSelectedNote(note, patternState.getState().steps[selectedStepIndex].volume);
+    render();
+  }, { signal: lifecycle.signal });
+  closeButton.addEventListener("click", closeInspector, { signal: lifecycle.signal });
+  doneButton.addEventListener("click", closeInspector, { signal: lifecycle.signal });
+  inspector.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeInspector();
+  }, { signal: lifecycle.signal });
   gateControl.addEventListener("keydown", (event) => {
     const currentIndex = gateButtons.findIndex(({ button }) => button === event.target);
     if (currentIndex === -1) return;
@@ -373,7 +462,7 @@ export function createPatternEditor({
     patternState.clearStep(selectedStepIndex);
     onStepCleared(clearedIndex);
     render();
-    focusStep(selectedStepIndex);
+    addButton.focus();
   }, { signal: lifecycle.signal });
   noteDownButton.addEventListener("click", () => {
     const note = getSelectedNote();
@@ -411,9 +500,10 @@ export function createPatternEditor({
   pitchSelect.addEventListener("change", handleNoteSelectionChange, { signal: lifecycle.signal });
   octaveSelect.addEventListener("change", handleNoteSelectionChange, { signal: lifecycle.signal });
   previewInput.addEventListener("change", handlePreviewChange, { signal: lifecycle.signal });
+  bankPrevious.addEventListener("click", () => showBank(bankIndex - 1), { signal: lifecycle.signal });
+  bankNext.addEventListener("click", () => showBank(bankIndex + 1), { signal: lifecycle.signal });
   grid.addEventListener("keydown", handleGridKeyDown, { signal: lifecycle.signal });
-  gridScroll?.addEventListener("scroll", positionInspector, { signal: lifecycle.signal });
-  globalThis.addEventListener?.("resize", positionInspector, { signal: lifecycle.signal });
+  globalThis.addEventListener?.("resize", () => renderBank(patternState.getState().length), { signal: lifecycle.signal });
   patternState.addEventListener("change", render);
   render();
 
@@ -423,5 +513,43 @@ export function createPatternEditor({
     patternState.removeEventListener("change", render);
   }
 
-  return Object.freeze({ dispose, render, setSelectedNote });
+  function inspectStep(index, { focus = true } = {}) {
+    if (!Number.isInteger(index) || index < 0 || index >= patternState.getState().length) return false;
+    openInspector(index, focus ? stepElements[index]?.setButton : null);
+    if (focus) {
+      globalThis.requestAnimationFrame?.(() => {
+        (patternState.getState().steps[index] ? noteDownButton : addButton).focus();
+      });
+    }
+    return true;
+  }
+
+  function setPlayhead(stepIndex, status, mode) {
+    const length = patternState.getState().length;
+    const nextStatus = mode === "pattern" ? status : "stopped";
+    const nextStepIndex = nextStatus === "stopped"
+      ? null
+      : ((stepIndex % length) + length) % length;
+    if (nextStepIndex === playheadStepIndex && nextStatus === playbackStatus) return;
+    if (playheadStepIndex !== null) {
+      const previous = stepElements[playheadStepIndex];
+      previous?.container.classList.remove("playback-step");
+      if (previous) previous.container.dataset.playbackState = "";
+      previous?.setButton.removeAttribute("aria-current");
+    }
+    playbackStatus = nextStatus;
+    playheadStepIndex = nextStepIndex;
+    if (playheadStepIndex === null) return;
+    const next = stepElements[playheadStepIndex];
+    next?.container.classList.add("playback-step");
+    if (next) next.container.dataset.playbackState = playbackStatus;
+    next?.setButton.setAttribute("aria-current", "step");
+    if ((globalThis.innerWidth ?? 1280) <= 900) {
+      const bankSize = (globalThis.innerWidth ?? 1280) <= 560 ? 4 : 8;
+      const playheadBank = Math.floor(playheadStepIndex / bankSize);
+      if (playheadBank !== bankIndex) showBank(playheadBank);
+    }
+  }
+
+  return Object.freeze({ dispose, inspectStep, render, setPlayhead, setSelectedNote });
 }

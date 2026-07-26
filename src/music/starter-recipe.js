@@ -335,6 +335,7 @@ function materializeRecipeProject(recipe) {
       bpm: recipe.tempo,
       loop: {
         enabled: false,
+        mode: "custom",
         startStep: 0,
         endStep: Math.max(...recipe.sections.map(({ endStep }) => endStep)),
       },

@@ -1,9 +1,11 @@
 import { instrumentDefaults } from "./instrument-state.js";
+import { getEffectiveMidiNote } from "../audio/pitch-policy.js";
+import { createBoundedUniqueName } from "../shared/bounded-name.js";
 import {
   createDefaultVisualiser,
   normalizeVisualiser,
   validateVisualiser,
-} from "../visualiser/visualiser-config.js?v=20260721-3";
+} from "../visualiser/visualiser-config.js";
 import {
   DEFAULT_PATTERN_LENGTH,
   DEFAULT_PATTERN_ROOT_OCTAVE,
@@ -32,6 +34,7 @@ export const MAX_PATTERN_NAME_LENGTH = 32;
 export const MAX_TRACK_NAME_LENGTH = 32;
 
 const VOICE_TYPES = new Set(["pulse12", "pulse25", "square", "triangle", "sawtooth", "noise"]);
+const LOOP_MODES = new Set(["custom", "arrangement"]);
 
 function cloneStep(step) {
   return step === null ? null : { ...step };
@@ -98,7 +101,12 @@ function validateInstrument(instrument, trackId) {
   };
   for (const [field, [minimum, maximum]] of Object.entries(ranges)) {
     const value = instrument[field];
-    if (!Number.isFinite(value) || value < minimum || value > maximum) {
+    if (
+      !Number.isFinite(value)
+      || (field === "octaveOffset" && !Number.isInteger(value))
+      || value < minimum
+      || value > maximum
+    ) {
       throw new RangeError(`Track ${trackId} has an invalid instrument ${field}.`);
     }
   }
@@ -183,6 +191,7 @@ function validateTransport(transport) {
   if (
     !loop ||
     typeof loop.enabled !== "boolean" ||
+    !LOOP_MODES.has(loop.mode) ||
     !Number.isInteger(loop.startStep) ||
     !Number.isInteger(loop.endStep) ||
     loop.startStep < 0 ||
@@ -235,6 +244,11 @@ export function validateProject(candidate) {
     validateMixer(track.mixer, track.id);
     if (!Array.isArray(track.clips)) throw new TypeError(`Track ${track.id} must contain a clip collection.`);
     validateClipCollection(track, patternsById, clipIds);
+    for (const pattern of candidate.patterns) {
+      for (const step of pattern.steps) {
+        if (step !== null) getEffectiveMidiNote(step.note, track.instrument.octaveOffset);
+      }
+    }
     trackIds.add(track.id);
   }
   return true;
@@ -329,16 +343,23 @@ export function migrateProject(candidate) {
 
 function normalizeProject(candidate) {
   const migrated = migrateProject(candidate);
-  validateProject(migrated);
-  return freezeProject({
+  const normalized = {
     ...migrated,
     metadata: { ...migrated.metadata },
     scaleGuide: normalizeScaleGuide(migrated.scaleGuide),
     visualiser: normalizeVisualiser(migrated.visualiser),
-    transport: { ...migrated.transport, loop: { ...migrated.transport.loop } },
+    transport: {
+      ...migrated.transport,
+      loop: {
+        ...migrated.transport.loop,
+        mode: migrated.transport.loop.mode ?? "custom",
+      },
+    },
     patterns: migrated.patterns.map(clonePattern),
     tracks: migrated.tracks.map(cloneTrack),
-  });
+  };
+  validateProject(normalized);
+  return freezeProject(normalized);
 }
 
 export function createDefaultProject() {
@@ -350,7 +371,12 @@ export function createDefaultProject() {
     transport: {
       bpm: 120,
       masterVolume: 0.35,
-      loop: { enabled: false, startStep: 0, endStep: DEFAULT_PATTERN_LENGTH },
+      loop: {
+        enabled: false,
+        endStep: DEFAULT_PATTERN_LENGTH,
+        mode: "custom",
+        startStep: 0,
+      },
     },
     patterns: [{
       id: DEFAULT_PATTERN_ID,
@@ -372,13 +398,6 @@ function nextIdentifier(prefix, ids) {
   let number = 1;
   while (ids.has(`${prefix}-${number}`)) number += 1;
   return `${prefix}-${number}`;
-}
-
-function uniqueName(base, existingNames) {
-  if (!existingNames.has(base)) return base;
-  let suffix = 2;
-  while (existingNames.has(`${base} ${suffix}`)) suffix += 1;
-  return `${base} ${suffix}`;
 }
 
 export function isTrackAudible(project, trackId) {
@@ -429,6 +448,29 @@ export function createProjectState(initialProject = createDefaultProject()) {
   let groupedHistoryRecorded = false;
   let state = normalizeProject(initialProject);
 
+  function updateWholeArrangementLoop(project) {
+    if (!project.transport.loop.enabled || project.transport.loop.mode !== "arrangement") return project;
+    const arrangementEnd = getArrangementEnd(project);
+    const loop = arrangementEnd > 0
+      ? {
+          ...project.transport.loop,
+          enabled: true,
+          startStep: 0,
+          endStep: arrangementEnd,
+        }
+      : {
+          ...project.transport.loop,
+          enabled: false,
+          startStep: 0,
+        };
+    if (
+      loop.enabled === project.transport.loop.enabled
+      && loop.startStep === project.transport.loop.startStep
+      && loop.endStep === project.transport.loop.endStep
+    ) return project;
+    return { ...project, transport: { ...project.transport, loop } };
+  }
+
   function getState() {
     return state;
   }
@@ -474,7 +516,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
   }
 
   function commit(nextProject, detail = {}) {
-    const nextState = normalizeProject(nextProject);
+    const nextState = normalizeProject(updateWholeArrangementLoop(nextProject));
     if (!historyGroupActive || !groupedHistoryRecorded) {
       retainPast(state);
       groupedHistoryRecorded = historyGroupActive;
@@ -520,7 +562,14 @@ export function createProjectState(initialProject = createDefaultProject()) {
     const patternIds = new Set(state.patterns.map(({ id }) => id));
     const names = new Set(state.patterns.map((pattern) => pattern.name));
     const id = nextIdentifier("pattern", patternIds);
-    const resolvedName = uniqueName(name?.trim() || `Pattern ${state.patterns.length + 1}`, names);
+    const resolvedName = createBoundedUniqueName(
+      name,
+      names,
+      {
+        fallback: `Pattern ${state.patterns.length + 1}`,
+        maximumLength: MAX_PATTERN_NAME_LENGTH,
+      },
+    );
     commit({
       ...state,
       patterns: [...state.patterns, {
@@ -539,7 +588,14 @@ export function createProjectState(initialProject = createDefaultProject()) {
     const patternId = nextIdentifier("pattern", patternIds);
     const pattern = {
       id: patternId,
-      name: uniqueName(name?.trim() || `Pattern ${state.patterns.length + 1}`, names),
+      name: createBoundedUniqueName(
+        name,
+        names,
+        {
+          fallback: `Pattern ${state.patterns.length + 1}`,
+          maximumLength: MAX_PATTERN_NAME_LENGTH,
+        },
+      ),
       rootOctave: DEFAULT_PATTERN_ROOT_OCTAVE,
       steps: Array(DEFAULT_PATTERN_LENGTH).fill(null),
     };
@@ -589,7 +645,10 @@ export function createProjectState(initialProject = createDefaultProject()) {
     const ids = new Set(state.patterns.map(({ id }) => id));
     const names = new Set(state.patterns.map((pattern) => pattern.name));
     const id = nextIdentifier("pattern", ids);
-    const name = uniqueName(`${source.name} variation`, names);
+    const name = createBoundedUniqueName(source.name, names, {
+      maximumLength: MAX_PATTERN_NAME_LENGTH,
+      suffix: "variation",
+    });
     commit({
       ...state,
       patterns: [...state.patterns, {
@@ -623,9 +682,10 @@ export function createProjectState(initialProject = createDefaultProject()) {
     const ids = new Set(state.patterns.map(({ id }) => id));
     const names = new Set(state.patterns.map((pattern) => pattern.name));
     const id = nextIdentifier("pattern", ids);
-    const resolvedName = uniqueName(
+    const resolvedName = createBoundedUniqueName(
       name?.trim() || `${source.name} variation`,
       names,
+      { maximumLength: MAX_PATTERN_NAME_LENGTH },
     );
     validateName(resolvedName, "Pattern", MAX_PATTERN_NAME_LENGTH);
     commit({
@@ -690,7 +750,14 @@ export function createProjectState(initialProject = createDefaultProject()) {
     const ids = new Set(state.tracks.map(({ id }) => id));
     const names = new Set(state.tracks.map((track) => track.name));
     const id = nextIdentifier("track", ids);
-    const resolvedName = uniqueName(name?.trim() || `Track ${state.tracks.length + 1}`, names);
+    const resolvedName = createBoundedUniqueName(
+      name,
+      names,
+      {
+        fallback: `Track ${state.tracks.length + 1}`,
+        maximumLength: MAX_TRACK_NAME_LENGTH,
+      },
+    );
     commit({
       ...state,
       tracks: [...state.tracks, {
@@ -762,7 +829,10 @@ export function createProjectState(initialProject = createDefaultProject()) {
     const ids = new Set(state.patterns.map(({ id }) => id));
     const names = new Set(state.patterns.map((pattern) => pattern.name));
     const patternId = nextIdentifier("pattern", ids);
-    const name = uniqueName(`${source.name} variation`, names);
+    const name = createBoundedUniqueName(source.name, names, {
+      maximumLength: MAX_PATTERN_NAME_LENGTH,
+      suffix: "variation",
+    });
     const variation = {
       id: patternId,
       name,
@@ -865,9 +935,15 @@ export function createProjectState(initialProject = createDefaultProject()) {
   }
 
   function setLoop(values) {
-    const loop = { ...state.transport.loop, ...values };
-    if (Object.keys(values).every((key) => state.transport.loop[key] === loop[key])) return false;
-    return commit({ ...state, transport: { ...state.transport, loop } }, { field: "transport.loop" });
+    const changesBounds = Object.hasOwn(values, "startStep") || Object.hasOwn(values, "endStep");
+    const loop = {
+      ...state.transport.loop,
+      ...values,
+      mode: values.mode ?? (changesBounds ? "custom" : state.transport.loop.mode),
+    };
+    if (Object.keys(loop).every((key) => state.transport.loop[key] === loop[key])) return false;
+    const nextProject = { ...state, transport: { ...state.transport, loop } };
+    return commit(nextProject, { field: "transport.loop" });
   }
 
   function beginHistoryGroup() {

@@ -122,9 +122,9 @@ function drawOrbShading(context, note, geometry, colours) {
   context.globalAlpha = 1;
 }
 
-function drawLabel(context, note, geometry, colours, ratio) {
+function drawLabel(context, note, geometry, colours, ratio, showLabel = true) {
   const { radius, x, y } = geometry;
-  if (radius < 13 * ratio) return;
+  if (!showLabel || radius < 10 * ratio) return;
   const trackSize = Math.max(7 * ratio, Math.min(12 * ratio, radius * 0.2));
   const noteSize = Math.max(8 * ratio, Math.min(15 * ratio, radius * 0.27));
   context.textAlign = "center";
@@ -141,37 +141,150 @@ function drawLabel(context, note, geometry, colours, ratio) {
 
 export function getProjectedNoteGeometry(note, {
   height,
+  pitchMaximum = 96,
+  pitchMinimum = 36,
+  presentationMode = "stereo",
   ratio = 1,
+  safeMargin = null,
+  trackCount = 1,
   width,
-  horizonY = height * 0.31,
-  vanishingX = width * 0.52,
+  horizonY = height * (width / height > 1.5 ? 0.31 : 0.23),
+  vanishingX = width * 0.5,
 } = {}) {
   if (!note || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     throw new TypeError("Projected note geometry requires a note and positive dimensions.");
   }
+  const resolvedSafeMargin = safeMargin
+    ?? Math.max(12 * ratio, Math.min(width, height) * 0.06);
   const depth = clamp(note.depth);
   const proximity = Math.pow(1 - depth, 1.45);
-  const nearX = vanishingX + clamp(note.pan, -1, 1) * width * 0.38;
-  const nearY = height * (0.79 - clamp(note.pitch) * 0.57);
-  const x = vanishingX + (nearX - vanishingX) * proximity;
-  const y = horizonY + (nearY - horizonY) * proximity;
+  const lane = trackCount <= 1 ? 0 : (note.trackIndex / (trackCount - 1)) * 2 - 1;
+  const horizontalValue = presentationMode === "lanes" ? lane : clamp(note.pan, -1, 1);
+  const horizontalRange = Math.max(0, width / 2 - resolvedSafeMargin);
+  const nearX = vanishingX + horizontalValue * horizontalRange;
+  const pitchSpan = Math.max(1, pitchMaximum - pitchMinimum);
+  const normalizedPitch = clamp((note.note - pitchMinimum) / pitchSpan);
+  const verticalRange = Math.max(0, height - horizonY - resolvedSafeMargin * 2);
+  const nearY = horizonY + resolvedSafeMargin + (1 - normalizedPitch) * verticalRange;
   const radius = Math.max(3 * ratio, (5 + clamp(note.velocity) * 46) * ratio * (0.16 + proximity * 0.84));
+  const objectMargin = Math.min(
+    Math.min(width, height) / 2,
+    resolvedSafeMargin + radius,
+  );
+  const x = clamp(
+    vanishingX + (nearX - vanishingX) * proximity,
+    objectMargin,
+    width - objectMargin,
+  );
+  const y = clamp(
+    horizonY + (nearY - horizonY) * proximity,
+    objectMargin,
+    height - objectMargin,
+  );
   const pixel = Math.max(2 * ratio, Math.round((2 + proximity * 3.2) * ratio));
   return Object.freeze({ pixel, proximity, radius, x, y });
 }
 
-function drawProjectedNote(context, note, options) {
-  const { background, height, horizonY, ink, ratio, vanishingX, width } = options;
-  const geometry = getProjectedNoteGeometry(note, {
-    height,
-    horizonY,
-    ratio,
-    vanishingX,
-    width,
-  });
-  const { pixel, proximity, radius, x, y } = geometry;
-  const alpha = clamp((0.2 + proximity * 0.8) * (note.active ? 0.7 + note.life * 0.3 : 1));
+function boxesOverlap(left, right, gap = 3) {
+  return left.left < right.right + gap
+    && left.right + gap > right.left
+    && left.top < right.bottom + gap
+    && left.bottom + gap > right.top;
+}
 
+function getLabelBox(note, geometry, ratio) {
+  const width = Math.max(note.trackName.length * 6, note.noteLabel.length * 8) * ratio;
+  const height = 24 * ratio;
+  return Object.freeze({
+    bottom: geometry.y + height / 2,
+    left: geometry.x - width / 2,
+    right: geometry.x + width / 2,
+    top: geometry.y - height / 2,
+  });
+}
+
+export function getCompositionSceneLayout(projection, {
+  height,
+  motion = "full",
+  presentationMode = "stereo",
+  ratio = 1,
+  width,
+} = {}) {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    throw new TypeError("Composition scene layout requires positive dimensions.");
+  }
+  const horizonY = height * (width / height > 1.5 ? 0.31 : 0.23);
+  const vanishingX = width * 0.5;
+  const trackCount = Math.max(1, projection.activity?.length
+    ?? 1 + Math.max(-1, ...projection.notes.map((note) => note.trackIndex)));
+  const pitchMinimum = Math.min(96, ...projection.notes.map((note) => note.note)) - 2;
+  const pitchMaximum = Math.max(36, ...projection.notes.map((note) => note.note)) + 2;
+  const prepared = projection.notes.map((original, index) => {
+    const note = motion === "reduced" && !original.active
+      ? { ...original, depth: clamp(Math.ceil(Math.max(0, original.stepsUntilStart)) / projection.horizonSteps) }
+      : original;
+    const geometry = getProjectedNoteGeometry(note, {
+      height,
+      horizonY,
+      pitchMaximum,
+      pitchMinimum,
+      presentationMode,
+      ratio,
+      trackCount,
+      vanishingX,
+      width,
+    });
+    return { geometry, key: original.id ?? `projected-note-${index}`, note };
+  });
+  const priority = [...prepared].sort((left, right) => (
+    Number(right.note.active) - Number(left.note.active)
+    || left.note.depth - right.note.depth
+    || left.note.trackIndex - right.note.trackIndex
+    || left.note.note - right.note.note
+    || left.key.localeCompare(right.key)
+  ));
+  const acceptedLabels = [];
+  const visibility = new Map();
+  for (const item of priority) {
+    const box = getLabelBox(item.note, item.geometry, ratio);
+    const collides = acceptedLabels.some((accepted) => boxesOverlap(box, accepted));
+    const visible = item.note.active || (!collides && item.geometry.radius >= 10 * ratio);
+    visibility.set(item.key, visible);
+    if (visible) acceptedLabels.push(box);
+  }
+  return Object.freeze({
+    horizonY,
+    notes: Object.freeze(prepared.map(({ geometry, key, note }) => Object.freeze({
+      geometry,
+      key,
+      labelVisible: visibility.get(key),
+      note,
+      tailLength: Math.max(
+        0,
+        Math.min(
+          note.gate * geometry.radius * 1.8,
+          height - (geometry.y + geometry.radius * 0.6),
+        ),
+      ),
+    }))),
+    pitchMaximum,
+    pitchMinimum,
+    presentationMode,
+    vanishingX,
+  });
+}
+
+function drawProjectedNote(context, item, options) {
+  const { background, highContrast, ink, ratio } = options;
+  const { geometry, labelVisible, note, tailLength } = item;
+  const { pixel, proximity, radius, x, y } = geometry;
+  const inactiveFactor = note.audible === false ? 0.34 : 1;
+  const alpha = clamp((0.2 + proximity * 0.8) * (note.active ? 0.7 + note.life * 0.3 : 1))
+    * inactiveFactor;
+
+  context.fillStyle = note.active || highContrast ? ink : note.colour;
+  context.globalAlpha = Math.max(0.32, alpha * 0.68);
+  context.fillRect(x - pixel / 2, y + radius * 0.6, pixel, tailLength);
   context.fillStyle = background;
   context.globalAlpha = alpha * 0.48;
   context.fillRect(x - radius * 0.62, y + radius * 0.78, radius * 1.5, pixel * 2);
@@ -193,34 +306,40 @@ function drawProjectedNote(context, note, options) {
     context.fillRect(x + radius, y - marker / 2, marker, marker);
     context.globalAlpha = 1;
   }
-  drawLabel(context, note, geometry, { alpha, ink }, ratio);
+  drawLabel(context, note, geometry, { alpha: highContrast ? 1 : alpha, ink }, ratio, labelVisible);
 }
 
 export function renderCompositionFrame(context, projection, {
   background = "#211b28",
   grid = "#40374d",
   height,
+  highContrast = false,
   ink = "#f3ecf7",
+  motion = "full",
   muted = "#a99bbd",
+  presentationMode = "stereo",
   ratio = 1,
   width,
 } = {}) {
-  const vanishingX = width * 0.52;
-  const horizonY = height * 0.31;
+  const scene = getCompositionSceneLayout(projection, {
+    height,
+    motion,
+    presentationMode,
+    ratio,
+    width,
+  });
+  const { horizonY, vanishingX } = scene;
   context.fillStyle = background;
   context.globalAlpha = 1;
   context.fillRect(0, 0, width, height);
   drawRoom(context, { grid, height, horizonY, ratio, vanishingX, width });
 
-  const notes = [...projection.notes].sort((left, right) => right.depth - left.depth);
-  notes.forEach((note) => drawProjectedNote(context, note, {
+  const notes = [...scene.notes].sort((left, right) => right.note.depth - left.note.depth);
+  notes.forEach((item) => drawProjectedNote(context, item, {
     background,
-    height,
-    horizonY,
+    highContrast,
     ink,
     ratio,
-    vanishingX,
-    width,
   }));
 
   if (notes.length === 0) {
@@ -235,6 +354,12 @@ export function renderCompositionFrame(context, projection, {
   return Object.freeze({
     horizonY,
     noteCount: notes.length,
+    noteTargets: Object.freeze(scene.notes.map(({ geometry, key, note }) => Object.freeze({
+      id: note.id ?? key,
+      radius: Math.max(14 * ratio, geometry.radius),
+      x: geometry.x,
+      y: geometry.y,
+    }))),
     vanishingX,
   });
 }

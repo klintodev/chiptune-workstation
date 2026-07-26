@@ -1,4 +1,4 @@
-import { normalizeProjectDocument } from "../persistence/project-document.js?v=20260722-1";
+import { normalizeProjectDocument } from "../persistence/project-document.js";
 
 export const PUBLICATION_FORMAT = "chiptune-workstation-publication";
 export const LEGACY_PUBLICATION_VERSION = 1;

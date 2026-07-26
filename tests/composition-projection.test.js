@@ -70,7 +70,9 @@ test("projection respects mute and arrangement loop wrapping", () => {
     mixer: { ...track.mixer, muted: true },
   }));
   const muted = buildCompositionProjection(state.getState(), timeline(), { horizonSteps: 8 });
-  assert.deepEqual(muted.notes, []);
+  assert.ok(muted.notes.length > 0);
+  assert.ok(muted.notes.every((note) => note.audible === false && note.timingState === "inactive"));
+  assert.equal(muted.activity[0].audible, false);
 });
 
 test("pattern projection wraps the selected pattern independently of clips", () => {
@@ -89,4 +91,43 @@ test("pattern projection wraps the selected pattern independently of clips", () 
   const wrapped = projection.notes.find((note) => note.patternStepIndex === 0);
   assert.equal(wrapped.stepsUntilStart, 1);
   assert.equal(wrapped.noteLabel, "C4");
+});
+
+test("stopped and paused projections retain deterministic previews without claiming activity", () => {
+  const state = createProjectState();
+  programPattern(state);
+  state.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+  for (const status of ["stopped", "paused"]) {
+    const first = buildCompositionProjection(
+      state.getState(),
+      timeline({ status, stepIndex: 0, stepProgress: 0 }),
+      { horizonSteps: 8 },
+    );
+    const second = buildCompositionProjection(
+      state.getState(),
+      timeline({ status, stepIndex: 0, stepProgress: 0 }),
+      { horizonSteps: 8 },
+    );
+    assert.deepEqual(first, second);
+    assert.ok(first.notes.length > 0);
+    assert.ok(first.notes.every((note) => note.active === false));
+  }
+});
+
+test("projection preserves track order and marks solo-excluded tracks inactive", () => {
+  const state = createProjectState();
+  programPattern(state);
+  state.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+  const secondTrackId = state.addTrack("Bass");
+  state.addClip(secondTrackId, DEFAULT_PATTERN_ID, 0);
+  state.updateTrack(secondTrackId, (track) => ({
+    ...track,
+    mixer: { ...track.mixer, solo: true },
+  }));
+  const projection = buildCompositionProjection(state.getState(), timeline(), { horizonSteps: 2 });
+  assert.deepEqual(projection.activity.map(({ trackId }) => trackId), [DEFAULT_TRACK_ID, secondTrackId]);
+  assert.equal(projection.activity[0].audible, false);
+  assert.equal(projection.activity[1].audible, true);
+  assert.ok(projection.notes.some((note) => note.trackId === DEFAULT_TRACK_ID && !note.audible));
+  assert.ok(projection.notes.some((note) => note.trackId === secondTrackId && note.active));
 });

@@ -17,7 +17,7 @@ function addNote(project, patternId, note = 60) {
   }));
 }
 
-function createHarness() {
+function createHarness(schedulerOptions = {}) {
   const project = createProjectState();
   let audioTime = 10;
   let timerCount = 0;
@@ -48,6 +48,7 @@ function createHarness() {
       return timerCount;
     },
     clearIntervalFn() {},
+    ...schedulerOptions,
   });
   return {
     get intervalCallback() { return intervalCallback; },
@@ -150,4 +151,60 @@ test("timeline snapshots follow the scheduler's audio clock", () => {
   assert.equal(paused.audioTime, null);
   assert.equal(paused.status, "paused");
   assert.equal(paused.stepProgress, 0);
+});
+
+test("a playing whole-arrangement loop follows extension and becomes empty safely", () => {
+  const harness = createHarness();
+  const errors = [];
+  harness.scheduler.addEventListener("statechange", (event) => {
+    if (event.detail.error) errors.push(event.detail.error);
+  });
+  addNote(harness.project, DEFAULT_PATTERN_ID);
+  const first = harness.project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+  harness.project.setLoop({
+    enabled: true,
+    endStep: 16,
+    mode: "arrangement",
+    startStep: 0,
+  });
+
+  harness.scheduler.play("arrangement");
+  const second = harness.project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 16);
+  harness.setAudioTime(11.96);
+  harness.intervalCallback();
+  assert.equal(harness.triggered.length, 2);
+
+  harness.project.removeClip(second);
+  harness.project.removeClip(first);
+  harness.setAudioTime(12.1);
+  harness.intervalCallback();
+  harness.setAudioTime(13);
+  harness.intervalCallback();
+  assert.equal(harness.scheduler.getState().status, "stopped");
+  assert.deepEqual(errors, []);
+});
+
+test("shortening a live loop replaces the complete pre-scheduled future suffix", () => {
+  const harness = createHarness({
+    lookAheadSeconds: 0.5,
+    startLeadSeconds: 0,
+  });
+  addNote(harness.project, DEFAULT_PATTERN_ID);
+  harness.project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+  harness.project.setLoop({
+    enabled: true,
+    endStep: 3,
+    mode: "custom",
+    startStep: 0,
+  });
+  harness.scheduler.play("arrangement");
+
+  harness.setAudioTime(10.01);
+  harness.project.setLoop({ endStep: 2, mode: "custom" });
+  harness.intervalCallback();
+
+  assert.equal(harness.scheduler.getTimelineSnapshot(10.26).stepIndex, 0);
+  assert.equal(harness.scheduler.getTimelineSnapshot(10.39).stepIndex, 1);
+  assert.equal(harness.scheduler.getTimelineSnapshot(10.505).stepIndex, 0);
+  assert.ok(harness.stopped.some(({ record }) => record.options.startTime === 10.375));
 });

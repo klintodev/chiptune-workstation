@@ -2,34 +2,35 @@ import {
   createAudioEngine,
   createAudioEngineError,
   isAudioEngineError,
-} from "./audio/audio-engine.js?v=20260721-3";
-import { createNotePreview } from "./audio/note-preview.js?v=20260721-1";
-import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260722-1";
-import { createAudioStatusFeature } from "./features/audio-status/audio-status.js?v=20260721-2";
-import { createArrangerFeature } from "./features/arranger/arranger-feature.js?v=20260722-1";
+} from "./audio/audio-engine.js";
+import { createNotePreview } from "./audio/note-preview.js";
+import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
+import { createAudioStatusFeature } from "./features/audio-status/audio-status.js";
+import { createArrangerFeature } from "./features/arranger/arranger-feature.js";
 import { createInstrumentFeature } from "./features/instrument/instrument.js";
-import { createInputController } from "./features/keyboard/input-controller.js?v=20260721-1";
+import { createHelpFeature } from "./features/help/help.js";
+import { createInputController } from "./features/keyboard/input-controller.js";
 import { createKeyboardFeature } from "./features/keyboard/keyboard.js";
-import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js?v=20260721-3";
-import { createProjectLibraryFeature } from "./features/project-library/project-library.js?v=20260722-1";
+import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js";
+import { createProjectLibraryFeature } from "./features/project-library/project-library.js";
 import { createGuidedCreationFeature } from "./features/guided-creation/guided-creation.js";
 import { createScaleEntryController } from "./features/guided-creation/scale-entry-controller.js";
 import { createStarterService } from "./features/guided-creation/starter-service.js";
 import { createThemeFeature } from "./features/theme/theme.js";
-import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js?v=20260721-3";
+import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js";
 import { getNoteName } from "./music/note.js";
 import { createInstrumentState } from "./state/instrument-state.js";
 import { DEFAULT_PATTERN_ROOT_OCTAVE, createPatternState } from "./state/pattern-state.js";
-import { createProjectState } from "./state/project-state.js?v=20260722-1";
+import { createProjectState } from "./state/project-state.js";
 import {
   createIndexedDbProjectRepository,
   createMemoryProjectRepository,
   createProjectPreferences,
-} from "./persistence/project-repository.js?v=20260722-1";
+} from "./persistence/project-repository.js";
 import {
   createProjectPersistence,
   loadInitialProjectDocument,
-} from "./persistence/project-persistence.js?v=20260722-1";
+} from "./persistence/project-persistence.js";
 import {
   createIndexedDbCheckpointRepository,
   createMemoryCheckpointRepository,
@@ -37,7 +38,8 @@ import {
 import { createCheckpointService } from "./persistence/checkpoint-service.js";
 import { createLocalRemixProvenanceRepository } from "./persistence/remix-provenance-repository.js";
 import { createSessionState } from "./state/session-state.js";
-import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260722-1";
+import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
+import { resolveProjectedNoteSource } from "./visualiser/visual-learning-model.js";
 
 const projectPreferences = createProjectPreferences();
 let projectRepository;
@@ -59,7 +61,7 @@ try {
     repository: projectRepository,
   });
 }
-export { projectRepository };
+export { projectPreferences, projectRepository };
 
 export const audioEngine = createAudioEngine();
 export const projectState = createProjectState(initialProjectDocument.project);
@@ -95,6 +97,7 @@ export const starterService = createStarterService({
   projectState,
 });
 const themeFeature = createThemeFeature({ sessionState });
+const helpFeature = createHelpFeature();
 const workspaceTabs = createWorkspaceTabs({ projectState, sessionState });
 const getSelectedTrackId = () => sessionState.getState().workspace.selectedTrackId;
 const getSelectedPatternId = () => sessionState.getState().workspace.selectedPatternId;
@@ -106,7 +109,6 @@ const instrumentState = createInstrumentState(undefined, {
   getTrackId: getSelectedTrackId,
   projectState,
   sessionState,
-  starterService,
 });
 const patternState = createPatternState(undefined, {
   getPatternId: getSelectedPatternId,
@@ -184,10 +186,26 @@ arrangerFeature = createArrangerFeature({
   audioEngine,
   inputController,
   notePreview,
+  onPatternPlayhead: (...values) => patternFeature?.setPlayhead(...values),
   projectState,
   scheduler,
   sessionState,
 });
+
+export function editProjectedNote(note) {
+  const source = resolveProjectedNoteSource(projectState.getState(), note);
+  if (!source) return false;
+  sessionState.setWorkspace({
+    activeDockPanel: source.activeDockPanel,
+    detailPanelCollapsed: source.detailPanelCollapsed,
+    selectedClipId: source.selectedClipId,
+    selectedPatternId: source.selectedPatternId,
+    selectedTrackId: source.selectedTrackId,
+  });
+  sessionState.setEditor({ selectedStepIndex: source.selectedStepIndex });
+  patternFeature.render();
+  return patternFeature.inspectStep(source.selectedStepIndex);
+}
 const projectLibraryFeature = createProjectLibraryFeature({
   onBeforeProjectChange: stopAllSound,
   onProjectDeleted: (projectId) => Promise.all([
@@ -204,6 +222,7 @@ const guidedCreationFeature = createGuidedCreationFeature({
   onBeforeProjectReplace: stopAllSound,
   projectState,
   sessionState,
+  starterService,
 });
 
 const applicationLifecycle = new AbortController();
@@ -282,6 +301,7 @@ function disposeApplication() {
   projectPersistence.dispose();
   checkpointRepository.dispose?.();
   instrumentFeature.dispose();
+  helpFeature.dispose();
   keyboardFeature.dispose();
   workspaceTabs.dispose();
   themeFeature.dispose();

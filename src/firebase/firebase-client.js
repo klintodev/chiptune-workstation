@@ -3,27 +3,31 @@ import {
   createCloudProjectRecord,
   normalizeCloudProjectRecord,
   summarizeCloudProjectRecord,
-} from "./cloud-project.js?v=20260722-1";
+} from "./cloud-project.js";
 import { FIREBASE_CONFIG, isFirebaseConfigured } from "./firebase-config.js";
 import {
   createPublicationRecord,
   LEGACY_PUBLICATION_VERSION,
   normalizePublicationRecord,
   PUBLICATION_SLOTS,
-} from "./publication.js?v=20260722-1";
+} from "./publication.js";
 import { FIREBASE_APP_CHECK_CONFIG } from "./firebase-config.js";
 
 const FIREBASE_SDK_VERSION = "12.16.0";
 const FIREBASE_SDK_ROOT = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
 
 async function loadFirebaseSdk({ includeAppCheck = false } = {}) {
-  const [app, auth, firestore, appCheck] = await Promise.all([
+  const [app, auth, appCheck] = await Promise.all([
     import(`${FIREBASE_SDK_ROOT}/firebase-app.js`),
     import(`${FIREBASE_SDK_ROOT}/firebase-auth.js`),
-    import(`${FIREBASE_SDK_ROOT}/firebase-firestore.js`),
     includeAppCheck ? import(`${FIREBASE_SDK_ROOT}/firebase-app-check.js`) : null,
   ]);
-  return Object.freeze({ app, appCheck, auth, firestore });
+  return Object.freeze({
+    app,
+    appCheck,
+    auth,
+    loadFirestore: () => import(`${FIREBASE_SDK_ROOT}/firebase-firestore.js`),
+  });
 }
 
 function toAccount(user) {
@@ -59,45 +63,76 @@ export async function createFirebaseClient({
     });
   }
   const auth = sdk.auth.getAuth(app);
-  const database = sdk.firestore.getFirestore(app);
+  let database = null;
+  let firestore = sdk.firestore ?? null;
+  let firestorePromise = null;
+  let profiledUid = "";
+
+  async function requireFirestore() {
+    if (database && firestore) return Object.freeze({ database, firestore });
+    if (!firestorePromise) {
+      firestorePromise = Promise.resolve(
+        firestore ?? sdk.loadFirestore?.(),
+      ).then((loadedFirestore) => {
+        if (!loadedFirestore?.getFirestore) {
+          throw new Error("Firebase Firestore could not be loaded.");
+        }
+        firestore = loadedFirestore;
+        database = firestore.getFirestore(app);
+        return Object.freeze({ database, firestore });
+      }).catch((error) => {
+        firestorePromise = null;
+        throw error;
+      });
+    }
+    return firestorePromise;
+  }
 
   function userDocument(uid) {
-    return sdk.firestore.doc(database, "users", uid);
+    return firestore.doc(database, "users", uid);
   }
 
   function projectsCollection(uid) {
-    return sdk.firestore.collection(database, "users", uid, "projects");
+    return firestore.collection(database, "users", uid, "projects");
   }
 
   function projectDocument(uid, projectId) {
-    return sdk.firestore.doc(database, "users", uid, "projects", projectId);
+    return firestore.doc(database, "users", uid, "projects", projectId);
   }
 
   function publicationDocument(publicationId) {
-    return sdk.firestore.doc(database, "publications", publicationId);
+    return firestore.doc(database, "publications", publicationId);
   }
 
   function publicationSlotsCollection(uid) {
-    return sdk.firestore.collection(database, "users", uid, "publicationSlots");
+    return firestore.collection(database, "users", uid, "publicationSlots");
   }
 
   function publicationSlotDocument(uid, slotId) {
-    return sdk.firestore.doc(database, "users", uid, "publicationSlots", slotId);
+    return firestore.doc(database, "users", uid, "publicationSlots", slotId);
   }
 
   async function updateProfile(user) {
     const account = toAccount(user);
     if (!account?.emailVerified) return;
-    await sdk.firestore.setDoc(userDocument(account.uid), {
+    await requireFirestore();
+    await firestore.setDoc(userDocument(account.uid), {
       uid: account.uid,
       email: account.email,
       displayName: account.displayName,
-      lastSeenAt: sdk.firestore.serverTimestamp(),
+      lastSeenAt: firestore.serverTimestamp(),
     });
+    profiledUid = account.uid;
+  }
+
+  async function prepareFirestore(uid) {
+    await requireFirestore();
+    const user = auth.currentUser;
+    if (user?.uid === uid && user.emailVerified && profiledUid !== uid) await updateProfile(user);
   }
 
   async function findPublicationSlot(uid, publicationId) {
-    const snapshot = await sdk.firestore.getDocs(publicationSlotsCollection(uid));
+    const snapshot = await firestore.getDocs(publicationSlotsCollection(uid));
     const occupied = new Map(snapshot.docs.map((entry) => [entry.id, entry.data().publicationId]));
     const existing = [...occupied].find(([, candidate]) => candidate === publicationId)?.[0];
     if (existing) return existing;
@@ -113,13 +148,13 @@ export async function createFirebaseClient({
     let cursor = null;
     do {
       const constraints = [
-        sdk.firestore.where("ownerId", "==", uid),
-        sdk.firestore.where("publicationVersion", "==", LEGACY_PUBLICATION_VERSION),
-        sdk.firestore.limit(100),
+        firestore.where("ownerId", "==", uid),
+        firestore.where("publicationVersion", "==", LEGACY_PUBLICATION_VERSION),
+        firestore.limit(100),
       ];
-      if (cursor) constraints.push(sdk.firestore.startAfter(cursor));
-      const snapshot = await sdk.firestore.getDocs(sdk.firestore.query(
-        sdk.firestore.collection(database, "publications"),
+      if (cursor) constraints.push(firestore.startAfter(cursor));
+      const snapshot = await firestore.getDocs(firestore.query(
+        firestore.collection(database, "publications"),
         ...constraints,
       ));
       documents.push(...snapshot.docs);
@@ -131,7 +166,7 @@ export async function createFirebaseClient({
   async function deleteReferenceGroups(groups) {
     for (const group of groups) {
       for (let index = 0; index < group.length; index += 400) {
-        const batch = sdk.firestore.writeBatch(database);
+        const batch = firestore.writeBatch(database);
         for (const reference of group.slice(index, index + 400)) batch.delete(reference);
         await batch.commit();
       }
@@ -172,19 +207,21 @@ export async function createFirebaseClient({
       return toAccount(credential.user);
     },
     async deleteProject(uid, projectId) {
-      await sdk.firestore.deleteDoc(projectDocument(uid, projectId));
+      await prepareFirestore(uid);
+      await firestore.deleteDoc(projectDocument(uid, projectId));
     },
     async deletePublication(uid, publicationId) {
+      await prepareFirestore(uid);
       const reference = publicationDocument(publicationId);
-      const snapshot = await sdk.firestore.getDoc(reference);
+      const snapshot = await firestore.getDoc(reference);
       if (!snapshot.exists()) return false;
       const publication = normalizePublicationRecord(snapshot.data(), { ownerId: uid });
       if (publication.publicationVersion === LEGACY_PUBLICATION_VERSION) {
-        await sdk.firestore.deleteDoc(reference);
+        await firestore.deleteDoc(reference);
         return true;
       }
       const slotReference = publicationSlotDocument(uid, publication.ownerSlot);
-      await sdk.firestore.runTransaction(database, async (transaction) => {
+      await firestore.runTransaction(database, async (transaction) => {
         const [current, slot] = await Promise.all([
           transaction.get(reference),
           transaction.get(slotReference),
@@ -203,9 +240,10 @@ export async function createFirebaseClient({
       const user = auth.currentUser;
       if (!user) throw new Error("Sign in before deleting an account.");
       await reauthenticateForDeletion(user, password);
+      await requireFirestore();
       const [projects, slots, legacyPublications] = await Promise.all([
-        sdk.firestore.getDocs(projectsCollection(user.uid)),
-        sdk.firestore.getDocs(publicationSlotsCollection(user.uid)),
+        firestore.getDocs(projectsCollection(user.uid)),
+        firestore.getDocs(publicationSlotsCollection(user.uid)),
         listLegacyPublications(user.uid),
       ]);
       const publicationReferences = [];
@@ -226,21 +264,24 @@ export async function createFirebaseClient({
       return null;
     },
     async getPublication(publicationId) {
-      const snapshot = await sdk.firestore.getDoc(publicationDocument(publicationId));
+      await requireFirestore();
+      const snapshot = await firestore.getDoc(publicationDocument(publicationId));
       return snapshot.exists() ? normalizePublicationRecord(snapshot.data()) : null;
     },
     async getProject(uid, projectId) {
-      const snapshot = await sdk.firestore.getDoc(projectDocument(uid, projectId));
+      await prepareFirestore(uid);
+      const snapshot = await firestore.getDoc(projectDocument(uid, projectId));
       return snapshot.exists()
         ? normalizeCloudProjectRecord(snapshot.data(), { ownerId: uid })
         : null;
     },
     async listProjects(uid) {
-      const request = sdk.firestore.query(
+      await prepareFirestore(uid);
+      const request = firestore.query(
         projectsCollection(uid),
-        sdk.firestore.orderBy("updatedAt", "desc"),
+        firestore.orderBy("updatedAt", "desc"),
       );
-      const snapshot = await sdk.firestore.getDocs(request);
+      const snapshot = await firestore.getDocs(request);
       return snapshot.docs.flatMap((entry) => {
         try {
           return [summarizeCloudProjectRecord(entry.data(), { ownerId: uid })];
@@ -251,7 +292,7 @@ export async function createFirebaseClient({
     },
     onAuthStateChanged(listener, onError) {
       return sdk.auth.onAuthStateChanged(auth, (user) => {
-        if (user?.emailVerified) void updateProfile(user).catch(() => {});
+        if (profiledUid && profiledUid !== user?.uid) profiledUid = "";
         listener(toAccount(user));
       }, onError);
     },
@@ -261,7 +302,6 @@ export async function createFirebaseClient({
       await sdk.auth.reload(user);
       if (user.emailVerified) {
         await sdk.auth.getIdToken(user, true);
-        await updateProfile(user);
       }
       return toAccount(user);
     },
@@ -279,8 +319,9 @@ export async function createFirebaseClient({
       return toAccount(user);
     },
     async saveProject(uid, document, expectedCloudRevision = 0) {
+      await prepareFirestore(uid);
       const reference = projectDocument(uid, document.id);
-      return sdk.firestore.runTransaction(database, async (transaction) => {
+      return firestore.runTransaction(database, async (transaction) => {
         const snapshot = await transaction.get(reference);
         const remote = snapshot.exists()
           ? normalizeCloudProjectRecord(snapshot.data(), { ownerId: uid })
@@ -292,7 +333,7 @@ export async function createFirebaseClient({
         const record = createCloudProjectRecord(uid, document, currentRevision + 1);
         transaction.set(reference, {
           ...record,
-          serverUpdatedAt: sdk.firestore.serverTimestamp(),
+          serverUpdatedAt: firestore.serverTimestamp(),
         });
         return record;
       });
@@ -307,10 +348,11 @@ export async function createFirebaseClient({
       publishedAt,
       updatedAt,
     }) {
+      await prepareFirestore(ownerId);
       const reference = publicationDocument(publicationId);
       const ownerSlot = await findPublicationSlot(ownerId, publicationId);
       const slotReference = publicationSlotDocument(ownerId, ownerSlot);
-      return sdk.firestore.runTransaction(database, async (transaction) => {
+      return firestore.runTransaction(database, async (transaction) => {
         const [snapshot, slotSnapshot] = await Promise.all([
           transaction.get(reference),
           transaction.get(slotReference),
@@ -341,7 +383,7 @@ export async function createFirebaseClient({
         });
         transaction.set(reference, {
           ...record,
-          serverUpdatedAt: sdk.firestore.serverTimestamp(),
+          serverUpdatedAt: firestore.serverTimestamp(),
         });
         transaction.set(slotReference, {
           publicationId,
@@ -392,17 +434,16 @@ export async function createFirebaseClient({
     },
     async signInWithEmail(email, password) {
       const credential = await sdk.auth.signInWithEmailAndPassword(auth, email, password);
-      if (credential.user.emailVerified) await updateProfile(credential.user);
       return toAccount(credential.user);
     },
     async signInWithGoogle() {
       const provider = new sdk.auth.GoogleAuthProvider();
       const credential = await sdk.auth.signInWithPopup(auth, provider);
-      if (credential.user.emailVerified) await updateProfile(credential.user);
       return toAccount(credential.user);
     },
     async signOut() {
       await sdk.auth.signOut(auth);
+      profiledUid = "";
     },
   });
 }

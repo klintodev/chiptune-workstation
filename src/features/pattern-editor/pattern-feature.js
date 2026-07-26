@@ -1,5 +1,5 @@
 import { queryRequired } from "../../shared/query-required.js";
-import { createPatternEditor } from "./pattern-editor.js?v=20260721-1";
+import { createPatternEditor } from "./pattern-editor.js";
 import { createPatternHistoryShortcut } from "./pattern-shortcuts.js";
 
 export function createPatternFeature({
@@ -16,6 +16,9 @@ export function createPatternFeature({
 }) {
   const lifecycle = new AbortController();
   const elements = {
+    bankNext: queryRequired(root, "#pattern-bank-next"),
+    bankPrevious: queryRequired(root, "#pattern-bank-previous"),
+    bankRange: queryRequired(root, "#pattern-bank-range"),
     clear: queryRequired(root, "#pattern-clear"),
     duplicate: queryRequired(root, "#pattern-duplicate"),
     grid: queryRequired(root, "#pattern-grid"),
@@ -29,7 +32,10 @@ export function createPatternFeature({
     selectedNote: queryRequired(root, "#selected-pattern-note"),
     selectionEmpty: queryRequired(root, "#pattern-selection-empty"),
     selectionSummary: queryRequired(root, "#pattern-selection-summary"),
+    stepAdd: queryRequired(root, "#selected-step-add"),
     stepClear: queryRequired(root, "#selected-step-clear"),
+    stepClose: queryRequired(root, "#selected-step-close"),
+    stepDone: queryRequired(root, "#selected-step-done"),
     stepGate: queryRequired(root, "#selected-step-gate"),
     stepNumber: queryRequired(root, "#selected-step-number"),
     stepSummary: queryRequired(root, "#selected-step-summary"),
@@ -88,7 +94,13 @@ export function createPatternFeature({
   }
 
   const editor = createPatternEditor({
+    addButton: elements.stepAdd,
+    bankNext: elements.bankNext,
+    bankPrevious: elements.bankPrevious,
+    bankRange: elements.bankRange,
     clearButton: elements.stepClear,
+    closeButton: elements.stepClose,
+    doneButton: elements.stepDone,
     gateControl: elements.stepGate,
     getNoteName,
     getScaleGuide,
@@ -97,6 +109,7 @@ export function createPatternFeature({
     noteUpButton: elements.noteUp,
     octaveSelect: elements.octave,
     onEditAction: disarmClear,
+    onSelectionChange: (selectedStepIndex) => sessionState.setEditor({ selectedStepIndex }),
     onStepCleared: showUndoToast,
     patternState,
     pitchSelect: elements.pitch,
@@ -135,6 +148,7 @@ export function createPatternFeature({
   }
 
   const historyShortcut = createPatternHistoryShortcut({
+    root,
     undo: () => restoreHistory(patternState.undo, () => patternState.getState().canUndo),
     redo: () => restoreHistory(patternState.redo, () => patternState.getState().canRedo),
   });
@@ -193,7 +207,9 @@ export function createPatternFeature({
       globalThis.clearTimeout(undoToastTimer);
       editor.dispose();
     },
+    inspectStep: editor.inspectStep,
     render,
+    setPlayhead: editor.setPlayhead,
     setSelectedNote: editor.setSelectedNote,
   });
 }

@@ -1,14 +1,15 @@
-import { createAudioEngine } from "./audio/audio-engine.js?v=20260721-3";
-import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260722-1";
-import { createFirebaseClient } from "./firebase/firebase-client.js?v=20260722-1";
+import { createAudioEngine } from "./audio/audio-engine.js";
+import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
+import { createFirebaseClient } from "./firebase/firebase-client.js";
 import { getTrackColour } from "./shared/track-presentation.js";
 import { publicErrorMessage } from "./shared/public-error.js";
-import { createProjectState, getArrangementEnd } from "./state/project-state.js?v=20260722-1";
-import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260722-1";
-import { fitCanvas } from "./visualiser/canvas-renderer.js?v=20260721-3";
-import { buildCompositionProjection } from "./visualiser/composition-projection.js?v=20260722-1";
-import { renderCompositionFrame } from "./visualiser/signal-stack-renderer.js?v=20260722-1";
 import { buildRemixStudioUrl } from "./features/remixing/remix-intent.js";
+import { setTextIfChanged } from "./shared/status-announcer.js";
+import { createProjectState, getArrangementEnd } from "./state/project-state.js";
+import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
+import { fitCanvas } from "./visualiser/canvas-renderer.js";
+import { buildCompositionProjection } from "./visualiser/composition-projection.js";
+import { renderCompositionFrame } from "./visualiser/signal-stack-renderer.js";
 
 const elements = {
   canvas: document.querySelector("#player-canvas"),
@@ -45,9 +46,9 @@ try {
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 function showError(message) {
-  elements.error.textContent = message;
+  setTextIfChanged(elements.error, message);
   elements.error.hidden = false;
-  elements.status.textContent = "Unavailable";
+  setTextIfChanged(elements.status, "Unavailable");
 }
 
 function resolveColour(value, fallback) {
@@ -87,8 +88,11 @@ function renderTransport() {
   elements.restart.disabled = !ready;
   elements.volume.disabled = !ready;
   elements.play.textContent = ready ? (state.status === "paused" ? "Resume" : "Play") : "Enable and play";
-  elements.status.textContent = state.status === "playing" ? "Playing" : state.status === "paused" ? "Paused" : "Stopped";
-  elements.position.textContent = `Step ${String(scheduler.getPlayheadStep() + 1).padStart(3, "0")}`;
+  setTextIfChanged(
+    elements.status,
+    state.status === "playing" ? "Playing" : state.status === "paused" ? "Paused" : "Stopped",
+  );
+  setTextIfChanged(elements.position, `Step ${String(scheduler.getPlayheadStep() + 1).padStart(3, "0")}`);
 }
 
 function renderVisuals() {
@@ -164,7 +168,7 @@ function createPlayer(record) {
   document.querySelector('meta[name="description"]').content = `Listen to ${record.title} by ${record.creatorName}.`;
   if (getArrangementEnd(project) === 0) showError("This published snapshot does not contain an arranged pattern yet.");
   else {
-    elements.status.textContent = "Ready to play";
+    setTextIfChanged(elements.status, "Ready to play");
     elements.play.disabled = false;
   }
   scheduleVisuals();

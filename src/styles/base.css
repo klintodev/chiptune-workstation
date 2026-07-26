@@ -1,8 +1,8 @@
 :root {
   font-family: "VT323", "Courier New", monospace;
-  --global-bar-height: 60px;
+  --global-bar-height: 64px;
   --detail-height: 320px;
-  --detail-tabs-height: 34px;
+  --detail-tabs-height: 44px;
   --track-header-width: 236px;
   --track-height: 76px;
   --ruler-height: 28px;
@@ -64,9 +64,9 @@ input[type="number"] {
 }
 
 button {
-  min-height: 30px;
+  min-height: 36px;
   font-family: "Silkscreen", "Courier New", monospace;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -113,7 +113,7 @@ h2 { margin-bottom: 0; font-family: "Silkscreen", "Courier New", monospace; lett
   margin: 0;
   color: var(--muted);
   font-family: "Silkscreen", "Courier New", monospace;
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -133,7 +133,7 @@ h2 { margin-bottom: 0; font-family: "Silkscreen", "Courier New", monospace; lett
   border: 0 !important;
 }
 
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 ::-webkit-scrollbar { width: 11px; height: 11px; }
 ::-webkit-scrollbar-track { background: var(--bg-1); }
 ::-webkit-scrollbar-thumb { border: 2px solid var(--bg-1); background: var(--line-strong); }
@@ -141,6 +141,23 @@ h2 { margin-bottom: 0; font-family: "Silkscreen", "Courier New", monospace; lett
 
 @media (prefers-reduced-motion: no-preference) {
   button, .status-light, .daw-workspace { transition: color 100ms ease, background-color 100ms ease, border-color 100ms ease, box-shadow 100ms ease, grid-template-rows 180ms ease; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .locate-flash { outline: 3px solid var(--accent); animation: none !important; }
+}
+
+@media (pointer: coarse) {
+  button,
+  summary,
+  select,
+  input[type="checkbox"] { min-height: 44px !important; }
 }
 
 @media (max-width: 900px) {
