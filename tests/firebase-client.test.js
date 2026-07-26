@@ -63,6 +63,7 @@ function createSdkDouble() {
       },
       firestore: {
         doc: (_database, ...segments) => segments.join("/"),
+        getDoc: async () => ({ exists: () => false }),
         getFirestore: () => ({ name: "database" }),
         serverTimestamp: () => "server-time",
         async setDoc(reference, data) {
@@ -104,17 +105,20 @@ test("email account verification and private password recovery use Firebase Auth
   assert.equal(refreshed.emailVerified, true);
   assert.equal(firebase.calls.reloads, 1);
   assert.equal(firebase.calls.forceTokenRefresh, 1);
+  assert.equal(firebase.calls.profileWrites, 0);
+
+  assert.equal(await client.getProject("email-user", "project-one"), null);
   assert.equal(firebase.calls.profileWrites, 1);
 
   await client.sendVerificationEmail();
   assert.equal(firebase.calls.verificationEmails, 2);
 });
 
-test("App Check initialises before Auth and Firestore when configured", async () => {
+test("App Check initialises before Auth while Firestore remains lazy", async () => {
   const order = [];
   const app = { name: "[DEFAULT]" };
   let loadOptions = null;
-  await createFirebaseClient({
+  const client = await createFirebaseClient({
     appCheckConfig: { siteKey: "public-enterprise-site-key" },
     config: {
       apiKey: "public-key",
@@ -137,11 +141,17 @@ test("App Check initialises before Auth and Firestore when configured", async ()
           },
         },
         auth: { getAuth: () => { order.push("auth"); return {}; } },
-        firestore: { getFirestore: () => { order.push("firestore"); return {}; } },
+        firestore: {
+          doc: () => "project",
+          getDoc: async () => ({ exists: () => false }),
+          getFirestore: () => { order.push("firestore"); return {}; },
+        },
       };
     },
   });
 
   assert.deepEqual(loadOptions, { includeAppCheck: true });
+  assert.deepEqual(order, ["app-check", "auth"]);
+  await client.getProject("user-one", "project-one");
   assert.deepEqual(order, ["app-check", "auth", "firestore"]);
 });

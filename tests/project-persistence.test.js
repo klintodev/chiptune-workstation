@@ -135,3 +135,27 @@ test("failed import is atomic and ID collisions create independent copies", asyn
   assert.equal((await repository.list()).length, 2);
   persistence.dispose();
 });
+
+test("repeated project duplication keeps maximum-length titles valid and unique", async () => {
+  const sourceProject = structuredClone(createDefaultProject());
+  sourceProject.metadata.title = "T".repeat(100);
+  const initial = createProjectDocument(sourceProject, { id: "source", now: FIRST_TIME });
+  const repository = createMemoryProjectRepository([initial]);
+  const projectState = createProjectState(initial.project);
+  const ids = Array.from({ length: 12 }, (_, index) => `copy-${index + 1}`);
+  const persistence = createProjectPersistence({
+    autosaveDelay: 60_000,
+    createId: () => ids.shift(),
+    initialDocument: initial,
+    now: () => SECOND_TIME,
+    preferences: createPreferences(),
+    projectState,
+    repository,
+  });
+
+  for (let index = 0; index < 12; index += 1) await persistence.duplicateProject();
+  const titles = (await repository.list()).map(({ title }) => title);
+  assert.equal(new Set(titles).size, titles.length);
+  assert.equal(titles.every((title) => title.length <= 100), true);
+  persistence.dispose();
+});

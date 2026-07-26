@@ -121,7 +121,12 @@ export function createTransportControls({
     const project = projectState.getState();
     const enabled = !project.transport.loop.enabled;
     const endStep = Math.max(1, projectState.getArrangementEnd());
-    projectState.setLoop({ enabled, startStep: 0, endStep });
+    projectState.setLoop({
+      enabled,
+      endStep,
+      mode: "arrangement",
+      startStep: 0,
+    });
     onError("");
   }
 

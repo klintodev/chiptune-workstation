@@ -20,6 +20,7 @@ test("instrument settings are validated and reset together", () => {
     releaseSeconds: 1.5,
   });
   assert.throws(() => instrument.setOctaveOffset(3), RangeError);
+  assert.throws(() => instrument.setOctaveOffset(0.5), RangeError);
 
   instrument.reset();
   assert.deepEqual(instrument.getState(), { ...instrumentDefaults });

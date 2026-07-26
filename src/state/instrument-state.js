@@ -21,7 +21,12 @@ function validateValue(key, value) {
     return;
   }
   const [minimum, maximum] = LIMITS[key] ?? [];
-  if (!Number.isFinite(value) || value < minimum || value > maximum) {
+  if (
+    !Number.isFinite(value)
+    || (key === "octaveOffset" && !Number.isInteger(value))
+    || value < minimum
+    || value > maximum
+  ) {
     throw new RangeError(`${key} must be between ${minimum} and ${maximum}.`);
   }
 }

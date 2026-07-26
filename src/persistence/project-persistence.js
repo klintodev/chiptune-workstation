@@ -7,14 +7,18 @@ import {
   reviseProjectDocument,
   serializeProjectDocument,
 } from "./project-document.js";
-import { createDefaultProject } from "../state/project-state.js";
+import { createBoundedUniqueName } from "../shared/bounded-name.js";
+import {
+  MAX_PROJECT_TITLE_LENGTH,
+  createDefaultProject,
+} from "../state/project-state.js";
 
-function uniqueTitle(base, summaries) {
-  const titles = new Set(summaries.map(({ title }) => title));
-  if (!titles.has(base)) return base;
-  let suffix = 2;
-  while (titles.has(`${base} ${suffix}`)) suffix += 1;
-  return `${base} ${suffix}`;
+function uniqueTitle(base, summaries, { fallback = "Untitled chiptune", suffix = "" } = {}) {
+  return createBoundedUniqueName(
+    base,
+    summaries.map(({ title }) => title),
+    { fallback, maximumLength: MAX_PROJECT_TITLE_LENGTH, suffix },
+  );
 }
 
 export async function loadInitialProjectDocument({
@@ -193,7 +197,7 @@ export function createProjectPersistence({
   async function duplicateProject() {
     await saveNow();
     const summaries = await repository.list();
-    const title = uniqueTitle(`${activeDocument.project.metadata.title} copy`, summaries);
+    const title = uniqueTitle(activeDocument.project.metadata.title, summaries, { suffix: "copy" });
     const copy = copyProjectDocument(activeDocument, { id: createId(), now: now(), title });
     const saved = await repository.save(copy);
     return activate(saved, { flushCurrent: false });
@@ -224,7 +228,7 @@ export function createProjectPersistence({
       imported = copyProjectDocument(imported, {
         id: createId(),
         now: now(),
-        title: uniqueTitle(`${imported.project.metadata.title} imported`, summaries),
+        title: uniqueTitle(imported.project.metadata.title, summaries, { suffix: "imported" }),
       });
     }
     const saved = await repository.save(imported);

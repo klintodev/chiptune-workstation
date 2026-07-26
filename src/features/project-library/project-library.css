@@ -64,7 +64,7 @@
 #project-library-save-status[data-state="unsaved"], #project-library-save-status[data-state="saving"] { border-color: var(--selection); color: var(--selection); }
 #project-library-save-status[data-state="error"], #project-library-save-status[data-state="unavailable"] { border-color: var(--danger); color: var(--danger); }
 .project-title-field input { min-height: 36px; padding: 5px 8px; font-size: 1.12rem; }
-.project-dialog-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.project-dialog-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .project-dialog-actions button { display: grid; min-height: 34px; place-items: center; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--ink); background: var(--bg-1); font-family: "Silkscreen", monospace; font-size: 0.52rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .project-dialog-actions .disabled { pointer-events: none; opacity: 0.38; }
 .project-library-heading { display: flex; justify-content: space-between; padding-top: 3px; }
@@ -85,6 +85,11 @@
 .project-library-error,
 .project-delete-panel p { margin: 0; font-size: 0.92rem; line-height: 1.3; }
 .project-storage-message { color: var(--muted); }
+.project-storage-recovery { display: flex; align-items: center; gap: 10px; padding: 10px 11px; border: 1px solid var(--danger); border-radius: 4px; background: color-mix(in srgb, var(--danger) 8%, var(--bg-1)); }
+.project-storage-recovery[hidden] { display: none; }
+.project-storage-recovery p { min-width: 0; margin: 0; color: var(--ink); font-size: 0.88rem; line-height: 1.3; }
+.project-storage-recovery strong { color: var(--danger); }
+.project-storage-recovery button { flex: 0 0 auto; min-height: 34px; }
 .project-share-render { display: flex; align-items: center; gap: 10px; padding: 10px 11px; border: 1px dashed var(--line-strong); border-radius: 4px; background: var(--bg-1); }
 .project-share-render > div:first-child { min-width: 0; flex: 1; }
 .project-share-render p { margin: 2px 0 0; color: var(--muted); font-size: 0.86rem; }
@@ -110,5 +115,6 @@
   .project-dialog-actions { grid-template-columns: repeat(2, 1fr); }
   .project-library-current, .project-share-render { grid-template-columns: 1fr; }
   .project-share-render { display: grid; }
+  .project-storage-recovery { align-items: stretch; flex-direction: column; }
   #project-share-render-actions { display: grid; grid-template-columns: 1fr 1fr; }
 }

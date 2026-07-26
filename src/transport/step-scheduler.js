@@ -1,4 +1,7 @@
-import { midiNoteToFrequency } from "../audio/voice-engine.js";
+import {
+  getEffectiveMidiNote,
+  midiNoteToFrequency,
+} from "../audio/pitch-policy.js";
 
 export const DEFAULT_BPM = 120;
 export const DEFAULT_LOOK_AHEAD_SECONDS = 0.1;
@@ -127,15 +130,21 @@ export function createStepScheduler({
     if (step === null || step.volume === 0) return;
     const config = getInstrumentConfig();
     const duration = activeSession.stepDurationSeconds * step.gate;
-    const voice = voiceEngine.trigger({
-      type: config.voiceType,
-      frequency: midiNoteToFrequency(step.note),
-      startTime,
-      duration,
-      intensity: step.volume,
-      attackSeconds: config.attackSeconds,
-      releaseSeconds: config.releaseSeconds,
-    });
+    let voice;
+    try {
+      voice = voiceEngine.trigger({
+        type: config.voiceType,
+        frequency: midiNoteToFrequency(getEffectiveMidiNote(step.note, config.octaveOffset ?? 0)),
+        startTime,
+        duration,
+        intensity: step.volume,
+        attackSeconds: config.attackSeconds,
+        releaseSeconds: config.releaseSeconds,
+      });
+    } catch (error) {
+      emitState(error);
+      return;
+    }
     activeSession.voices.set(nextVoiceId, {
       voice,
       endTime: startTime + duration + config.releaseSeconds + 0.01,

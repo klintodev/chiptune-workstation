@@ -10,6 +10,7 @@ import { createCloudProjectService } from "../src/firebase/cloud-project-service
 import {
   createProjectDocument,
   reviseProjectDocument,
+  serializeProjectDocument,
 } from "../src/persistence/project-document.js";
 import {
   createMemoryProjectRepository,
@@ -43,6 +44,12 @@ function rename(document, title) {
   const project = JSON.parse(JSON.stringify(document.project));
   project.metadata.title = title;
   return reviseProjectDocument(document, project, { now: SECOND_TIME });
+}
+
+function createDeferred() {
+  let resolve;
+  const promise = new Promise((complete) => { resolve = complete; });
+  return { promise, resolve };
 }
 
 test("first cloud backup is explicit and records its remote revision", async () => {
@@ -222,6 +229,43 @@ test("opening a divergent remote project preserves the existing local version fi
   service.dispose();
 });
 
+test("cloud open preserves the active in-memory version when durable saving fails", async () => {
+  const original = createProjectDocument(createDefaultProject(), { id: "shared-id", now: FIRST_TIME });
+  const active = rename(original, "Unsaved active tune");
+  const remote = rename(original, "Remote tune");
+  const localRepository = createMemoryProjectRepository([original]);
+  let reloadCount = 0;
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        return createCloudProjectRecord("user-one", remote, 3);
+      },
+    }),
+    createId: () => "active-safety-copy",
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository,
+    now: () => SECOND_TIME,
+    persistence: {
+      getActiveDocument: () => active,
+      getExportText: () => serializeProjectDocument(active),
+      async saveNow() {
+        throw new Error("IndexedDB unavailable");
+      },
+    },
+    preferences: createPreferences(original.id),
+    reload: () => { reloadCount += 1; },
+  });
+
+  await service.openProject(remote.id);
+  assert.equal((await localRepository.get(remote.id)).project.metadata.title, "Remote tune");
+  assert.equal(
+    (await localRepository.get("active-safety-copy")).project.metadata.title,
+    "Unsaved active tune (local before cloud open)",
+  );
+  assert.equal(reloadCount, 1);
+  service.dispose();
+});
+
 test("cloud operations require a signed-in owner", async () => {
   const service = createCloudProjectService({
     accountService: createAccountServiceDouble({}, null),
@@ -252,5 +296,231 @@ test("cloud operations reject an unverified account before network access", asyn
 
   await assert.rejects(service.listProjects(), /Verify your email/);
   assert.equal(clientRequested, false);
+  service.dispose();
+});
+
+test("startup cloud-link failures are caught and reported as background failures", async () => {
+  const changes = [];
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({}),
+    linkRepository: {
+      async delete() {},
+      async get() {
+        return null;
+      },
+      async list() {
+        throw new Error("Storage access denied");
+      },
+      async save(link) {
+        return link;
+      },
+    },
+    localRepository: createMemoryProjectRepository(),
+    onlineTarget: new EventTarget(),
+    preferences: createPreferences(),
+  });
+  service.addEventListener("change", (event) => changes.push(event.detail.type));
+
+  service.start();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(changes, ["failed"]);
+  service.dispose();
+});
+
+test("simultaneous retries serialize one unchanged remote write", async () => {
+  const document = createProjectDocument(createDefaultProject(), { id: "project-one", now: FIRST_TIME });
+  const linkRepository = createMemoryCloudLinkRepository([{
+    uid: "user-one",
+    projectId: document.id,
+    cloudRevision: 1,
+    pendingDocument: document,
+    status: "pending",
+  }]);
+  const entered = createDeferred();
+  const release = createDeferred();
+  let activeWrites = 0;
+  let maximumActiveWrites = 0;
+  let writes = 0;
+  const client = {
+    async saveProject(uid, candidate, expectedRevision) {
+      writes += 1;
+      activeWrites += 1;
+      maximumActiveWrites = Math.max(maximumActiveWrites, activeWrites);
+      entered.resolve();
+      await release.promise;
+      activeWrites -= 1;
+      return createCloudProjectRecord(uid, candidate, expectedRevision + 1);
+    },
+  };
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble(client),
+    linkRepository,
+    localRepository: createMemoryProjectRepository([document]),
+    preferences: createPreferences(document.id),
+  });
+
+  const first = service.retryProject(document.id);
+  const second = service.retryProject(document.id);
+  await entered.promise;
+  assert.equal(writes, 1);
+  assert.equal(maximumActiveWrites, 1);
+  release.resolve();
+  await Promise.all([first, second]);
+  assert.equal(writes, 1);
+  assert.equal((await linkRepository.get("user-one", document.id)).status, "synced");
+  service.dispose();
+});
+
+test("a local edit queued during a write remains pending and syncs next", async () => {
+  const original = createProjectDocument(createDefaultProject(), { id: "project-one", now: FIRST_TIME });
+  const latest = rename(original, "Post-write edit");
+  const localRepository = createMemoryProjectRepository([original]);
+  const linkRepository = createMemoryCloudLinkRepository([{
+    uid: "user-one",
+    projectId: original.id,
+    cloudRevision: 1,
+    pendingDocument: original,
+    status: "pending",
+  }]);
+  const entered = createDeferred();
+  const release = createDeferred();
+  const writes = [];
+  const client = {
+    async saveProject(uid, candidate, expectedRevision) {
+      writes.push(candidate);
+      if (writes.length === 1) {
+        entered.resolve();
+        await release.promise;
+      }
+      return createCloudProjectRecord(uid, candidate, expectedRevision + 1);
+    },
+  };
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble(client),
+    linkRepository,
+    localRepository,
+    preferences: createPreferences(original.id),
+    setTimer: () => 1,
+  });
+
+  const retry = service.retryProject(original.id);
+  await entered.promise;
+  await localRepository.save(latest);
+  const queue = service.queueProject(latest);
+  release.resolve();
+  await Promise.all([retry, queue]);
+  let link = await linkRepository.get("user-one", original.id);
+  assert.equal(link.status, "pending");
+  assert.equal(link.pendingDocument.project.metadata.title, "Post-write edit");
+
+  await service.retryProject(original.id);
+  link = await linkRepository.get("user-one", original.id);
+  assert.equal(writes.length, 2);
+  assert.equal(writes[1].project.metadata.title, "Post-write edit");
+  assert.equal(link.status, "synced");
+  service.dispose();
+});
+
+test("conflict resolution uploads the latest post-conflict local document", async () => {
+  const original = createProjectDocument(createDefaultProject(), { id: "project-one", now: FIRST_TIME });
+  const latest = rename(original, "Edited after conflict");
+  const localRepository = createMemoryProjectRepository([latest]);
+  const linkRepository = createMemoryCloudLinkRepository([{
+    uid: "user-one",
+    projectId: original.id,
+    cloudRevision: 4,
+    pendingDocument: original,
+    status: "conflict",
+  }]);
+  let uploaded = null;
+  const client = {
+    async saveProject(uid, candidate, expectedRevision) {
+      uploaded = candidate;
+      return createCloudProjectRecord(uid, candidate, expectedRevision + 1);
+    },
+  };
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble(client),
+    linkRepository,
+    localRepository,
+    preferences: createPreferences(original.id),
+  });
+
+  await service.queueProject(latest);
+  assert.equal(
+    (await linkRepository.get("user-one", original.id)).pendingDocument.project.metadata.title,
+    "Edited after conflict",
+  );
+  await service.overwriteConflictWithLocal(original.id);
+  assert.equal(uploaded.project.metadata.title, "Edited after conflict");
+  assert.equal((await linkRepository.get("user-one", original.id)).status, "synced");
+  service.dispose();
+});
+
+test("conflict resolution uses the in-memory export when durable saving fails", async () => {
+  const original = createProjectDocument(createDefaultProject(), { id: "project-one", now: FIRST_TIME });
+  const latest = rename(original, "Unsaved recovery edit");
+  const localRepository = createMemoryProjectRepository([original]);
+  const linkRepository = createMemoryCloudLinkRepository([{
+    uid: "user-one",
+    projectId: original.id,
+    cloudRevision: 4,
+    pendingDocument: original,
+    status: "conflict",
+  }]);
+  let uploaded = null;
+  const client = {
+    async saveProject(uid, candidate, expectedRevision) {
+      uploaded = candidate;
+      return createCloudProjectRecord(uid, candidate, expectedRevision + 1);
+    },
+  };
+  const persistence = {
+    getActiveDocument: () => latest,
+    getExportText: () => serializeProjectDocument(latest),
+    async saveNow() {
+      throw new Error("IndexedDB unavailable");
+    },
+  };
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble(client),
+    linkRepository,
+    localRepository,
+    persistence,
+    preferences: createPreferences(original.id),
+  });
+
+  await service.overwriteConflictWithLocal(original.id);
+  assert.equal(uploaded.project.metadata.title, "Unsaved recovery edit");
+  assert.equal((await linkRepository.get("user-one", original.id)).status, "synced");
+  service.dispose();
+});
+
+test("conflict-copy names remain valid at the project title limit", async () => {
+  const local = createProjectDocument(createDefaultProject(), { id: "project-one", now: FIRST_TIME });
+  const remote = rename(local, "R".repeat(100));
+  const localRepository = createMemoryProjectRepository([local]);
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async saveProject() {
+        throw createCloudConflictError(createCloudProjectRecord("user-one", remote, 2));
+      },
+    }),
+    createId: () => "bounded-conflict",
+    linkRepository: createMemoryCloudLinkRepository([{
+      uid: "user-one",
+      projectId: local.id,
+      cloudRevision: 1,
+      pendingDocument: local,
+      status: "pending",
+    }]),
+    localRepository,
+    preferences: createPreferences(local.id),
+  });
+
+  await service.retryProject(local.id);
+  const title = (await localRepository.get("bounded-conflict")).project.metadata.title;
+  assert.ok(title.length <= 100);
+  assert.match(title, / \(cloud conflict\)$/);
   service.dispose();
 });

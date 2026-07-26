@@ -1,4 +1,9 @@
-import { createVoiceEngine, midiNoteToFrequency } from "./voice-engine.js";
+import {
+  getEffectiveMidiNote,
+  midiNoteToFrequency,
+  validateAudioSampleRate,
+} from "./pitch-policy.js";
+import { createVoiceEngine } from "./voice-engine.js";
 import {
   createProjectState,
   getArrangementEnd,
@@ -14,6 +19,7 @@ export function createArrangementRenderPlan(project, {
   maxDurationSeconds = MAX_EXPORT_SECONDS,
   sampleRate = EXPORT_SAMPLE_RATE,
 } = {}) {
+  validateAudioSampleRate(sampleRate);
   const normalized = createProjectState(project).getState();
   const endStep = getArrangementEnd(normalized);
   if (endStep === 0) throw new RangeError("Place at least one pattern before exporting audio.");
@@ -34,7 +40,10 @@ export function createArrangementRenderPlan(project, {
         notes.push(Object.freeze({
           attackSeconds: track.instrument.attackSeconds,
           durationSeconds: stepDurationSeconds * step.gate,
-          frequency: midiNoteToFrequency(step.note + track.instrument.octaveOffset * 12),
+          frequency: midiNoteToFrequency(getEffectiveMidiNote(
+            step.note,
+            track.instrument.octaveOffset,
+          )),
           intensity: step.volume,
           releaseSeconds: track.instrument.releaseSeconds,
           startTime: (clip.startStep + index) * stepDurationSeconds,
@@ -93,6 +102,13 @@ export async function renderArrangementOffline(project, {
     context = createOfflineContext(OfflineContext, plan);
   } catch (error) {
     throw new Error("The browser could not allocate enough memory for this audio export.", { cause: error });
+  }
+  try {
+    validateAudioSampleRate(context.sampleRate);
+  } catch (error) {
+    throw new Error("This browser cannot render the full project note range at its current audio sample rate.", {
+      cause: error,
+    });
   }
   const master = context.createGain();
   master.gain.setValueAtTime(plan.masterVolume, 0);
