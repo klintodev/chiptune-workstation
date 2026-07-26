@@ -87,6 +87,26 @@ test("text summaries group bounded upcoming notes while reporting active notes a
   assert.match(summary, /Bass: G4 in 6\.00 steps/);
 });
 
+test("text summaries do not describe muted or solo-excluded notes as upcoming", () => {
+  const summary = buildProjectionSummary({
+    mode: "arrangement",
+    notes: [
+      projectedNote({
+        audible: false,
+        id: "muted",
+        noteLabel: "D4",
+        timingState: "inactive",
+        trackName: "Muted lead",
+      }),
+      projectedNote({ id: "audible", noteLabel: "E4", timingState: "upcoming" }),
+    ],
+    status: "playing",
+    stepIndex: 8,
+  });
+  assert.doesNotMatch(summary, /Muted lead|D4/);
+  assert.match(summary, /Pulse 1: E4 in 2\.00 steps/);
+});
+
 test("edit handoff resolves authoritative IDs and fails closed for stale notes", () => {
   const project = createProjectState();
   project.updatePattern(DEFAULT_PATTERN_ID, (pattern) => ({

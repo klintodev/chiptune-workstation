@@ -290,7 +290,11 @@ export function createVisualiserFeature({
       item.append(button);
       return item;
     }));
-    if (focusedId) surface.list.querySelector(`[data-projected-note-id="${focusedId}"]`)?.focus();
+    if (focusedId) {
+      [...surface.list.querySelectorAll("[data-projected-note-id]")]
+        .find((button) => button.dataset.projectedNoteId === focusedId)
+        ?.focus();
+    }
   }
 
   function drawSurface(surface, projection) {

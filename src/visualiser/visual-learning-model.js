@@ -25,7 +25,9 @@ export function getProjectedNoteAccessibleName(note) {
 
 export function buildProjectionSummary(projection, { maximumUpcoming = 12 } = {}) {
   const active = projection.notes.filter((note) => note.active);
-  const upcoming = projection.notes.filter((note) => !note.active).slice(0, maximumUpcoming);
+  const upcoming = projection.notes
+    .filter((note) => note.timingState === "upcoming")
+    .slice(0, maximumUpcoming);
   const position = `${projection.mode === "pattern" ? "Pattern" : "Arrangement"} `
     + `step ${projection.stepIndex + 1}, ${projection.status}.`;
   const activeText = active.length === 0
