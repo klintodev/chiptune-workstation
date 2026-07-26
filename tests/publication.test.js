@@ -32,6 +32,11 @@ test("publication records contain a validated immutable playback snapshot", () =
   assert.equal(record.sourceProjectId, "project-song");
   assert.equal(record.ownerSlot, "01");
   assert.equal(record.allowRemix, false);
+  assert.deepEqual(record.document.project.scaleGuide, {
+    tonic: 0,
+    scale: "major",
+    lock: false,
+  });
   assert.equal("ownerId" in record, false);
   assert.equal(normalizePublicationRecord(record).publicationId, "publication-1");
   const { ownerSlot, ...legacyBase } = record;
@@ -41,6 +46,18 @@ test("publication records contain a validated immutable playback snapshot", () =
   const versionTwo = { ...record, publicationVersion: 2 };
   delete versionTwo.allowRemix;
   assert.equal(normalizePublicationRecord(versionTwo).allowRemix, false);
+});
+
+test("public player exposes remixing only through an explained, revision-bound action", async () => {
+  const [html, source] = await Promise.all([
+    readFile(new URL("../player.html", import.meta.url), "utf8"),
+    readFile(new URL("../src/player.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(html, /id="player-remix-section"[^>]*hidden/);
+  assert.match(html, /The source stays unchanged/);
+  assert.match(html, /not uploaded or published automatically/);
+  assert.match(source, /record\.allowRemix === true/);
+  assert.match(source, /buildRemixStudioUrl\(record\)/);
 });
 
 test("republishing preserves one stable URL and advances snapshot revision", async () => {

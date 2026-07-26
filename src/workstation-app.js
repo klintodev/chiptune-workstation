@@ -12,6 +12,8 @@ import { createInputController } from "./features/keyboard/input-controller.js?v
 import { createKeyboardFeature } from "./features/keyboard/keyboard.js";
 import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js?v=20260721-3";
 import { createProjectLibraryFeature } from "./features/project-library/project-library.js?v=20260722-1";
+import { createGuidedCreationFeature } from "./features/guided-creation/guided-creation.js";
+import { createScaleEntryController } from "./features/guided-creation/scale-entry-controller.js";
 import { createThemeFeature } from "./features/theme/theme.js";
 import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js?v=20260721-3";
 import { getNoteName } from "./music/note.js";
@@ -27,6 +29,12 @@ import {
   createProjectPersistence,
   loadInitialProjectDocument,
 } from "./persistence/project-persistence.js?v=20260722-1";
+import {
+  createIndexedDbCheckpointRepository,
+  createMemoryCheckpointRepository,
+} from "./persistence/checkpoint-repository.js";
+import { createCheckpointService } from "./persistence/checkpoint-service.js";
+import { createLocalRemixProvenanceRepository } from "./persistence/remix-provenance-repository.js";
 import { createSessionState } from "./state/session-state.js";
 import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260722-1";
 
@@ -50,6 +58,7 @@ try {
     repository: projectRepository,
   });
 }
+export { projectRepository };
 
 export const audioEngine = createAudioEngine();
 export const projectState = createProjectState(initialProjectDocument.project);
@@ -62,6 +71,22 @@ export const projectPersistence = createProjectPersistence({
   repository: projectRepository,
 });
 export const sessionState = createSessionState();
+export const scaleEntryController = createScaleEntryController({
+  getScaleGuide: () => projectState.getState().scaleGuide,
+});
+let checkpointRepository;
+try {
+  checkpointRepository = createIndexedDbCheckpointRepository();
+} catch {
+  checkpointRepository = createMemoryCheckpointRepository();
+}
+export { checkpointRepository };
+export const remixProvenanceRepository = createLocalRemixProvenanceRepository();
+export const checkpointService = createCheckpointService({
+  persistence: projectPersistence,
+  replaceProject: (document, detail) => projectPersistence.replaceActiveProject(document.project, detail),
+  repository: checkpointRepository,
+});
 const themeFeature = createThemeFeature({ sessionState });
 const workspaceTabs = createWorkspaceTabs({ projectState, sessionState });
 const getSelectedTrackId = () => sessionState.getState().workspace.selectedTrackId;
@@ -109,9 +134,10 @@ const inputController = createInputController({
     keyboardFeature?.render();
   },
   onNoteStart: (note) => patternFeature?.setSelectedNote(note),
+  resolvePatternNote: (note, options) => scaleEntryController.resolve(note, options),
 });
 
-function stopAllSound() {
+export function stopAllSound() {
   scheduler.stop();
   notePreview.stop();
   inputController.stopAll();
@@ -121,6 +147,7 @@ function stopAllSound() {
 keyboardFeature = createKeyboardFeature({
   audioEngine,
   getKeyboardNoteOffset,
+  getScaleGuide: () => projectState.getState().scaleGuide,
   getNoteName,
   inputController,
   instrumentState,
@@ -136,11 +163,13 @@ const instrumentFeature = createInstrumentFeature({
 });
 patternFeature = createPatternFeature({
   getNoteName,
+  getScaleGuide: () => projectState.getState().scaleGuide,
   notePreview,
   onError: (message) => arrangerFeature?.showError(message),
   onStructuralEdit: scheduler.stop,
   patternState,
   projectState,
+  resolveNewNote: (note) => scaleEntryController.resolve(note),
   sessionState,
 });
 arrangerFeature = createArrangerFeature({
@@ -153,8 +182,20 @@ arrangerFeature = createArrangerFeature({
 });
 const projectLibraryFeature = createProjectLibraryFeature({
   onBeforeProjectChange: stopAllSound,
+  onProjectDeleted: (projectId) => Promise.all([
+    checkpointRepository.deleteProject(projectId),
+    remixProvenanceRepository.delete(projectId),
+  ]),
   persistence: projectPersistence,
   projectState,
+});
+const guidedCreationFeature = createGuidedCreationFeature({
+  checkpointService,
+  entryController: scaleEntryController,
+  getSelectedPatternId,
+  onBeforeProjectReplace: stopAllSound,
+  projectState,
+  sessionState,
 });
 
 const applicationLifecycle = new AbortController();
@@ -216,7 +257,10 @@ sessionState.addEventListener("change", (event) => {
 
 projectState.addEventListener("change", (event) => {
   scheduler.releaseInvalidOwnership();
-  if (event.detail.field === "pattern.rootOctave") keyboardFeature.render();
+  if (event.detail.field === "pattern.rootOctave" || event.detail.field === "scaleGuide") {
+    keyboardFeature.render();
+    patternFeature.render();
+  }
   if (event.detail.field === "track.name") instrumentFeature.render();
 }, { signal: applicationLifecycle.signal });
 
@@ -226,7 +270,9 @@ function disposeApplication() {
   arrangerFeature.dispose();
   patternFeature.dispose();
   projectLibraryFeature.dispose();
+  guidedCreationFeature.dispose();
   projectPersistence.dispose();
+  checkpointRepository.dispose?.();
   instrumentFeature.dispose();
   keyboardFeature.dispose();
   workspaceTabs.dispose();

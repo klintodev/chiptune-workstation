@@ -24,4 +24,21 @@ a { color: var(--accent); }
 .player-controls input { width: 100%; accent-color: var(--accent); }
 .player-progress { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); }
 .player-error { margin: 0; padding: 10px; border: 1px solid var(--danger); color: var(--danger); }
-@media (max-width: 650px) { .player-controls { grid-template-columns: auto 1fr auto; } .player-controls label { grid-column: 1 / -1; min-height: 42px; } .player-shell > header, .player-shell > footer { align-items: flex-start; flex-direction: column; } }
+.player-remix { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px; border: 1px solid var(--accent); border-radius: 4px; background: #171220; }
+.player-remix > div { display: grid; gap: 2px; }
+.player-remix strong { color: var(--accent); font-weight: 400; }
+.player-remix span { color: var(--muted); }
+.player-remix button { border-color: var(--accent); color: #1d1522; background: var(--accent); }
+.player-remix-dialog { position: fixed; z-index: 10; inset: 50% auto auto 50%; width: min(520px, calc(100vw - 28px)); max-width: none; margin: 0; padding: 0; border: 0; color: var(--ink); background: transparent; transform: translate(-50%, -50%); }
+.player-remix-dialog::backdrop { background: #08050dcc; backdrop-filter: blur(5px); }
+.player-remix-dialog > div { display: grid; gap: 11px; padding: 18px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 20px 70px #08050ddd; }
+.player-remix-dialog h2, .player-remix-dialog p { margin: 0; }
+.player-remix-dialog p { color: var(--muted); line-height: 1.3; }
+.player-remix-dialog > div > div { display: flex; justify-content: flex-end; gap: 8px; }
+.player-remix-dialog .primary { border-color: var(--accent); color: #1d1522; background: var(--accent); }
+@media (max-width: 650px) {
+  .player-controls { grid-template-columns: auto 1fr auto; }
+  .player-controls label { grid-column: 1 / -1; min-height: 42px; }
+  .player-remix { align-items: stretch; flex-direction: column; }
+  .player-shell > header, .player-shell > footer { align-items: flex-start; flex-direction: column; }
+}

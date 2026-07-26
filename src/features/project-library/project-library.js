@@ -18,6 +18,7 @@ function formatUpdatedAt(value) {
 
 export function createProjectLibraryFeature({
   onBeforeProjectChange = () => {},
+  onProjectDeleted = async () => {},
   persistence,
   projectState,
   root = document,
@@ -159,7 +160,7 @@ export function createProjectLibraryFeature({
 
   function requestDelete(summary) {
     pendingDelete = summary;
-    elements.deleteMessage.textContent = `Delete “${summary.title}” from this browser? This cannot be undone.`;
+    elements.deleteMessage.textContent = `Delete “${summary.title}” and its device-local checkpoints from this browser? This cannot be undone.`;
     if (elements.dialog.open) elements.dialog.close();
     elements.deleteDialog.showModal();
     elements.cancelDelete.focus();
@@ -239,7 +240,7 @@ export function createProjectLibraryFeature({
     const projectId = pendingDelete.id;
     setBusy(true);
     onBeforeProjectChange();
-    void persistence.deleteProject(projectId).then(async () => {
+    void persistence.deleteProject(projectId).then(() => onProjectDeleted(projectId)).then(async () => {
       if (elements.deleteDialog.open) elements.deleteDialog.close();
       pendingDelete = null;
       setBusy(false);

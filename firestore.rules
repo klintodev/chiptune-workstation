@@ -29,12 +29,21 @@ service cloud.firestore {
     function validProject(project) {
       return project is map
         && project.keys().hasOnly([
-          "schemaVersion", "metadata", "visualiser", "transport", "patterns", "tracks"
+          "schemaVersion", "metadata", "scaleGuide", "visualiser", "transport", "patterns", "tracks"
         ])
-        && project.schemaVersion == 5
+        && project.schemaVersion == 6
         && project.metadata is map
         && project.metadata.keys().hasOnly(["title"])
         && validText(project.metadata.title, 1, 100)
+        && project.scaleGuide is map
+        && project.scaleGuide.keys().hasOnly(["tonic", "scale", "lock"])
+        && project.scaleGuide.tonic is int
+        && project.scaleGuide.tonic >= 0
+        && project.scaleGuide.tonic <= 11
+        && project.scaleGuide.scale in [
+          "major", "natural-minor", "major-pentatonic", "minor-pentatonic", "chromatic"
+        ]
+        && project.scaleGuide.lock is bool
         && project.visualiser is map
         && project.transport is map
         && project.transport.keys().hasOnly(["bpm", "masterVolume", "loop"])

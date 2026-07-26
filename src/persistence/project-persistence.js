@@ -150,12 +150,16 @@ export function createProjectPersistence({
 
   projectState.addEventListener("change", handleProjectChange);
 
-  async function activate(document, { flushCurrent = true } = {}) {
+  async function activate(document, { detail = {}, flushCurrent = true } = {}) {
     const target = normalizeProjectDocument(document);
     if (flushCurrent) await saveNow();
     suppressAutosave = true;
     try {
-      projectState.replace(target.project, { operation: "open-project", projectId: target.id });
+      projectState.replace(target.project, {
+        operation: "open-project",
+        projectId: target.id,
+        ...detail,
+      });
     } finally {
       suppressAutosave = false;
     }
@@ -236,6 +240,13 @@ export function createProjectPersistence({
     return serializeProjectDocument(activeDocument);
   }
 
+  async function replaceActiveProject(project, detail = {}) {
+    await saveNow();
+    const candidate = reviseProjectDocument(activeDocument, project, { now: now() });
+    const saved = await repository.save(candidate);
+    return activate(saved, { detail, flushCurrent: false });
+  }
+
   function getExportText() {
     const document = dirty
       ? reviseProjectDocument(activeDocument, projectState.getState(), { now: now() })
@@ -265,6 +276,7 @@ export function createProjectPersistence({
     importProject,
     listProjects,
     openProject,
+    replaceActiveProject,
     removeEventListener: events.removeEventListener.bind(events),
     saveNow,
   });

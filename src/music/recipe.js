@@ -5,7 +5,11 @@ import {
   MIN_PATTERN_NOTE,
   SUPPORTED_PATTERN_GATES,
 } from "../state/pattern-state.js";
-import { getScalePitchClasses, normalizeScaleGuide } from "./scale.js";
+import {
+  getScalePitchClasses,
+  normalizeScaleGuide,
+  snapMidiNoteToScale,
+} from "./scale.js";
 
 export const RECIPE_VERSION = 1;
 export const RECIPE_TYPES = Object.freeze(["arpeggio", "rhythm"]);
@@ -94,12 +98,21 @@ function createArpeggioSteps(recipe, guide, length) {
   boundedNumber(volume, "Recipe velocity", 0, 1);
   return Array.from({ length }, (_, index) => {
     if (index % recipe.rate !== 0) return null;
-    return validateStep({ note: notes[Math.floor(index / recipe.rate) % notes.length], gate, volume });
+    const proposedNote = notes[Math.floor(index / recipe.rate) % notes.length];
+    const note = snapMidiNoteToScale(proposedNote, guide, {
+      minimum: MIN_PATTERN_NOTE,
+      maximum: MAX_PATTERN_NOTE,
+    });
+    return validateStep({ note, gate, volume });
   });
 }
 
-function createRhythmSteps(recipe, length) {
-  const note = boundedInteger(recipe.note, "Rhythm note", MIN_PATTERN_NOTE, MAX_PATTERN_NOTE);
+function createRhythmSteps(recipe, guide, length) {
+  const proposedNote = boundedInteger(recipe.note, "Rhythm note", MIN_PATTERN_NOTE, MAX_PATTERN_NOTE);
+  const note = snapMidiNoteToScale(proposedNote, guide, {
+    minimum: MIN_PATTERN_NOTE,
+    maximum: MAX_PATTERN_NOTE,
+  });
   const density = boundedNumber(recipe.density, "Rhythm density", 0, 1);
   const gate = recipe.gate ?? DEFAULT_PATTERN_GATE;
   const volume = recipe.volume ?? DEFAULT_PATTERN_VOLUME;
@@ -148,7 +161,7 @@ export function createRecipePreview({
   const length = resolvedEnd - startStep;
   const generated = recipe.type === "arpeggio"
     ? createArpeggioSteps(recipe, normalizedGuide, length)
-    : createRhythmSteps(recipe, length);
+    : createRhythmSteps(recipe, normalizedGuide, length);
   const steps = pattern.steps.map((step) => step === null ? null : validateStep(step));
   const replaced = steps.slice(startStep, resolvedEnd);
   steps.splice(startStep, length, ...generated);

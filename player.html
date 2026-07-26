@@ -27,10 +27,24 @@
           <label><span>Volume</span><input id="player-volume" type="range" min="0" max="100" step="1" value="100" disabled /></label>
         </div>
         <div class="player-progress"><span id="player-position">Step 001</span><span id="player-status" role="status">Loading publication...</span></div>
+        <div id="player-remix-section" class="player-remix" hidden>
+          <div><strong>Make your own version</strong><span>Import this snapshot into your browser as a separate local project.</span></div>
+          <button id="player-remix" type="button">Remix in Klinto Studio</button>
+        </div>
         <p id="player-error" class="player-error" role="alert" hidden></p>
       </section>
       <footer>This is a read-only published snapshot. <a href="./">Create your own in Klinto Studio.</a></footer>
     </main>
+    <dialog id="player-remix-dialog" class="player-remix-dialog" aria-labelledby="player-remix-title">
+      <div>
+        <span class="eyebrow">Creator-approved remix</span>
+        <h2 id="player-remix-title">Create a new local project?</h2>
+        <p>This copies this exact public revision into your browser. The source stays unchanged, and you get no access to the creator’s account or private project.</p>
+        <p>The new project is not uploaded or published automatically. Source attribution is retained if you later choose to publish it.</p>
+        <p><strong>Rights note:</strong> in-product remix permission does not guarantee rights to external samples, trademarks, or material the creator did not own.</p>
+        <div><button id="player-remix-cancel" type="button">Cancel</button><button id="player-remix-confirm" class="primary" type="button">Create local remix</button></div>
+      </div>
+    </dialog>
     <script type="module" src="./src/player.js?v=20260722-1"></script>
   </body>
 </html>

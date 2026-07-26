@@ -155,6 +155,52 @@ test("variation scopes do not create notes when rhythm is not selected", () => {
   assert.equal(preview.steps[3].note, 64);
 });
 
+test("octave-only variations preserve pitch class and respect note and leap bounds", () => {
+  const pattern = patternWithSteps([
+    { note: 60, gate: 0.75, volume: 0.7 },
+    { note: 60, gate: 0.75, volume: 0.7 },
+    { note: 60, gate: 0.75, volume: 0.7 },
+    { note: 60, gate: 0.75, volume: 0.7 },
+  ]);
+  const preview = createVariationPreview({
+    options: {
+      scopes: ["octave"],
+      minimumNote: 48,
+      maximumNote: 72,
+      maximumLeap: 12,
+      octaveShifts: [-1, 0, 1],
+      stayInScale: false,
+    },
+    pattern,
+    seed: 23,
+  });
+
+  assert.ok(preview.steps.every((step) => step.note >= 48 && step.note <= 72));
+  assert.ok(preview.steps.every((step) => step.note % 12 === 0));
+  for (let index = 1; index < preview.steps.length; index += 1) {
+    assert.ok(Math.abs(preview.steps[index].note - preview.steps[index - 1].note) <= 12);
+  }
+  assert.ok(preview.steps.every((step) => step.gate === 0.75 && step.volume === 0.7));
+});
+
+test("rhythm-created notes stay in the selected scale even without pitch scope", () => {
+  const pattern = patternWithSteps(Array(8).fill(null));
+  const preview = createVariationPreview({
+    guide: { tonic: 2, scale: "major-pentatonic", lock: true },
+    options: {
+      scopes: ["rhythm"],
+      density: 1,
+      minimumNote: 48,
+      maximumNote: 72,
+      stayInScale: true,
+    },
+    pattern,
+    seed: 3,
+  });
+
+  assert.equal(preview.steps.every((step) => [2, 4, 6, 9, 11].includes(step.note % 12)), true);
+});
+
 test("recipe and variation validation fails before changing authoritative state", () => {
   const pattern = patternWithSteps(Array(4).fill(null));
   assert.throws(() => createRecipePreview({

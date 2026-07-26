@@ -7,7 +7,7 @@ import {
 } from "../state/pattern-state.js";
 import { snapMidiNoteToScale } from "./scale.js";
 
-const SCOPES = new Set(["pitch", "rhythm", "velocity", "gate"]);
+const SCOPES = new Set(["pitch", "octave", "rhythm", "velocity", "gate"]);
 
 function createRandom(seed) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffff_ffff) {
@@ -74,6 +74,15 @@ export function createVariationPreview({
   if (!Array.isArray(gates) || gates.length === 0 || gates.some((gate) => !SUPPORTED_PATTERN_GATES.includes(gate))) {
     throw new RangeError("Variation gates must be a non-empty subset of supported gates.");
   }
+  const octaveShifts = options.octaveShifts ?? [-1, 0, 1];
+  if (
+    !Array.isArray(octaveShifts)
+    || octaveShifts.length === 0
+    || octaveShifts.some((octave) => !Number.isInteger(octave) || octave < -2 || octave > 2)
+  ) throw new RangeError("Variation octave shifts must be integers from -2 to 2.");
+  if (options.stayInScale !== undefined && typeof options.stayInScale !== "boolean") {
+    throw new TypeError("Variation scale membership must be enabled or disabled.");
+  }
 
   const random = createRandom(seed);
   const steps = pattern.steps.map(cloneStep);
@@ -95,7 +104,31 @@ export function createVariationPreview({
       const lower = previousNote === null ? minimum : Math.max(minimum, previousNote - maximumLeap);
       const upper = previousNote === null ? maximum : Math.min(maximum, previousNote + maximumLeap);
       note = lower + Math.floor(random() * (upper - lower + 1));
-      if (guide) note = snapMidiNoteToScale(note, { ...guide, lock: true }, { minimum: lower, maximum: upper });
+      if (guide && options.stayInScale !== false) {
+        note = snapMidiNoteToScale(note, { ...guide, lock: true }, { minimum: lower, maximum: upper });
+      }
+    }
+    if (scopes.has("octave")) {
+      const lower = previousNote === null ? minimum : Math.max(minimum, previousNote - maximumLeap);
+      const upper = previousNote === null ? maximum : Math.min(maximum, previousNote + maximumLeap);
+      const candidates = octaveShifts
+        .map((octave) => note + octave * 12)
+        .filter((candidate) => candidate >= lower && candidate <= upper);
+      note = candidates.length > 0 ? choose(candidates, random) : Math.max(lower, Math.min(upper, note));
+      if (guide && options.stayInScale !== false) {
+        note = snapMidiNoteToScale(note, { ...guide, lock: true }, { minimum: lower, maximum: upper });
+      }
+    }
+    if (
+      current === null
+      && guide
+      && options.stayInScale !== false
+      && !scopes.has("pitch")
+      && !scopes.has("octave")
+    ) {
+      const lower = previousNote === null ? minimum : Math.max(minimum, previousNote - maximumLeap);
+      const upper = previousNote === null ? maximum : Math.min(maximum, previousNote + maximumLeap);
+      note = snapMidiNoteToScale(note, { ...guide, lock: true }, { minimum: lower, maximum: upper });
     }
     const next = Object.freeze({
       note,

@@ -46,17 +46,28 @@ export function createMemoryRemixProvenanceRepository() {
   });
 }
 
-export function createLocalRemixProvenanceRepository(storage = globalThis.localStorage) {
+export function createLocalRemixProvenanceRepository(storage = null) {
+  if (storage === null) {
+    try {
+      storage = globalThis.localStorage;
+    } catch {
+      storage = null;
+    }
+  }
   if (!storage) return createMemoryRemixProvenanceRepository();
   return Object.freeze({
     async delete(projectId) {
-      storage.removeItem(`${STORAGE_PREFIX}${projectId}`);
-      return true;
+      try {
+        storage.removeItem(`${STORAGE_PREFIX}${projectId}`);
+        return true;
+      } catch {
+        return false;
+      }
     },
     async get(projectId) {
-      const value = storage.getItem(`${STORAGE_PREFIX}${projectId}`);
-      if (!value) return null;
       try {
+        const value = storage.getItem(`${STORAGE_PREFIX}${projectId}`);
+        if (!value) return null;
         return normalizeProvenance(JSON.parse(value));
       } catch {
         return null;
