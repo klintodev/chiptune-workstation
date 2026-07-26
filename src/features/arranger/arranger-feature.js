@@ -1,4 +1,5 @@
 import { queryRequired } from "../../shared/query-required.js";
+import { setTextIfChanged } from "../../shared/status-announcer.js";
 import { createArrangementView } from "./arrangement-view.js";
 import { createPatternLibrary } from "./pattern-library.js";
 import { createTransportControls } from "./transport-controls.js";
@@ -17,7 +18,7 @@ export function createArrangerFeature({
   const error = queryRequired(root, "#arrangement-error");
 
   function showError(message) {
-    error.textContent = message;
+    setTextIfChanged(error, message);
     error.hidden = !message;
   }
 

@@ -1,4 +1,5 @@
 import { getTrackColour } from "../../shared/track-presentation.js";
+import { setTextIfChanged } from "../../shared/status-announcer.js";
 import { fitCanvas } from "../../visualiser/canvas-renderer.js";
 import { buildCompositionProjection } from "../../visualiser/composition-projection.js";
 import { renderCompositionFrame } from "../../visualiser/signal-stack-renderer.js";
@@ -177,7 +178,8 @@ export function createVisualiserFeature({
             <h2 id="visualiser-title">Upcoming notes</h2>
             <p id="visualiser-description" class="visually-hidden">The same deterministic note projection shown in the editing dock.</p>
           </div>
-          <output class="visualiser-status" data-status aria-live="off"></output>
+          <output class="visualiser-status" data-status></output>
+          <p class="visually-hidden" data-announcer role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="visualiser-actions">
             <label>View <select data-presentation><option value="lanes">Track lanes</option><option value="stereo">Stereo</option></select></label>
             <label><input type="checkbox" data-reduced-motion /> Reduced motion</label>
@@ -211,8 +213,10 @@ export function createVisualiserFeature({
   const resize = dock.querySelector("[data-resize]");
   const fullscreen = dock.querySelector("[data-fullscreen]");
   const status = dialog.querySelector("[data-status]");
+  const announcer = dialog.querySelector("[data-announcer]");
   const play = dialog.querySelector("[data-play]");
   const stop = dialog.querySelector("[data-stop]");
+  let announcedTransportStatus = null;
 
   function setPreferences(values) {
     preferences = normalizeVisualPreferences({ ...preferences, ...values });
@@ -336,14 +340,21 @@ export function createVisualiserFeature({
     if (root.visibilityState === "hidden") return;
     const projection = getProjection();
     const label = transportLabel(projection);
-    status.textContent = label;
-    dockStatus.textContent = label;
+    setTextIfChanged(status, label);
+    setTextIfChanged(dockStatus, label);
+    if (announcedTransportStatus !== projection.status) {
+      announcedTransportStatus = projection.status;
+      const announcementLabel = projection.status === "playing"
+        ? "Playing"
+        : projection.status === "paused" ? "Paused" : "Stopped";
+      setTextIfChanged(announcer, announcementLabel);
+    }
     play.disabled = root.getElementById("transport-play")?.disabled ?? true;
     stop.disabled = root.getElementById("transport-stop")?.disabled ?? true;
     for (const surface of surfaces) {
       if (isSurfaceVisible(surface)) drawSurface(surface, projection);
     }
-    if (scheduler.getState().status === "playing") {
+    if (scheduler.getState().status === "playing" && preferences.motion !== "reduced") {
       animationFrame = window.requestAnimationFrame(draw);
     }
   }
@@ -437,9 +448,14 @@ export function createVisualiserFeature({
   }, { signal: lifecycle.signal });
   open.addEventListener("click", () => {
     if (!dialog.open) dialog.showModal();
+    dialog.querySelector("[data-close]").focus();
     scheduleDraw();
   }, { signal: lifecycle.signal });
   dialog.querySelector("[data-close]").addEventListener("click", () => dialog.close(), { signal: lifecycle.signal });
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    dialog.close();
+  }, { signal: lifecycle.signal });
   play.addEventListener("click", () => root.getElementById("transport-play")?.click(), { signal: lifecycle.signal });
   stop.addEventListener("click", () => root.getElementById("transport-stop")?.click(), { signal: lifecycle.signal });
   dialog.querySelector("[data-announce]").addEventListener("click", () => {

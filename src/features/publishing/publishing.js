@@ -145,10 +145,15 @@ export function createPublishingFeature({
     showMessage("");
     void refresh();
     if (!dialog.open) dialog.showModal();
+    elements.close.focus();
   }
   open.addEventListener("click", openPublishing, { signal: lifecycle.signal });
   quickOpen.addEventListener("click", openPublishing, { signal: lifecycle.signal });
   elements.close.addEventListener("click", () => dialog.close(), { signal: lifecycle.signal });
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    dialog.close();
+  }, { signal: lifecycle.signal });
   elements.publish.addEventListener("click", () => {
     const creatorName = elements.creator.value.trim();
     if (!creatorName) {

@@ -150,6 +150,16 @@ export function createArrangementView({
   const elements = {
     addTrack,
     canvas: queryRequired(root, "#arrangement-canvas"),
+    clipBack: queryRequired(root, "#selected-clip-back"),
+    clipBackFour: queryRequired(root, "#selected-clip-back-four"),
+    clipForward: queryRequired(root, "#selected-clip-forward"),
+    clipForwardFour: queryRequired(root, "#selected-clip-forward-four"),
+    clipInspector: queryRequired(root, "#selected-clip-inspector"),
+    clipPattern: queryRequired(root, "#selected-clip-pattern"),
+    clipRemove: queryRequired(root, "#selected-clip-remove"),
+    clipStart: queryRequired(root, "#selected-clip-start"),
+    clipTrack: queryRequired(root, "#selected-clip-track"),
+    clipVariation: queryRequired(root, "#selected-clip-variation"),
     empty: queryRequired(root, "#arrangement-empty"),
     heading: queryRequired(root, ".arrangement-heading"),
     scroll: queryRequired(root, ".arrangement-scroll"),
@@ -252,7 +262,7 @@ export function createArrangementView({
     return row;
   }
 
-  function createTrackHeader(track, trackIndex, selected, canRemove) {
+  function createTrackHeader(track, trackIndex) {
     const header = root.createElement("div");
     header.className = "track-header";
     header.dataset.trackId = track.id;
@@ -278,12 +288,7 @@ export function createArrangementView({
     solo.setAttribute("aria-pressed", String(track.mixer.solo));
     solo.setAttribute("aria-label", `Solo ${track.name}`);
     switches.append(mute, solo);
-    const remove = createButton(root, "\u00d7", "remove-track", track.id);
-    remove.className = "track-remove";
-    remove.disabled = !canRemove;
-    remove.setAttribute("aria-label", `Remove ${track.name}`);
-    remove.title = canRemove ? `Remove ${track.name}` : "The project must keep one track";
-    primary.append(channel, activity, switches, remove);
+    primary.append(channel, activity, switches);
 
     const name = root.createElement("input");
     name.className = "track-name-input";
@@ -354,7 +359,7 @@ export function createArrangementView({
       clipElement.setAttribute("role", "button");
       clipElement.setAttribute("aria-pressed", String(clip.id === selectedClipId));
       clipElement.setAttribute("aria-label", `${pattern.name}, ${pattern.steps.length} steps, starts at step ${clip.startStep + 1}`);
-      clipElement.title = "Drag to move this clip. Right-click to create an editable variation.";
+      clipElement.title = "Select for move, track, variation and remove controls. Drag to move quickly.";
 
       const name = root.createElement("strong");
       name.textContent = pattern.name;
@@ -371,15 +376,7 @@ export function createArrangementView({
         note.style.opacity = String(0.35 + mark.emphasis * 0.65);
         return note;
       }));
-      const remove = root.createElement("button");
-      remove.type = "button";
-      remove.className = "arrangement-clip-remove";
-      remove.dataset.action = "remove-clip";
-      remove.dataset.clipId = clip.id;
-      remove.textContent = "\u00d7";
-      remove.setAttribute("aria-label", `Remove ${pattern.name} clip`);
-      remove.title = "Remove clip";
-      clipElement.append(contour, name, detail, remove);
+      clipElement.append(contour, name, detail);
       lane.append(clipElement);
     }
     return lane;
@@ -511,8 +508,51 @@ export function createArrangementView({
     return true;
   }
 
+  function renderClipInspector(project, workspace) {
+    if (!workspace.selectedClipId) {
+      elements.clipInspector.hidden = true;
+      return;
+    }
+    let selected;
+    try {
+      selected = projectState.getClip(workspace.selectedClipId);
+    } catch {
+      elements.clipInspector.hidden = true;
+      return;
+    }
+    const pattern = project.patterns.find(({ id }) => id === selected.clip.patternId);
+    elements.clipInspector.hidden = false;
+    elements.clipPattern.textContent = `Loop: ${pattern.name}`;
+    const optionIds = [...elements.clipTrack.options].map(({ value }) => value);
+    if (optionIds.join("|") !== project.tracks.map(({ id }) => id).join("|")) {
+      elements.clipTrack.replaceChildren(...project.tracks.map((track) => {
+        const option = root.createElement("option");
+        option.value = track.id;
+        option.textContent = track.name;
+        return option;
+      }));
+    } else {
+      project.tracks.forEach((track, index) => {
+        elements.clipTrack.options[index].textContent = track.name;
+      });
+    }
+    elements.clipTrack.value = selected.track.id;
+    elements.clipStart.value = String(selected.clip.startStep + 1);
+    elements.clipStart.max = String(MAX_ARRANGEMENT_STEPS - pattern.steps.length + 1);
+    const canMoveBy = (offset) => projectState.canMoveClip(
+      selected.clip.id,
+      selected.track.id,
+      selected.clip.startStep + offset,
+    );
+    elements.clipBack.disabled = !canMoveBy(-1);
+    elements.clipBackFour.disabled = !canMoveBy(-4);
+    elements.clipForward.disabled = !canMoveBy(1);
+    elements.clipForwardFour.disabled = !canMoveBy(4);
+  }
+
   function render() {
     if (activeRangeTrackId !== null) return;
+    const focusedClipId = root.activeElement?.closest?.(".arrangement-clip")?.dataset.clipId;
     const project = projectState.getState();
     const workspace = getWorkspace();
     const patterns = new Map(project.patterns.map((pattern) => [pattern.id, pattern]));
@@ -524,7 +564,7 @@ export function createArrangementView({
       row.style.setProperty("--track-color", getTrackColour(trackIndex));
       row.classList.toggle("selected", track.id === workspace.selectedTrackId);
       row.append(
-        createTrackHeader(track, trackIndex, track.id === workspace.selectedTrackId, project.tracks.length > 1),
+        createTrackHeader(track, trackIndex),
         createLane(track, patterns, workspace.selectedClipId),
       );
       rows.push(row);
@@ -532,13 +572,19 @@ export function createArrangementView({
     rows.push(createAddTrackRow());
     elements.canvas.replaceChildren(...rows);
     elements.addTrack.disabled = project.tracks.length >= MAX_PROJECT_TRACKS;
-    elements.empty.hidden = project.tracks.some((track) => track.clips.length > 0);
+    elements.empty.hidden = project.tracks.some((track) => track.clips.some((clip) => (
+      patterns.get(clip.patternId)?.steps.some((step) => step !== null && step.volume > 0)
+    )));
     renderTrackMenu(project, workspace);
     timelineNavigation.zoomOut.disabled = stepWidth <= MIN_TIMELINE_STEP_WIDTH;
     timelineNavigation.zoomIn.disabled = stepWidth >= MAX_TIMELINE_STEP_WIDTH;
     timelineNavigation.zoomReset.textContent = `${Math.round(stepWidth / DEFAULT_TIMELINE_STEP_WIDTH * 100)}%`;
     syncTrackActivity();
     renderOverview(project);
+    renderClipInspector(project, workspace);
+    if (focusedClipId) {
+      elements.canvas.querySelector(`[data-clip-id="${focusedClipId}"]`)?.focus();
+    }
   }
 
   function seekFromRuler(ruler, clientX) {
@@ -637,6 +683,36 @@ export function createArrangementView({
     projectState.removeTrack(trackId, { allowClips: track.clips.length > 0 });
   }
 
+  function moveClip(clipId, trackId, startStep, { focusClip = false } = {}) {
+    try {
+      projectState.moveClip(clipId, trackId, startStep);
+      const selected = projectState.getClip(clipId);
+      selectTrack(selected.track.id, {
+        activeDockPanel: "sequencer",
+        selectedClipId: clipId,
+        selectedPatternId: selected.clip.patternId,
+      });
+      onError("");
+      if (focusClip) elements.canvas.querySelector(`[data-clip-id="${clipId}"]`)?.focus();
+      return true;
+    } catch (error) {
+      onError(`${error.message} Choose another track or start step.`);
+      render();
+      return false;
+    }
+  }
+
+  function createVariation(clipId) {
+    const selected = projectState.getClip(clipId);
+    const patternId = projectState.createClipVariation(clipId);
+    selectTrack(selected.track.id, {
+      activeDockPanel: "sequencer",
+      selectedClipId: clipId,
+      selectedPatternId: patternId,
+    });
+    return patternId;
+  }
+
   const clipDragController = createClipDragController({
     canvas: elements.canvas,
     maxArrangementSteps: MAX_ARRANGEMENT_STEPS,
@@ -698,6 +774,10 @@ export function createArrangementView({
       });
       const workspace = getWorkspace();
       try {
+        const pattern = projectState.getPattern(workspace.selectedPatternId);
+        if (!pattern.steps.some((step) => step !== null && step.volume > 0)) {
+          throw new RangeError("Add at least one note to this loop before adding it to the song.");
+        }
         const clipId = projectState.addClip(lane.dataset.trackId, workspace.selectedPatternId, startStep);
         selectTrack(lane.dataset.trackId, { activeDockPanel: "sequencer", selectedClipId: clipId });
         onError("");
@@ -710,10 +790,6 @@ export function createArrangementView({
     try {
       if (action === "seek-arrangement") {
         seekFromRuler(target, event.clientX);
-      } else if (action === "remove-clip") {
-        const wasSelected = getWorkspace().selectedClipId === clipId;
-        projectState.removeClip(clipId);
-        if (wasSelected) sessionState.setWorkspace({ selectedClipId: null });
       } else if (action === "remove-track") {
         requestTrackRemoval(trackId);
       } else if (action === "select-track") {
@@ -849,9 +925,76 @@ export function createArrangementView({
       return;
     }
     const clip = event.target.closest(".arrangement-clip");
-    if (event.target !== clip || event.key !== "Enter") return;
-    event.preventDefault();
-    clip.click();
+    if (event.target !== clip) return;
+    if (["Enter", " ", "Spacebar"].includes(event.key)) {
+      event.preventDefault();
+      clip.click();
+      return;
+    }
+    if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault();
+      const selected = projectState.getClip(clip.dataset.clipId);
+      const direction = event.key === "ArrowLeft" ? -1 : 1;
+      moveClip(
+        selected.clip.id,
+        selected.track.id,
+        selected.clip.startStep + direction * (event.shiftKey ? 4 : 1),
+        { focusClip: true },
+      );
+      return;
+    }
+    if (["ArrowUp", "ArrowDown"].includes(event.key)) {
+      event.preventDefault();
+      const selected = projectState.getClip(clip.dataset.clipId);
+      const tracks = projectState.getState().tracks;
+      const trackIndex = tracks.findIndex(({ id }) => id === selected.track.id);
+      const targetTrack = tracks[trackIndex + (event.key === "ArrowUp" ? -1 : 1)];
+      if (targetTrack) {
+        moveClip(selected.clip.id, targetTrack.id, selected.clip.startStep, { focusClip: true });
+      }
+    }
+  }, { signal: lifecycle.signal });
+
+  function moveSelectedBy(offset) {
+    const clipId = getWorkspace().selectedClipId;
+    if (!clipId) return;
+    const selected = projectState.getClip(clipId);
+    moveClip(clipId, selected.track.id, selected.clip.startStep + offset);
+  }
+
+  elements.clipBack.addEventListener("click", () => moveSelectedBy(-1), { signal: lifecycle.signal });
+  elements.clipBackFour.addEventListener("click", () => moveSelectedBy(-4), { signal: lifecycle.signal });
+  elements.clipForward.addEventListener("click", () => moveSelectedBy(1), { signal: lifecycle.signal });
+  elements.clipForwardFour.addEventListener("click", () => moveSelectedBy(4), { signal: lifecycle.signal });
+  elements.clipTrack.addEventListener("change", () => {
+    const clipId = getWorkspace().selectedClipId;
+    if (!clipId) return;
+    const selected = projectState.getClip(clipId);
+    moveClip(clipId, elements.clipTrack.value, selected.clip.startStep);
+  }, { signal: lifecycle.signal });
+  elements.clipStart.addEventListener("change", () => {
+    const clipId = getWorkspace().selectedClipId;
+    if (!clipId) return;
+    const selected = projectState.getClip(clipId);
+    moveClip(clipId, selected.track.id, Number(elements.clipStart.value) - 1);
+  }, { signal: lifecycle.signal });
+  elements.clipVariation.addEventListener("click", () => {
+    const clipId = getWorkspace().selectedClipId;
+    if (!clipId) return;
+    try {
+      createVariation(clipId);
+      onError("");
+    } catch (error) {
+      onError(error.message);
+    }
+  }, { signal: lifecycle.signal });
+  elements.clipRemove.addEventListener("click", () => {
+    const clipId = getWorkspace().selectedClipId;
+    if (!clipId) return;
+    projectState.removeClip(clipId);
+    sessionState.setWorkspace({ selectedClipId: null });
+    elements.scroll.focus();
+    onError("");
   }, { signal: lifecycle.signal });
 
   elements.addTrack.addEventListener("click", () => {
@@ -945,15 +1088,9 @@ export function createArrangementView({
   clipContextMenu.variation.addEventListener("click", () => {
     if (!contextClipId) return;
     const clipId = contextClipId;
-    const selected = projectState.getClip(clipId);
     try {
-      const patternId = projectState.createClipVariation(clipId);
+      createVariation(clipId);
       closeClipContextMenu();
-      selectTrack(selected.track.id, {
-        activeDockPanel: "sequencer",
-        selectedClipId: clipId,
-        selectedPatternId: patternId,
-      });
       onError("");
     } catch (error) {
       closeClipContextMenu();

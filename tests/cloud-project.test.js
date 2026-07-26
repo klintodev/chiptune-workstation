@@ -44,5 +44,6 @@ test("checked-in Firestore rules are owner-scoped and deny unmatched documents",
   assert.match(rules, /request\.auth\.uid == userId/);
   assert.match(rules, /request\.resource\.data\.ownerId == userId/);
   assert.match(rules, /cloudRevision == resource\.data\.cloudRevision \+ 1/);
+  assert.match(rules, /transport\.loop\.mode in \["custom", "arrangement"\]/);
   assert.match(rules, /match \/\{document=\*\*\}[\s\S]*allow read, write: if false/);
 });

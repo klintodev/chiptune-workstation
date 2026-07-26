@@ -1,4 +1,7 @@
-import { midiNoteToFrequency } from "../audio/voice-engine.js";
+import {
+  getEffectiveMidiNote,
+  midiNoteToFrequency,
+} from "../audio/pitch-policy.js";
 import { getArrangementEnd, MAX_ARRANGEMENT_STEPS } from "../state/project-state.js";
 import {
   DEFAULT_BPM,
@@ -127,25 +130,38 @@ export function createArrangementScheduler({
     return bounds.looping ? bounds.startStep : null;
   }
 
-  function triggerStep(activeSession, { clipId = null, pattern, step, track }, startTime) {
+  function triggerStep(activeSession, {
+    clipId = null,
+    pattern,
+    step,
+    stepIndex,
+    track,
+  }, startTime) {
     if (step === null || step.volume === 0) return null;
     const config = track.instrument;
     const duration = activeSession.stepDurationSeconds * step.gate;
-    const voice = getVoiceEngine(track.id).trigger({
-      type: config.voiceType,
-      frequency: midiNoteToFrequency(step.note + config.octaveOffset * 12),
-      startTime,
-      duration,
-      intensity: step.volume,
-      attackSeconds: config.attackSeconds,
-      releaseSeconds: config.releaseSeconds,
-    });
+    let voice;
+    try {
+      voice = getVoiceEngine(track.id).trigger({
+        type: config.voiceType,
+        frequency: midiNoteToFrequency(getEffectiveMidiNote(step.note, config.octaveOffset)),
+        startTime,
+        duration,
+        intensity: step.volume,
+        attackSeconds: config.attackSeconds,
+        releaseSeconds: config.releaseSeconds,
+      });
+    } catch (error) {
+      emitState(error);
+      return null;
+    }
     const endTime = startTime + duration + config.releaseSeconds + 0.01;
     activeSession.voices.set(nextVoiceId, {
       clipId,
       endTime,
       patternId: pattern.id,
       startTime,
+      stepIndex,
       trackId: track.id,
       voice,
     });
@@ -159,6 +175,7 @@ export function createArrangementScheduler({
     return triggerStep(activeSession, {
       pattern,
       step: pattern.steps[stepIndex],
+      stepIndex,
       track,
     }, startTime);
   }
@@ -178,6 +195,7 @@ export function createArrangementScheduler({
         clipId: clip.id,
         pattern,
         step: pattern.steps[localStep],
+        stepIndex,
         track,
       }, startTime);
       if (endTime !== null) latestEndTime = Math.max(latestEndTime ?? endTime, endTime);
@@ -225,6 +243,72 @@ export function createArrangementScheduler({
     activeSession.nextStepIndex = nextStep;
     activeSession.nextStepTime = activeSession.positions.at(-1).startTime + activeSession.stepDurationSeconds;
     return true;
+  }
+
+  function reconcileArrangementBounds(activeSession, now) {
+    if (activeSession.mode !== "arrangement") return;
+    const project = getProjectState();
+    const bounds = getBounds(activeSession);
+    const inBounds = (stepIndex) => (
+      stepIndex >= bounds.startStep && stepIndex < bounds.endStep
+    );
+
+    let previousStep = null;
+    let hasSequenceAnchor = false;
+    let cutoffTime = null;
+    for (const position of activeSession.positions) {
+      if (position.startTime <= now + 0.001) {
+        previousStep = position.stepIndex;
+        hasSequenceAnchor = true;
+        continue;
+      }
+      const expectedStep = hasSequenceAnchor
+        ? getNextStep(activeSession, previousStep, project)
+        : position.stepIndex;
+      if (!inBounds(position.stepIndex) || position.stepIndex !== expectedStep) {
+        cutoffTime = position.startTime;
+        break;
+      }
+      previousStep = position.stepIndex;
+      hasSequenceAnchor = true;
+    }
+
+    if (cutoffTime !== null) {
+      releaseSessionVoices(activeSession, now, (record) => record.startTime >= cutoffTime);
+      activeSession.positions = activeSession.positions.filter(
+        (position) => position.startTime < cutoffTime,
+      );
+      activeSession.finishing = false;
+      activeSession.finishTime = null;
+      const retainedPosition = activeSession.positions.at(-1);
+      activeSession.lastScheduledStep = retainedPosition?.stepIndex ?? bounds.startStep - 1;
+      activeSession.nextStepTime = cutoffTime;
+      activeSession.nextStepIndex = retainedPosition
+        ? (
+            inBounds(retainedPosition.stepIndex)
+              ? getNextStep(activeSession, retainedPosition.stepIndex, project)
+              : bounds.looping ? bounds.startStep : null
+          )
+        : bounds.startStep;
+    }
+
+    if (bounds.endStep <= bounds.startStep) {
+      if (!activeSession.finishing) {
+        activeSession.lastScheduledStep = bounds.startStep - 1;
+        activeSession.nextStepIndex = null;
+        markFinishing(activeSession, Math.max(now, activeSession.nextStepTime), null);
+      }
+      return;
+    }
+    if (activeSession.nextStepIndex !== null && !inBounds(activeSession.nextStepIndex)) {
+      if (bounds.looping) {
+        activeSession.nextStepIndex = bounds.startStep;
+      } else {
+        activeSession.lastScheduledStep = bounds.endStep - 1;
+        activeSession.nextStepIndex = null;
+        markFinishing(activeSession, Math.max(now, activeSession.nextStepTime), null);
+      }
+    }
   }
 
   function completeSession(activeSession) {
@@ -276,6 +360,7 @@ export function createArrangementScheduler({
     try {
       const now = getAudioTime();
       pruneFinishedVoices(activeSession, now);
+      reconcileArrangementBounds(activeSession, now);
       reviveExtendedArrangement(activeSession);
       if (activeSession.finishing) {
         if (now >= activeSession.finishTime) completeSession(activeSession);

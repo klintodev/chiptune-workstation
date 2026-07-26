@@ -1,5 +1,5 @@
 import { DEFAULT_PATTERN_VOLUME } from "../state/pattern-state.js";
-import { midiNoteToFrequency } from "./voice-engine.js";
+import { getEffectiveMidiNote, midiNoteToFrequency } from "./pitch-policy.js";
 
 export function createNotePreview({ getAudioTime, getInstrumentConfig, getVoiceEngine, voiceEngine }) {
   const resolveVoiceEngine = getVoiceEngine ?? (() => voiceEngine);
@@ -19,7 +19,7 @@ export function createNotePreview({ getAudioTime, getInstrumentConfig, getVoiceE
     try {
       activeVoice = resolveVoiceEngine().trigger({
         type: config.voiceType,
-        frequency: midiNoteToFrequency(note + config.octaveOffset * 12),
+        frequency: midiNoteToFrequency(getEffectiveMidiNote(note, config.octaveOffset)),
         startTime: getAudioTime(),
         duration: 0.14,
         intensity: volume,

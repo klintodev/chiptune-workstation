@@ -8,6 +8,7 @@ import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
 import { createAudioStatusFeature } from "./features/audio-status/audio-status.js";
 import { createArrangerFeature } from "./features/arranger/arranger-feature.js";
 import { createInstrumentFeature } from "./features/instrument/instrument.js";
+import { createHelpFeature } from "./features/help/help.js";
 import { createInputController } from "./features/keyboard/input-controller.js";
 import { createKeyboardFeature } from "./features/keyboard/keyboard.js";
 import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js";
@@ -51,6 +52,7 @@ try {
     repository: projectRepository,
   });
 }
+export { projectPreferences, projectRepository };
 
 export const audioEngine = createAudioEngine();
 export const projectState = createProjectState(initialProjectDocument.project);
@@ -64,6 +66,7 @@ export const projectPersistence = createProjectPersistence({
 });
 export const sessionState = createSessionState();
 const themeFeature = createThemeFeature({ sessionState });
+const helpFeature = createHelpFeature();
 const workspaceTabs = createWorkspaceTabs({ projectState, sessionState });
 const getSelectedTrackId = () => sessionState.getState().workspace.selectedTrackId;
 const getSelectedPatternId = () => sessionState.getState().workspace.selectedPatternId;
@@ -148,7 +151,7 @@ arrangerFeature = createArrangerFeature({
   audioEngine,
   inputController,
   notePreview,
-  onPatternPlayhead: patternFeature.setPlayhead,
+  onPatternPlayhead: (...values) => patternFeature?.setPlayhead(...values),
   projectState,
   scheduler,
   sessionState,
@@ -245,6 +248,7 @@ function disposeApplication() {
   projectLibraryFeature.dispose();
   projectPersistence.dispose();
   instrumentFeature.dispose();
+  helpFeature.dispose();
   keyboardFeature.dispose();
   workspaceTabs.dispose();
   themeFeature.dispose();

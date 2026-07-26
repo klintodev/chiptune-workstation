@@ -45,8 +45,9 @@ service cloud.firestore {
         && project.transport.masterVolume >= 0
         && project.transport.masterVolume <= 1
         && project.transport.loop is map
-        && project.transport.loop.keys().hasOnly(["enabled", "startStep", "endStep"])
+        && project.transport.loop.keys().hasOnly(["enabled", "startStep", "endStep", "mode"])
         && project.transport.loop.enabled is bool
+        && project.transport.loop.mode in ["custom", "arrangement"]
         && project.transport.loop.startStep is int
         && project.transport.loop.startStep >= 0
         && project.transport.loop.endStep is int

@@ -14,6 +14,9 @@ export function createPatternFeature({
 }) {
   const lifecycle = new AbortController();
   const elements = {
+    bankNext: queryRequired(root, "#pattern-bank-next"),
+    bankPrevious: queryRequired(root, "#pattern-bank-previous"),
+    bankRange: queryRequired(root, "#pattern-bank-range"),
     clear: queryRequired(root, "#pattern-clear"),
     duplicate: queryRequired(root, "#pattern-duplicate"),
     grid: queryRequired(root, "#pattern-grid"),
@@ -27,7 +30,10 @@ export function createPatternFeature({
     selectedNote: queryRequired(root, "#selected-pattern-note"),
     selectionEmpty: queryRequired(root, "#pattern-selection-empty"),
     selectionSummary: queryRequired(root, "#pattern-selection-summary"),
+    stepAdd: queryRequired(root, "#selected-step-add"),
     stepClear: queryRequired(root, "#selected-step-clear"),
+    stepClose: queryRequired(root, "#selected-step-close"),
+    stepDone: queryRequired(root, "#selected-step-done"),
     stepGate: queryRequired(root, "#selected-step-gate"),
     stepNumber: queryRequired(root, "#selected-step-number"),
     stepSummary: queryRequired(root, "#selected-step-summary"),
@@ -86,7 +92,13 @@ export function createPatternFeature({
   }
 
   const editor = createPatternEditor({
+    addButton: elements.stepAdd,
+    bankNext: elements.bankNext,
+    bankPrevious: elements.bankPrevious,
+    bankRange: elements.bankRange,
     clearButton: elements.stepClear,
+    closeButton: elements.stepClose,
+    doneButton: elements.stepDone,
     gateControl: elements.stepGate,
     getNoteName,
     grid: elements.grid,
@@ -132,6 +144,7 @@ export function createPatternFeature({
   }
 
   const historyShortcut = createPatternHistoryShortcut({
+    root,
     undo: () => restoreHistory(patternState.undo, () => patternState.getState().canUndo),
     redo: () => restoreHistory(patternState.redo, () => patternState.getState().canRedo),
   });

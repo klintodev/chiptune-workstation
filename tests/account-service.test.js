@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createAccountService } from "../src/firebase/account-service.js";
+import {
+  createAccountService,
+  createAccountSessionPreference,
+} from "../src/firebase/account-service.js";
 
 function createFirebaseDouble() {
   let authListener = null;
@@ -131,5 +134,33 @@ test("a missing Firebase configuration degrades only the account feature", async
   await service.start();
   assert.equal(service.getState().status, "unavailable");
   assert.equal(service.getState().error, "The account action could not be completed. Local projects remain available.");
+  service.dispose();
+});
+
+test("account contact is opt-in and signing out clears the restoration marker", async () => {
+  const firebase = createFirebaseDouble();
+  const values = new Map();
+  const preference = createAccountSessionPreference({
+    getItem: (key) => values.get(key) ?? null,
+    removeItem: (key) => values.delete(key),
+    setItem: (key, value) => values.set(key, value),
+  });
+  let loads = 0;
+  const service = createAccountService({
+    async loadClient() {
+      loads += 1;
+      return firebase.client;
+    },
+    sessionPreference: preference,
+  });
+
+  assert.equal(loads, 0);
+  assert.equal(preference.isEnabled(), false);
+  await service.start();
+  assert.equal(loads, 1);
+  assert.equal(preference.isEnabled(), true);
+  firebase.emitAccount({ uid: "email-user", emailVerified: true });
+  await service.signOut();
+  assert.equal(preference.isEnabled(), false);
   service.dispose();
 });

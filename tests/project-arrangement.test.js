@@ -5,9 +5,11 @@ import {
   DEFAULT_PATTERN_ID,
   DEFAULT_TRACK_ID,
   MAX_ARRANGEMENT_STEPS,
+  MAX_PATTERN_NAME_LENGTH,
   MAX_PROJECT_TRACKS,
   createProjectState,
   isTrackAudible,
+  validateProject,
 } from "../src/state/project-state.js";
 
 test("pattern duplication creates an independent variation while clips stay linked", () => {
@@ -156,4 +158,85 @@ test("multiple solos are audible while mute always overrides solo", () => {
   assert.equal(isTrackAudible(snapshot, DEFAULT_TRACK_ID), true);
   assert.equal(isTrackAudible(snapshot, secondTrackId), false);
   assert.equal(isTrackAudible(snapshot, thirdTrackId), false);
+});
+
+test("a whole-arrangement loop follows final-clip edits and disables when empty", () => {
+  const project = createProjectState();
+  const first = project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+  project.setLoop({
+    enabled: true,
+    endStep: 16,
+    mode: "arrangement",
+    startStep: 0,
+  });
+
+  const second = project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 32);
+  assert.equal(project.getState().transport.loop.endStep, 48);
+  project.moveClip(second, DEFAULT_TRACK_ID, 48);
+  assert.equal(project.getState().transport.loop.endStep, 64);
+  const repeated = project.repeatClip(second);
+  assert.equal(project.getState().transport.loop.endStep, 80);
+  project.removeClip(repeated);
+  assert.equal(project.getState().transport.loop.endStep, 64);
+  project.removeClip(second);
+  assert.equal(project.getState().transport.loop.endStep, 16);
+  project.removeClip(first);
+  assert.equal(project.getArrangementEnd(), 0);
+  assert.equal(project.getState().transport.loop.enabled, false);
+});
+
+test("an explicit custom loop remains stable across arrangement edits", () => {
+  const project = createProjectState();
+  const first = project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+  project.setLoop({
+    enabled: true,
+    endStep: 12,
+    mode: "custom",
+    startStep: 4,
+  });
+
+  project.repeatClip(first);
+  assert.deepEqual(project.getState().transport.loop, {
+    enabled: true,
+    endStep: 12,
+    mode: "custom",
+    startStep: 4,
+  });
+});
+
+test("an exact-end custom loop is distinct from the serializable whole-arrangement mode", () => {
+  const project = createProjectState();
+  const first = project.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+  project.setLoop({
+    enabled: true,
+    endStep: 16,
+    mode: "custom",
+    startStep: 0,
+  });
+  const reloaded = createProjectState(project.getState());
+
+  reloaded.repeatClip(first);
+  assert.deepEqual(reloaded.getState().transport.loop, {
+    enabled: true,
+    endStep: 16,
+    mode: "custom",
+    startStep: 0,
+  });
+
+  reloaded.setLoop({ mode: "arrangement" });
+  assert.equal(reloaded.getState().transport.loop.endStep, 32);
+  const second = reloaded.getState().tracks[0].clips.at(-1);
+  reloaded.repeatClip(second.id);
+  assert.equal(reloaded.getState().transport.loop.endStep, 48);
+});
+
+test("maximally named pattern variations stay bounded and unique", () => {
+  const project = createProjectState();
+  project.renamePattern(DEFAULT_PATTERN_ID, "P".repeat(MAX_PATTERN_NAME_LENGTH));
+  for (let index = 0; index < 12; index += 1) project.duplicatePattern(DEFAULT_PATTERN_ID);
+
+  const names = project.getState().patterns.map(({ name }) => name);
+  assert.equal(new Set(names).size, names.length);
+  assert.equal(names.every((name) => name.length <= MAX_PATTERN_NAME_LENGTH), true);
+  assert.equal(validateProject(project.getState()), true);
 });

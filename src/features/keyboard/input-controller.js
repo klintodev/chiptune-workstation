@@ -1,17 +1,9 @@
-import { midiNoteToFrequency } from "../../audio/voice-engine.js";
+import {
+  getEffectiveMidiNote,
+  midiNoteToFrequency,
+} from "../../audio/pitch-policy.js";
+import { isGlobalShortcutEligible } from "../../shared/keyboard-policy.js";
 import { KEY_BY_CODE } from "./keyboard-layout.js";
-
-function isTextEntry(target) {
-  if (!(target instanceof Element)) return false;
-  if (target.matches("textarea") || target.isContentEditable) return true;
-  if (!(target instanceof HTMLInputElement)) return false;
-  return !["range", "button", "checkbox", "radio", "submit", "reset"].includes(target.type);
-}
-
-function releaseControlFocus(target) {
-  if (target instanceof HTMLSelectElement) target.blur();
-  if (target instanceof HTMLInputElement && target.type === "range") target.blur();
-}
 
 export function createInputController({
   getInstrumentConfig,
@@ -33,7 +25,7 @@ export function createInputController({
   function createVoice(baseNote) {
     const config = getInstrumentConfig();
     const patternNote = baseNote + getKeyboardNoteOffset() * 12;
-    const playedNote = patternNote + config.octaveOffset * 12;
+    const playedNote = getEffectiveMidiNote(patternNote, config.octaveOffset);
     const activeVoiceEngine = resolveVoiceEngine();
     const voice = activeVoiceEngine.trigger({
       type: config.voiceType,
@@ -86,10 +78,9 @@ export function createInputController({
   }
 
   function handleKeyDown(event) {
-    if (event.repeat || isTextEntry(event.target)) return;
+    if (!isGlobalShortcutEligible(event, root)) return;
     const key = KEY_BY_CODE.get(event.code);
     if (!key) return;
-    releaseControlFocus(event.target);
     event.preventDefault();
     start(`keyboard:${event.code}`, key.note);
   }
@@ -97,8 +88,7 @@ export function createInputController({
   function handleKeyUp(event) {
     const key = KEY_BY_CODE.get(event.code);
     if (!key) return;
-    event.preventDefault();
-    stop(`keyboard:${event.code}`);
+    if (stop(`keyboard:${event.code}`)) event.preventDefault();
   }
 
   function handlePointerDown(event) {
