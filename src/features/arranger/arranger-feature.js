@@ -1,4 +1,5 @@
 import { queryRequired } from "../../shared/query-required.js";
+import { setTextIfChanged } from "../../shared/status-announcer.js";
 import { createArrangementView } from "./arrangement-view.js";
 import { createPatternLibrary } from "./pattern-library.js";
 import { createTransportControls } from "./transport-controls.js";
@@ -7,6 +8,7 @@ export function createArrangerFeature({
   audioEngine,
   inputController,
   notePreview,
+  onPatternPlayhead = () => {},
   projectState,
   root = document,
   scheduler,
@@ -16,7 +18,7 @@ export function createArrangerFeature({
   const error = queryRequired(root, "#arrangement-error");
 
   function showError(message) {
-    error.textContent = message;
+    setTextIfChanged(error, message);
     error.hidden = !message;
   }
 
@@ -78,7 +80,10 @@ export function createArrangerFeature({
   const transportControls = createTransportControls({
     audioEngine,
     onError: showError,
-    onPlayhead: arrangementView.setPlayhead,
+    onPlayhead(stepIndex, status, mode) {
+      arrangementView.setPlayhead(stepIndex, status, mode);
+      onPatternPlayhead(stepIndex, status, mode);
+    },
     projectState,
     root,
     scheduler,

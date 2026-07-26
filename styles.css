@@ -5,6 +5,7 @@
 @import url("./src/features/arranger/arranger.css?v=20260722-1");
 @import url("./src/features/arranger/clip-drag.css");
 @import url("./src/features/instrument/instrument.css?v=20260721-2");
+@import url("./src/features/help/help.css");
 @import url("./src/features/keyboard/keyboard.css?v=20260721-2");
 @import url("./src/features/pattern-editor/pattern-editor.css?v=20260721-4");
 @import url("./src/features/project-library/project-library.css?v=20260721-4");

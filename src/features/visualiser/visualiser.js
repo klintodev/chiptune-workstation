@@ -1,4 +1,5 @@
 import { getTrackColour, getVoiceLabel } from "../../shared/track-presentation.js";
+import { setTextIfChanged } from "../../shared/status-announcer.js";
 import { fitCanvas } from "../../visualiser/canvas-renderer.js";
 import { buildCompositionProjection } from "../../visualiser/composition-projection.js";
 import { renderCompositionFrame } from "../../visualiser/signal-stack-renderer.js";
@@ -21,7 +22,7 @@ function readTheme(root) {
 }
 
 function transportLabel(session) {
-  const mode = session.workspace.playbackMode === "pattern" ? "Pattern" : "Arrangement";
+  const mode = session.workspace.playbackMode === "pattern" ? "Pattern" : "Song";
   const state = session.transport.status || "stopped";
   const step = String((session.transport.retainedStepIndex ?? 0) + 1).padStart(3, "0");
   return `${mode} · ${state} · step ${step}`;
@@ -58,7 +59,8 @@ export function createVisualiserFeature({
             <h2 id="visualiser-title">Upcoming notes</h2>
             <p id="visualiser-description" class="visually-hidden">A pixel-art perspective projection of upcoming notes in the project arrangement.</p>
           </div>
-          <output class="visualiser-status" data-status aria-live="polite"></output>
+          <output class="visualiser-status" data-status></output>
+          <p class="visually-hidden" data-announcer role="status" aria-live="polite" aria-atomic="true"></p>
           <div class="visualiser-actions">
             <button type="button" data-play title="Play"><span aria-hidden="true">&#9654;</span><span>Play</span></button>
             <button type="button" data-stop title="Stop"><span aria-hidden="true">&#9632;</span><span>Stop</span></button>
@@ -77,9 +79,11 @@ export function createVisualiserFeature({
 
   const canvas = dialog.querySelector("canvas");
   const status = dialog.querySelector("[data-status]");
+  const announcer = dialog.querySelector("[data-announcer]");
   const trackList = dialog.querySelector("[data-track-list]");
   const play = dialog.querySelector("[data-play]");
   const stop = dialog.querySelector("[data-stop]");
+  let announcedTransportStatus = null;
   let context = null;
   try {
     context = canvas.getContext?.("2d", { alpha: false }) ?? null;
@@ -117,7 +121,15 @@ export function createVisualiserFeature({
   }
 
   function syncTransport() {
-    status.textContent = transportLabel(sessionState.getState());
+    const session = sessionState.getState();
+    setTextIfChanged(status, transportLabel(session));
+    if (announcedTransportStatus !== session.transport.status) {
+      announcedTransportStatus = session.transport.status;
+      const label = session.transport.status === "playing"
+        ? "Playing"
+        : session.transport.status === "paused" ? "Paused" : "Stopped";
+      setTextIfChanged(announcer, label);
+    }
     const sourcePlay = root.getElementById("transport-play");
     const sourceStop = root.getElementById("transport-stop");
     play.disabled = sourcePlay?.disabled ?? true;
@@ -148,9 +160,14 @@ export function createVisualiserFeature({
     syncTrackDescription();
     syncTransport();
     if (!dialog.open) dialog.showModal();
+    dialog.querySelector("[data-close]").focus();
     scheduleDraw();
   }, { signal: lifecycle.signal });
   dialog.querySelector("[data-close]").addEventListener("click", () => dialog.close(), { signal: lifecycle.signal });
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    dialog.close();
+  }, { signal: lifecycle.signal });
   play.addEventListener("click", () => root.getElementById("transport-play")?.click(), { signal: lifecycle.signal });
   stop.addEventListener("click", () => root.getElementById("transport-stop")?.click(), { signal: lifecycle.signal });
   dialog.addEventListener("close", () => {

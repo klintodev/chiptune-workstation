@@ -1,6 +1,7 @@
 import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js";
 import { downloadProjectFile } from "../../persistence/project-download.js";
 import { queryRequired } from "../../shared/query-required.js";
+import { announceStatus, setTextIfChanged } from "../../shared/status-announcer.js";
 
 const STATUS_LABELS = Object.freeze({
   error: "Save failed",
@@ -50,6 +51,7 @@ export function createProjectLibraryFeature({
     title: queryRequired(root, "#project-title"),
   };
   let busy = false;
+  let previousPersistenceStatus = persistence.getState().status;
   let pendingDelete = null;
   let renderGeneration = 0;
 
@@ -68,15 +70,22 @@ export function createProjectLibraryFeature({
     elements.librarySaveStatus.dataset.state = state.status;
     elements.open.dataset.saveState = state.status;
     elements.open.title = `${project.metadata.title} · ${STATUS_LABELS[state.status] ?? state.status}`;
+    if (state.status !== previousPersistenceStatus) {
+      previousPersistenceStatus = state.status;
+      if (state.status === "saved") announceStatus(root, "Saved");
+      if (state.status === "error" || state.status === "unavailable") {
+        announceStatus(root, `Error: ${state.error?.message ?? "Project could not be saved."}`);
+      }
+    }
     if (root.activeElement !== elements.name) elements.name.value = project.metadata.title;
     const needsRecovery = !state.persistent || state.status === "error";
     elements.storageRecovery.hidden = !needsRecovery;
     if (!state.persistent) {
-      elements.storageMessage.textContent = `Browser storage is unavailable. This session will not survive a reload.${state.error?.message ? ` ${state.error.message}` : ""}`;
+      setTextIfChanged(elements.storageMessage, `Browser storage is unavailable. This session will not survive a reload.${state.error?.message ? ` ${state.error.message}` : ""}`);
     } else if (state.status === "error") {
-      elements.storageMessage.textContent = `Automatic saving failed. Your current edits are still available in this tab.${state.error?.message ? ` ${state.error.message}` : ""}`;
+      setTextIfChanged(elements.storageMessage, `Automatic saving failed. Your current edits are still available in this tab.${state.error?.message ? ` ${state.error.message}` : ""}`);
     } else {
-      elements.storageMessage.textContent = "Projects are saved automatically in this browser.";
+      setTextIfChanged(elements.storageMessage, "Projects are saved automatically in this browser.");
     }
   }
 
@@ -162,6 +171,7 @@ export function createProjectLibraryFeature({
   function openLibrary() {
     void renderLibrary();
     if (!elements.dialog.open) elements.dialog.showModal();
+    elements.close.focus();
   }
 
   function downloadActiveProject() {
@@ -193,7 +203,10 @@ export function createProjectLibraryFeature({
 
   elements.open.addEventListener("click", openLibrary, { signal: lifecycle.signal });
   elements.close.addEventListener("click", () => elements.dialog.close(), { signal: lifecycle.signal });
-  elements.dialog.addEventListener("cancel", () => elements.dialog.close(), { signal: lifecycle.signal });
+  elements.dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    elements.dialog.close();
+  }, { signal: lifecycle.signal });
   elements.name.addEventListener("focus", projectState.beginHistoryGroup, { signal: lifecycle.signal });
   elements.name.addEventListener("input", () => {
     if (elements.name.value.trim() === "") return;

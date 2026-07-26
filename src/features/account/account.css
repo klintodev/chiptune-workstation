@@ -116,6 +116,7 @@
 }
 
 @media (max-width: 560px) {
+  .account-summary { width: 44px; min-width: 44px; min-height: 44px; }
   .account-current-project, .account-cloud-heading { align-items: stretch; flex-direction: column; }
   .account-sync-actions { display: grid; }
   .account-email-form > div, .account-delete-panel > div, .account-verification-actions { grid-template-columns: 1fr; }
