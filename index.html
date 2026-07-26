@@ -26,8 +26,6 @@
       :root { color-scheme: dark; background: #211b28; }
       html, body { width: 100%; min-width: 320px; min-height: 100%; margin: 0; background: #211b28; }
       body { color: #f3ecf7; font-family: "Courier New", monospace; }
-      body > * { visibility: hidden; animation: critical-reveal 0s 3s forwards; }
-      @keyframes critical-reveal { to { visibility: visible; } }
     </style>
     <link rel="icon" href="/assets/brand/klinto-mark.svg" type="image/svg+xml" />
     <link rel="icon" href="/assets/brand/favicon-32.png" sizes="32x32" type="image/png" />
@@ -49,10 +47,19 @@
 
         <div class="global-transport" aria-label="Transport and mix controls">
           <div class="arrangement-transport" aria-label="Transport controls">
-            <button id="transport-start" type="button" title="Return to start" aria-label="Return to start">&#9198;</button>
-            <button id="transport-play" class="transport-play" type="button" disabled aria-label="Play" aria-describedby="song-play-help">&#9654;</button>
-            <button id="transport-stop" type="button" disabled aria-label="Stop">&#9632;</button>
-            <button id="transport-loop" type="button" disabled aria-label="Loop arrangement" aria-pressed="false">&#8635;</button>
+            <button id="transport-start" type="button" title="Return to start" aria-label="Return to start">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3v10M13 3 6 8l7 5Z" /></svg>
+            </button>
+            <button id="transport-play" class="transport-play" type="button" disabled aria-label="Play" aria-describedby="song-play-help" data-transport-state="stopped">
+              <svg data-icon-play viewBox="0 0 16 16" aria-hidden="true"><path d="m5 3 8 5-8 5Z" /></svg>
+              <svg data-icon-pause viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3h3v10H4zM9 3h3v10H9z" /></svg>
+            </button>
+            <button id="transport-stop" type="button" disabled aria-label="Stop" title="Playback is already stopped">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4h8v8H4z" /></svg>
+            </button>
+            <button id="transport-loop" type="button" disabled aria-label="Loop arrangement" aria-pressed="false" title="Add a loop to the song to enable arrangement looping">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 5h7l-2-2M12 11H5l2 2M12 5a5 5 0 0 1 1 5M4 11a5 5 0 0 1-1-5" /></svg>
+            </button>
           </div>
           <label class="mode-control"><span>Play</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
           <label class="tempo-control"><span>Tempo</span><span><input id="tempo" type="number" min="40" max="240" step="1" value="120" inputmode="numeric" aria-label="Tempo in BPM" /><output id="tempo-value" for="tempo">120</output><small>BPM</small></span></label>
@@ -64,6 +71,7 @@
         <div class="global-status">
           <button id="audio-status-open" class="status-cluster" type="button" aria-haspopup="dialog" aria-controls="audio-setup" title="Open audio setup"><span id="status-light" class="status-light" aria-hidden="true"></span><span><span class="status-label">Audio</span><strong id="audio-state">Not started</strong></span></button>
           <div id="global-tools" class="global-tools" aria-label="Workstation tools"></div>
+          <button id="crt-toggle" class="crt-toggle" type="button" aria-pressed="true" title="Turn CRT texture off"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v10H2zM4 6h8M4 8h8M4 10h8" /></svg><span class="visually-hidden">CRT texture on</span></button>
           <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" title="Toggle theme"><span data-theme-icon aria-hidden="true">&#9790;</span><span data-theme-label>Dark</span></button>
           <div id="account-slot" class="account-slot"></div>
           <output id="transport-status" class="transport-status">Song · Stopped · step 001</output>
@@ -71,7 +79,7 @@
         </div>
       </header>
 
-      <dialog id="audio-setup" class="audio-setup" aria-labelledby="setup-title" aria-describedby="status-description" open>
+      <dialog id="audio-setup" class="audio-setup" aria-labelledby="setup-title" aria-describedby="status-description">
         <div class="audio-setup-card">
           <div><p class="eyebrow">Browser chiptune workstation</p><h2 id="setup-title">Klinto Studio</h2><p id="status-description" class="lede">Create, arrange, visualise and share chiptune tracks in your browser—no installation required.</p></div>
           <div class="audio-setup-actions"><button id="audio-action" class="primary-action" type="button"><span>Start making music</span><span aria-hidden="true">&#8599;</span></button><button id="audio-setup-close" type="button">Continue without sound</button></div>
@@ -86,6 +94,7 @@
             <h2 id="arrangement-title">Arrangement</h2>
             <p id="arrangement-error" class="arrangement-error" role="alert" hidden></p>
           </div>
+          <p class="mobile-arrangement-note"><strong>Song overview</strong><span>Use a wider screen for detailed arranging.</span></p>
           <div class="arrangement-stage">
             <p id="arrangement-empty" class="arrangement-empty">Your song is empty. Add notes below, then choose <strong>Add loop to song</strong>.</p>
             <div class="arrangement-scroll" tabindex="0" aria-label="Track arrangement timeline"><div id="arrangement-canvas" class="arrangement-canvas"></div></div>
@@ -108,7 +117,7 @@
           <div id="dock-panels" class="dock-panels">
             <section id="dock-panel-sequencer" class="sequencer-section dock-panel" role="tabpanel" aria-labelledby="workspace-tab-pattern">
               <div class="pattern-toolbar">
-                <span class="panel-context">Loop (pattern)</span><button class="term-help" type="button" data-help-term="pattern" aria-label="Explain pattern">?</button>
+                <span class="panel-context">Loop</span><button class="term-help" type="button" data-help-term="pattern" aria-label="Explain pattern">?</button>
                 <label><span class="visually-hidden">Pattern</span><select id="pattern-select" aria-details="help-pattern"><option value="pattern-1">Pattern 1</option></select></label>
                 <label class="pattern-name-field"><span>Name</span><input id="pattern-name" type="text" maxlength="32" value="Pattern 1" /></label>
                 <label><span>Length</span><select id="pattern-length"><option value="4">4</option><option value="8">8</option><option value="16" selected>16</option><option value="32">32</option></select></label>
@@ -119,7 +128,7 @@
                   <button id="pattern-redo" type="button" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">&#8631; Redo</button>
                   <input id="place-start" type="hidden" value="1" />
                   <button id="place-pattern" class="place-pattern" type="button">&#9656; Add loop to song</button>
-                  <details class="pattern-menu"><summary aria-label="More pattern actions">&#8943;</summary><div><button id="pattern-new" type="button">New pattern</button><button id="pattern-variation" type="button">Duplicate variation</button><button id="pattern-duplicate" type="button">Double length</button><button id="pattern-delete" type="button" disabled>Delete pattern</button><button id="pattern-clear" class="danger-action" type="button">Clear pattern</button></div></details>
+                  <details class="pattern-menu"><summary aria-label="More pattern actions"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" /><circle cx="13" cy="8" r="1.3" /></svg></summary><div><button id="pattern-new" type="button">New pattern</button><button id="pattern-variation" type="button">Duplicate variation</button><button id="pattern-duplicate" type="button">Double length</button><button id="pattern-delete" type="button" disabled title="The only pattern cannot be deleted">Delete pattern</button><button id="pattern-clear" class="danger-action" type="button">Clear pattern</button></div></details>
                 </div>
               </div>
 
@@ -154,16 +163,14 @@
                     <output id="selected-pattern-note">C4</output>
                     <button id="selected-note-up" type="button" aria-label="Raise selected note by one semitone">&#9654;</button>
                     <button id="selected-step-add" class="safe-action" type="button">Add C4</button>
-                    <label class="visually-hidden"><span>Pitch</span><select id="pattern-pitch"><option value="0">C</option><option value="1">C&#9839;</option><option value="2">D</option><option value="3">D&#9839;</option><option value="4">E</option><option value="5">F</option><option value="6">F&#9839;</option><option value="7">G</option><option value="8">G&#9839;</option><option value="9">A</option><option value="10">A&#9839;</option><option value="11">B</option></select></label>
-                    <label class="visually-hidden"><span>Octave</span><select id="pattern-octave"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
                     <label class="pattern-toggle"><input id="pattern-preview" type="checkbox" checked /> Preview notes</label>
                   </div>
                   <div id="selected-step-gate" class="selected-step-gate" role="radiogroup" aria-label="Selected step gate length" aria-details="help-gate">
-                    <div class="selected-step-gate-heading"><span>Note length (gate) <button class="term-help" type="button" data-help-term="gate" aria-label="Explain gate">?</button></span><output>75%</output></div>
+                    <div class="selected-step-gate-heading"><span>Note length <button class="term-help" type="button" data-help-term="gate" aria-label="Explain gate">?</button></span><output>75%</output></div>
                     <div class="selected-step-gate-options"><button type="button" role="radio" data-gate="0.25" aria-label="25 percent gate"><span>1/4</span><small>25%</small></button><button type="button" role="radio" data-gate="0.5" aria-label="50 percent gate"><span>1/2</span><small>50%</small></button><button type="button" role="radio" data-gate="0.75" aria-label="75 percent gate"><span>3/4</span><small>75%</small></button><button type="button" role="radio" data-gate="1" aria-label="Full gate"><span>Full</span><small>100%</small></button></div>
                   </div>
-                  <div class="selected-step-volume"><span>Loudness (velocity) <button class="term-help" type="button" data-help-term="velocity" aria-label="Explain velocity">?</button></span><input id="selected-step-volume" type="range" min="0" max="100" step="1" value="70" aria-label="Selected note loudness" aria-details="help-velocity" /><output id="selected-step-volume-value" for="selected-step-volume">70%</output></div>
-                  <div class="selected-step-actions"><button id="selected-step-clear" class="danger-action" type="button" disabled>Clear note</button><button id="selected-step-done" class="safe-action" type="button">Done</button></div>
+                  <div class="selected-step-volume"><span>Loudness <button class="term-help" type="button" data-help-term="velocity" aria-label="Explain velocity">?</button></span><input id="selected-step-volume" type="range" min="0" max="100" step="1" value="70" aria-label="Selected note loudness" aria-details="help-velocity" /><output id="selected-step-volume-value" for="selected-step-volume">70%</output></div>
+                  <div class="selected-step-actions"><button id="selected-step-clear" class="danger-action" type="button" disabled title="This step does not contain a note">Clear note</button><button id="selected-step-done" class="safe-action" type="button">Done</button></div>
                 </dialog>
                 <div class="pattern-footer">
                   <p id="pattern-selection-empty"><strong>Make your first loop:</strong> tap an empty step to add C4, add more notes, then choose <strong>Add loop to song</strong>.</p>
@@ -183,14 +190,14 @@
                 <details id="selected-track-menu" class="track-menu"><summary>Track options</summary><div class="track-menu-panel"><label>Track name<input id="selected-track-name" type="text" maxlength="32" /></label><div><button id="selected-track-up" type="button">Move up</button><button id="selected-track-down" type="button">Move down</button></div><button id="selected-track-remove" class="danger-action" type="button">Remove track</button></div></details>
               </div>
               <div class="device-rack">
-                <fieldset class="device device-oscillator"><legend>Sound shape (voice) <button class="term-help" type="button" data-help-term="voice" aria-label="Explain voice">?</button></legend><select id="voice-type" class="visually-hidden" aria-label="Voice"><option value="pulse12">Pulse 12.5%</option><option value="pulse25">Pulse 25%</option><option value="square">Pulse 50%</option><option value="triangle">Triangle</option><option value="sawtooth">Saw</option><option value="noise">Noise</option></select><div id="voice-options" class="voice-options" role="radiogroup" aria-label="Voice" aria-details="help-voice"><button type="button" data-voice="pulse12">Pulse 12.5%</button><button type="button" data-voice="pulse25">Pulse 25%</button><button type="button" data-voice="square">Pulse 50%</button><button type="button" data-voice="triangle">Triangle</button><button type="button" data-voice="sawtooth">Saw</button><button type="button" data-voice="noise">Noise</button></div><div class="octave-control"><span>Octave</span><button id="octave-down" type="button" aria-label="Octave down">&minus;</button><strong id="octave-value">0</strong><button id="octave-up" type="button" aria-label="Octave up">+</button></div></fieldset>
-                <fieldset class="device device-envelope"><legend>Note shape</legend><div class="device-term-help"><button class="device-help-button" type="button" data-help-term="attack">Explain fade-in</button><button class="device-help-button" type="button" data-help-term="release">Explain tail</button></div><label>Fade-in (attack) <output id="attack-value" for="attack">8 ms</output><input id="attack" type="range" min="1" max="2000" step="1" value="8" aria-details="help-attack" /></label><label>Tail (release) <output id="release-value" for="release">30 ms</output><input id="release" type="range" min="10" max="3000" step="10" value="30" aria-details="help-release" /></label></fieldset>
+                <fieldset class="device device-oscillator"><legend>Sound shape <button class="term-help" type="button" data-help-term="voice" aria-label="Explain voice">?</button></legend><div id="voice-options" class="voice-options" role="radiogroup" aria-label="Voice" aria-details="help-voice"><button type="button" role="radio" data-voice="pulse12">Pulse 12.5%</button><button type="button" role="radio" data-voice="pulse25">Pulse 25%</button><button type="button" role="radio" data-voice="square">Pulse 50%</button><button type="button" role="radio" data-voice="triangle">Triangle</button><button type="button" role="radio" data-voice="sawtooth">Saw</button><button type="button" role="radio" data-voice="noise">Noise</button></div><div class="octave-control"><span>Octave</span><button id="octave-down" type="button" aria-label="Octave down">&minus;</button><strong id="octave-value">0</strong><button id="octave-up" type="button" aria-label="Octave up">+</button></div></fieldset>
+                <fieldset class="device device-envelope"><legend>Note shape</legend><div class="device-term-help"><button class="device-help-button" type="button" data-help-term="attack">Explain fade-in</button><button class="device-help-button" type="button" data-help-term="release">Explain tail</button></div><label>Fade-in <output id="attack-value" for="attack">8 ms</output><input id="attack" type="range" min="1" max="2000" step="1" value="8" aria-details="help-attack" /></label><label>Tail <output id="release-value" for="release">30 ms</output><input id="release" type="range" min="10" max="3000" step="10" value="30" aria-details="help-release" /></label></fieldset>
                 <fieldset class="device device-output"><legend>Output</legend><label>Volume <output id="volume-value" for="volume">35%</output><input id="volume" type="range" min="0" max="100" step="1" value="35" /></label><button id="reset-instrument" type="button">Reset device</button></fieldset>
               </div>
             </section>
 
             <section id="dock-panel-keyboard" class="keyboard-section dock-panel" role="tabpanel" aria-labelledby="workspace-tab-keyboard" hidden>
-              <div class="keyboard-heading"><div><span class="panel-context">Keybed</span><h2 id="keyboard-title">Computer keyboard</h2><p>Two octaves mapped to your keyboard</p></div><button id="stop-sound" class="panic-button" type="button" disabled>&#9632; Stop sound</button></div>
+              <div class="keyboard-heading"><div><span class="panel-context">Keybed</span><h2 id="keyboard-title">Computer keyboard</h2><p>Two octaves mapped to your keyboard</p></div><button id="stop-sound" class="panic-button" type="button" disabled title="No notes are sounding"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4h8v8H4z" /></svg>Stop sound</button></div>
               <div class="keyboard-scroll"><div id="keyboard-keybed" class="keyboard-keybed" aria-label="Playable keyboard"></div></div>
             </section>
           </div>

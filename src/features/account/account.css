@@ -9,14 +9,14 @@
 .account-dialog::backdrop, .account-delete-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(5px); }
 .account-dialog-panel { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--line-bright); border-radius: 6px; background: var(--panel-raised); box-shadow: 0 20px 70px var(--shadow); }
 .account-dialog-panel > header { display: flex; align-items: flex-start; justify-content: space-between; }
-.account-dialog-panel h2, .account-delete-panel h2 { margin: 3px 0 0; font-size: 1.18rem; }
+.account-dialog-panel h2, .account-delete-panel h2 { margin: 3px 0 0; font-size: var(--font-pixel-title); }
 #account-close { width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; font-family: sans-serif; font-size: 1.15rem; }
 
 .account-signed-out, .account-signed-in, .account-cloud-content { display: grid; gap: 13px; }
 .account-verification[hidden], .account-cloud-content[hidden] { display: none; }
 .account-signed-out > p, .account-cloud-heading p { margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.3; }
 .account-email-form { display: grid; gap: 8px; }
-.account-email-form label { display: grid; gap: 4px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.account-email-form label { display: grid; gap: 4px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); letter-spacing: 0.08em; text-transform: uppercase; }
 .account-email-form input { min-height: 38px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--ink); background: var(--bg-1); font-family: "VT323", monospace; font-size: 1.1rem; }
 .account-email-form label small { color: var(--label); font-family: "VT323", monospace; font-size: 0.86rem; letter-spacing: 0; text-transform: none; }
 .account-password-reset { min-height: 0; justify-self: end; padding: 2px 0; border: 0; color: var(--label); background: transparent; font-family: "VT323", monospace; font-size: 0.9rem; text-transform: none; }
@@ -24,7 +24,7 @@
 .account-email-form > div { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .account-email-form button, .account-google-action, .account-signed-in-actions button, .account-sync-actions button { min-height: 38px; }
 .account-email-form .safe-action, .account-sync-actions .safe-action, .account-delete-panel .safe-action { border-color: var(--accent); color: var(--black); background: var(--accent); }
-.account-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.54rem; text-transform: uppercase; }
+.account-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); text-transform: uppercase; }
 .account-divider::before, .account-divider::after { height: 1px; flex: 1; background: var(--line); content: ""; }
 .account-google-action {
   display: flex;
@@ -106,7 +106,7 @@
 .account-delete-panel > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .account-delete-panel button { min-height: 40px; }
 .account-delete-panel .neutral-action { border-color: var(--line-strong); color: var(--muted); background: var(--surface-strong); }
-.account-erasure-panel label { display: grid; gap: 5px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.56rem; text-transform: uppercase; }
+.account-erasure-panel label { display: grid; gap: 5px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); text-transform: uppercase; }
 .account-erasure-panel input { min-height: 38px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--ink); background: var(--bg-1); font-family: "VT323", monospace; font-size: 1.1rem; }
 .account-erasure-panel .account-message { padding: 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg-1); }
 

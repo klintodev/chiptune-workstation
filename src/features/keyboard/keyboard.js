@@ -61,20 +61,22 @@ export function createKeyboardFeature({
     button.type = "button";
     button.className = `music-key ${colour}`;
     button.dataset.note = String(key.note);
-    button.disabled = true;
     computerKey.textContent = key.label;
     button.append(computerKey, noteName);
 
     const owner = (pointerId) => `pointer:${pointerId}:${key.note}`;
     const keyboardOwner = `keybed:${key.note}`;
     const keyboardPreview = createOneShotPreview({
-      start: () => inputController.start(keyboardOwner, key.note),
+      start: () => {
+        void inputController.startWhenReady(keyboardOwner, key.note);
+        return true;
+      },
       stop: () => inputController.stop(keyboardOwner),
     });
     keyboardPreviews.add(keyboardPreview);
     button.addEventListener("pointerdown", (event) => {
       button.setPointerCapture(event.pointerId);
-      inputController.start(owner(event.pointerId), key.note);
+      void inputController.startWhenReady(owner(event.pointerId), key.note);
     }, { signal: lifecycle.signal });
     button.addEventListener("pointerup", (event) => {
       inputController.stop(owner(event.pointerId));
@@ -139,7 +141,7 @@ export function createKeyboardFeature({
       const patternNote = baseNote + getKeyboardNoteOffset() * 12;
       const scale = getScaleGuide ? classifyScaleNote(patternNote, getScaleGuide()) : null;
       const active = activeNotes.has(baseNote);
-      button.disabled = !ready;
+      button.disabled = audioEngine.getState() === "closed";
       button.classList.toggle("active", active);
       button.classList.toggle("in-scale", scale?.inScale === true);
       button.classList.toggle("out-of-scale", scale?.inScale === false);

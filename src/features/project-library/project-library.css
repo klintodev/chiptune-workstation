@@ -18,19 +18,19 @@
 .project-library-heading {
   color: var(--muted);
   font-family: "Silkscreen", monospace;
-  font-size: 0.52rem;
+  font-size: var(--font-pixel-label);
   letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 #project-title { overflow: hidden; min-width: 0; color: var(--ink); font-family: "VT323", monospace; font-size: 1.15rem; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 .project-save-pill { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 3px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .project-save-pill > span { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-#project-save-status { color: var(--accent); font-family: "Silkscreen", monospace; font-size: 0.5rem; letter-spacing: 0.08em; text-transform: uppercase; }
+#project-save-status { color: var(--accent); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); letter-spacing: 0.08em; text-transform: uppercase; }
 .project-summary[data-save-state="unsaved"] .project-save-pill,
-.project-summary[data-save-state="saving"] .project-save-pill { border-color: color-mix(in srgb, var(--selection) 45%, transparent); background: color-mix(in srgb, var(--selection) 10%, transparent); }
+.project-summary[data-save-state="saving"] .project-save-pill { border-color: color-mix(in srgb, var(--selected) 45%, transparent); background: color-mix(in srgb, var(--selected) 10%, transparent); }
 .project-summary[data-save-state="unsaved"] .project-save-pill > span,
-.project-summary[data-save-state="saving"] .project-save-pill > span { background: var(--selection); box-shadow: 0 0 6px var(--selection); }
-#project-save-status[data-state="unsaved"], #project-save-status[data-state="saving"] { color: var(--selection); }
+.project-summary[data-save-state="saving"] .project-save-pill > span { background: var(--selected); box-shadow: 0 0 6px var(--selected); }
+#project-save-status[data-state="unsaved"], #project-save-status[data-state="saving"] { color: var(--selected); }
 #project-save-status[data-state="error"], #project-save-status[data-state="unavailable"] { color: var(--danger); }
 
 .project-dialog,
@@ -54,18 +54,18 @@
 .project-delete-panel { display: grid; gap: 13px; padding: 18px; border: 1px solid var(--line-bright); border-radius: 6px; background: var(--panel-raised); box-shadow: 0 20px 70px var(--shadow); }
 .project-dialog-panel > header { display: flex; align-items: flex-start; justify-content: space-between; }
 .project-dialog-panel h2,
-.project-delete-panel h2 { margin: 3px 0 0; font-size: 1.18rem; }
+.project-delete-panel h2 { margin: 3px 0 0; font-size: var(--font-pixel-title); }
 #project-library-close { width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; font-family: sans-serif; font-size: 1.15rem; }
 .project-title-field { display: grid; gap: 5px; }
 .project-library-current { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
 .project-library-current-status { display: grid; gap: 5px; justify-items: end; }
-.project-library-current-status > span { color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.52rem; letter-spacing: 0.11em; text-transform: uppercase; }
-#project-library-save-status { min-width: 78px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent); border-radius: 4px; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-family: "Silkscreen", monospace; font-size: 0.52rem; letter-spacing: 0.08em; text-align: center; text-transform: uppercase; }
-#project-library-save-status[data-state="unsaved"], #project-library-save-status[data-state="saving"] { border-color: var(--selection); color: var(--selection); }
+.project-library-current-status > span { color: var(--muted); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); letter-spacing: 0.11em; text-transform: uppercase; }
+#project-library-save-status { min-width: 78px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent); border-radius: 4px; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); letter-spacing: 0.08em; text-align: center; text-transform: uppercase; }
+#project-library-save-status[data-state="unsaved"], #project-library-save-status[data-state="saving"] { border-color: var(--selected); color: var(--selected); }
 #project-library-save-status[data-state="error"], #project-library-save-status[data-state="unavailable"] { border-color: var(--danger); color: var(--danger); }
 .project-title-field input { min-height: 36px; padding: 5px 8px; font-size: 1.12rem; }
 .project-dialog-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.project-dialog-actions button { display: grid; min-height: 34px; place-items: center; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--ink); background: var(--bg-1); font-family: "Silkscreen", monospace; font-size: 0.52rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.project-dialog-actions button { display: grid; min-height: 34px; place-items: center; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--ink); background: var(--bg-1); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); letter-spacing: 0.04em; text-transform: uppercase; }
 .project-dialog-actions .disabled { pointer-events: none; opacity: 0.38; }
 .project-library-heading { display: flex; justify-content: space-between; padding-top: 3px; }
 .project-library-heading output { color: var(--label); font-family: "VT323", monospace; font-size: 0.78rem; letter-spacing: 0; text-transform: none; }

@@ -4,7 +4,7 @@ const STATE_CONTENT = Object.freeze({
   idle: {
     title: "Not started",
     action: "Start making music",
-    description: "Create, arrange, visualise and share chiptune tracks in your browser\u2014no installation required.",
+    description: "Sound starts when you play your first note or press Play. You can also start or diagnose it here.",
   },
   running: {
     title: "Ready",
@@ -49,7 +49,7 @@ export function createAudioStatusFeature({
   };
   let timeFrame = null;
   let previousStatus = null;
-  let setupDismissed = false;
+  let setupDismissed = true;
   let setupReturnFocus = null;
   if (elements.setup.open) elements.setup.close();
 
@@ -110,11 +110,8 @@ export function createAudioStatusFeature({
     elements.statusLight.dataset.state = error ? "error" : state;
     elements.errorPanel.hidden = !error;
     setTextIfChanged(elements.errorMessage, error?.message ?? "");
-    const needsSetup = state !== "running" || Boolean(error);
-    if (needsSetup && !setupDismissed && !elements.setup.open) openSetup();
-    if ((!needsSetup || setupDismissed) && elements.setup.open) closeSetup({
-      dismissed: setupDismissed,
-    });
+    if (error && !setupDismissed && !elements.setup.open) openSetup();
+    if (state === "running" && elements.setup.open) closeSetup();
     elements.action.disabled = state === "running" || state === "closed";
     const semanticStatus = error ? `Error: ${error.message}` : state;
     if (semanticStatus !== previousStatus) {
@@ -131,7 +128,7 @@ export function createAudioStatusFeature({
     onRenderDependants?.();
   }
 
-  elements.action.addEventListener("click", async () => {
+  async function enable() {
     sessionState.setAudio({ error: null });
     elements.action.disabled = true;
     elements.actionLabel.textContent = "Starting\u2026";
@@ -142,8 +139,14 @@ export function createAudioStatusFeature({
       sessionState.setAudio({
         error: isAudioEngineError(error) ? error : createUnexpectedError(error),
       });
+      setupDismissed = false;
     }
     render();
+    return audioEngine.isReady();
+  }
+
+  elements.action.addEventListener("click", () => {
+    void enable();
   }, { signal: lifecycle.signal });
   elements.close.addEventListener("click", () => closeSetup({ dismissed: true }), {
     signal: lifecycle.signal,
@@ -178,6 +181,7 @@ export function createAudioStatusFeature({
       lifecycle.abort();
       stopTimeDisplay();
     },
+    enable,
     render,
     stopTimeDisplay,
   });

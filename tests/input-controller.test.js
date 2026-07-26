@@ -89,13 +89,14 @@ test("a note that cannot start does not consume the one-note scale bypass", () =
   controller.dispose();
 });
 
-test("computer note keys work from non-editable controls and stop across focus changes", () => {
+test("computer note keys enable audio from non-editable controls and stop across focus changes", async () => {
   const root = new EventTarget();
   let blockingSurfaces = [];
   root.querySelectorAll = () => blockingSurfaces;
   const triggered = [];
   const stopped = [];
   const controller = createInputController({
+    ensureAudio: () => true,
     getInstrumentConfig: () => ({
       attackSeconds: 0.008,
       octaveOffset: 0,
@@ -134,6 +135,7 @@ test("computer note keys work from non-editable controls and stop across focus c
 
   const keyDown = createEvent(button);
   controller.handleKeyDown(keyDown);
+  await Promise.resolve();
   assert.equal(triggered.length, 1);
   assert.equal(keyDown.prevented, true);
 
@@ -146,6 +148,7 @@ test("computer note keys work from non-editable controls and stop across focus c
   controller.handleKeyDown(createEvent(button, { ctrlKey: true }));
   blockingSurfaces = [{ closest: () => null }];
   controller.handleKeyDown(createEvent(button));
+  await Promise.resolve();
   assert.equal(triggered.length, 1);
   controller.dispose();
 });

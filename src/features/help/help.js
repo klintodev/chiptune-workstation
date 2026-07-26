@@ -32,13 +32,13 @@ export function createHelpFeature({ root = document } = {}) {
         <section aria-labelledby="help-glossary">
           <h3 id="help-glossary">Plain-language glossary</h3>
           <dl>
-            <div id="help-pattern" tabindex="-1"><dt>Pattern</dt><dd>A short repeating loop of note steps.</dd></div>
-            <div id="help-clip" tabindex="-1"><dt>Clip</dt><dd>One occurrence of a pattern placed in the song.</dd></div>
-            <div id="help-gate" tabindex="-1"><dt>Gate</dt><dd>How much of the step the note is held: its note length.</dd></div>
-            <div id="help-velocity" tabindex="-1"><dt>Velocity</dt><dd>The note's loudness or strength.</dd></div>
-            <div id="help-voice" tabindex="-1"><dt>Voice or oscillator</dt><dd>The basic sound shape used by an instrument.</dd></div>
-            <div id="help-attack" tabindex="-1"><dt>Attack</dt><dd>How quickly the note fades in.</dd></div>
-            <div id="help-release" tabindex="-1"><dt>Release</dt><dd>How long the note's tail takes to fade out.</dd></div>
+            <div id="help-pattern" tabindex="-1"><dt>Loop <small>Pattern</small></dt><dd>A short repeating group of note steps.</dd></div>
+            <div id="help-clip" tabindex="-1"><dt>Song block <small>Clip</small></dt><dd>One occurrence of a loop placed in the song.</dd></div>
+            <div id="help-gate" tabindex="-1"><dt>Note length <small>Gate</small></dt><dd>How much of the step the note is held.</dd></div>
+            <div id="help-velocity" tabindex="-1"><dt>Loudness <small>Velocity</small></dt><dd>The note's volume or strength.</dd></div>
+            <div id="help-voice" tabindex="-1"><dt>Sound shape <small>Voice / oscillator</small></dt><dd>The basic waveform used by an instrument.</dd></div>
+            <div id="help-attack" tabindex="-1"><dt>Fade-in <small>Attack</small></dt><dd>How quickly the note reaches full volume.</dd></div>
+            <div id="help-release" tabindex="-1"><dt>Tail <small>Release</small></dt><dd>How long the note takes to fade out.</dd></div>
           </dl>
         </section>
         <p class="help-shortcuts"><strong>Keyboard:</strong> Arrow keys move around steps. Enter adds a note. Delete or Backspace clears it. A focused clip moves with Arrow keys; hold Shift for four steps. Space controls playback only when no control is focused.</p>

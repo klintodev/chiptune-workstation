@@ -4,7 +4,7 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-test("HTML establishes a dark first paint before external styles", async () => {
+test("HTML establishes a dark first paint without hiding the interface", async () => {
   for (const filename of ["index.html", "player.html"]) {
     const html = await readFile(new URL(filename, root), "utf8");
     const critical = html.indexOf('id="critical-startup"');
@@ -12,16 +12,16 @@ test("HTML establishes a dark first paint before external styles", async () => {
 
     assert.ok(critical > 0, `${filename} needs inline startup styles.`);
     assert.ok(critical < stylesheet, `${filename} must apply startup styles before external CSS.`);
-    assert.match(html, /body > \* \{ visibility: hidden;/);
-    assert.match(html, /critical-reveal 0s 3s forwards/);
+    assert.doesNotMatch(html, /body > \* \{ visibility: hidden;/);
+    assert.doesNotMatch(html, /critical-reveal/);
   }
 
   const [base, player] = await Promise.all([
     readFile(new URL("src/styles/base.css", root), "utf8"),
     readFile(new URL("player.css", root), "utf8"),
   ]);
-  assert.match(base, /body > \* \{ visibility: visible; animation: none; \}/);
-  assert.match(player, /body > \* \{ visibility: visible; animation: none; \}/);
+  assert.doesNotMatch(base, /body > \* \{/);
+  assert.doesNotMatch(player, /body > \* \{/);
 });
 
 test("production build bundles pages and Firebase serves only generated output", async () => {

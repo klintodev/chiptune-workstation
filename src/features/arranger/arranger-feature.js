@@ -6,6 +6,7 @@ import { createTransportControls } from "./transport-controls.js";
 
 export function createArrangerFeature({
   audioEngine,
+  ensureAudio,
   inputController,
   notePreview,
   onPatternPlayhead = () => {},
@@ -79,6 +80,7 @@ export function createArrangerFeature({
   });
   const transportControls = createTransportControls({
     audioEngine,
+    ensureAudio,
     onError: showError,
     onPlayhead(stepIndex, status, mode) {
       arrangementView.setPlayhead(stepIndex, status, mode);

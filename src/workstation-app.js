@@ -133,9 +133,21 @@ export const scheduler = createArrangementScheduler({
 });
 
 let arrangerFeature;
+let audioStatusFeature;
 let keyboardFeature;
 let patternFeature;
+async function ensureAudio() {
+  if (audioEngine.isReady()) return true;
+  if (audioStatusFeature) return audioStatusFeature.enable();
+  try {
+    await audioEngine.enable();
+    return audioEngine.isReady();
+  } catch {
+    return false;
+  }
+}
 const inputController = createInputController({
+  ensureAudio,
   getInstrumentConfig: instrumentState.getState,
   getKeyboardNoteOffset,
   getVoiceEngine: getSelectedVoiceEngine,
@@ -174,7 +186,13 @@ const instrumentFeature = createInstrumentFeature({
 patternFeature = createPatternFeature({
   getNoteName,
   getScaleGuide: () => projectState.getState().scaleGuide,
-  notePreview,
+  notePreview: {
+    play: async (...values) => {
+      if (await ensureAudio()) return notePreview.play(...values);
+      return false;
+    },
+    stop: notePreview.stop,
+  },
   onError: (message) => arrangerFeature?.showError(message),
   onStructuralEdit: scheduler.stop,
   patternState,
@@ -184,6 +202,7 @@ patternFeature = createPatternFeature({
 });
 arrangerFeature = createArrangerFeature({
   audioEngine,
+  ensureAudio,
   inputController,
   notePreview,
   onPatternPlayhead: (...values) => patternFeature?.setPlayhead(...values),
@@ -226,7 +245,7 @@ const guidedCreationFeature = createGuidedCreationFeature({
 });
 
 const applicationLifecycle = new AbortController();
-const audioStatusFeature = createAudioStatusFeature({
+audioStatusFeature = createAudioStatusFeature({
   audioEngine,
   createUnexpectedError: (error) => createAudioEngineError(
     "unexpected",

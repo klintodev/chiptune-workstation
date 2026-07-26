@@ -78,8 +78,10 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
   function render() {
     const project = projectState.getState();
     const workspace = sessionState.getState().workspace;
+    const hasClips = project.tracks.some((track) => track.clips.length > 0);
     const activePanel = panels.has(workspace.activeDockPanel) ? workspace.activeDockPanel : "sequencer";
     const collapsed = workspace.detailPanelCollapsed === true;
+    dawWorkspace.classList.toggle("awaiting-first-clip", !hasClips);
     dawWorkspace.classList.toggle("detail-collapsed", collapsed);
     editorDock.classList.toggle("collapsed", collapsed);
     dockPanels.hidden = collapsed;

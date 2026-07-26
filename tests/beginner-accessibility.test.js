@@ -224,7 +224,7 @@ test("beginner-facing markup exposes explicit tools and a guided first loop", as
   assert.match(helpSource, /aria-controls", "help-dialog"/);
   assert.match(helpSource, /aria-details", `help-/);
   for (const term of ["Pattern", "Clip", "Gate", "Velocity", "Voice", "Attack", "Release"]) {
-    assert.match(helpSource, new RegExp(`<dt>${term}`));
+    assert.match(helpSource, new RegExp(`<small>${term}`));
   }
 });
 

@@ -7,6 +7,7 @@ import {
 import { classifyScaleNote } from "../../music/scale.js";
 
 const GRID_NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"]);
+const DEFAULT_SELECTED_NOTE = 60;
 const GATE_LABELS = Object.freeze({
   0.25: "1/4",
   0.5: "1/2",
@@ -40,12 +41,10 @@ export function createPatternEditor({
   grid,
   noteDownButton,
   noteUpButton,
-  octaveSelect,
   onEditAction,
   onSelectionChange = () => {},
   onStepCleared = () => {},
   patternState,
-  pitchSelect,
   previewInput,
   previewNote,
   resolveNewNote = (note) => note,
@@ -77,28 +76,16 @@ export function createPatternEditor({
   let inspectorOpen = false;
   let playbackStatus = "stopped";
   let playheadStepIndex = null;
+  let selectedNote = DEFAULT_SELECTED_NOTE;
   let selectedStepIndex = null;
 
   function getSelectedNote() {
-    return (Number(octaveSelect.value) + 1) * 12 + Number(pitchSelect.value);
-  }
-
-  function constrainPitchSelection() {
-    const octave = Number(octaveSelect.value);
-    for (const option of pitchSelect.options) {
-      const note = (octave + 1) * 12 + Number(option.value);
-      option.disabled = note < MIN_PATTERN_NOTE || note > MAX_PATTERN_NOTE;
-    }
-    if (pitchSelect.selectedOptions[0]?.disabled) {
-      pitchSelect.value = [...pitchSelect.options].find((option) => !option.disabled).value;
-    }
+    return selectedNote;
   }
 
   function loadStepControls(step) {
     if (step === null) return;
-    pitchSelect.value = String(step.note % 12);
-    octaveSelect.value = String(Math.floor(step.note / 12) - 1);
-    constrainPitchSelection();
+    selectedNote = step.note;
   }
 
   function previewSelectedNote(note, volume = DEFAULT_PATTERN_VOLUME) {
@@ -110,8 +97,7 @@ export function createPatternEditor({
     if (!Number.isInteger(note) || note < MIN_PATTERN_NOTE || note > MAX_PATTERN_NOTE) {
       throw new RangeError(`Selected note must be between ${MIN_PATTERN_NOTE} and ${MAX_PATTERN_NOTE}.`);
     }
-    pitchSelect.value = String(note % 12);
-    octaveSelect.value = String(Math.floor(note / 12) - 1);
+    selectedNote = note;
     let volume = DEFAULT_PATTERN_VOLUME;
     if (selectedStepIndex !== null) {
       patternState.setStep(selectedStepIndex, note);
@@ -285,7 +271,6 @@ export function createPatternEditor({
   }
 
   function render() {
-    constrainPitchSelection();
     const pattern = patternState.getState();
     if (pattern.patternId !== activePatternId) {
       activePatternId = pattern.patternId;
@@ -378,25 +363,6 @@ export function createPatternEditor({
     }
     render();
     focusStep(currentIndex);
-  }
-
-  function handleNoteSelectionChange(event) {
-    onEditAction?.();
-    event.currentTarget.blur();
-    constrainPitchSelection();
-    const proposedNote = getSelectedNote();
-    const current = selectedStepIndex === null ? undefined : patternState.getState().steps[selectedStepIndex];
-    const note = current === null ? resolveNewNote(proposedNote) : proposedNote;
-    if (note !== proposedNote) {
-      pitchSelect.value = String(note % 12);
-      octaveSelect.value = String(Math.floor(note / 12) - 1);
-    }
-    if (selectedStepIndex !== null) patternState.setStep(selectedStepIndex, note);
-    const volume = selectedStepIndex === null
-      ? DEFAULT_PATTERN_VOLUME
-      : patternState.getState().steps[selectedStepIndex]?.volume ?? DEFAULT_PATTERN_VOLUME;
-    previewSelectedNote(note, volume);
-    render();
   }
 
   function showBank(index, { focus = false } = {}) {
@@ -497,8 +463,6 @@ export function createPatternEditor({
   volumeInput.addEventListener("pointerup", finishVolumeEdit, { signal: lifecycle.signal });
   volumeInput.addEventListener("pointercancel", finishVolumeEdit, { signal: lifecycle.signal });
   volumeInput.addEventListener("change", finishVolumeEdit, { signal: lifecycle.signal });
-  pitchSelect.addEventListener("change", handleNoteSelectionChange, { signal: lifecycle.signal });
-  octaveSelect.addEventListener("change", handleNoteSelectionChange, { signal: lifecycle.signal });
   previewInput.addEventListener("change", handlePreviewChange, { signal: lifecycle.signal });
   bankPrevious.addEventListener("click", () => showBank(bankIndex - 1), { signal: lifecycle.signal });
   bankNext.addEventListener("click", () => showBank(bankIndex + 1), { signal: lifecycle.signal });

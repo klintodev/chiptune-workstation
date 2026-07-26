@@ -9,6 +9,7 @@ export function createInputController({
   getInstrumentConfig,
   getKeyboardNoteOffset = () => 0,
   getVoiceEngine,
+  ensureAudio = async () => true,
   onActiveNotesChange,
   onNoteStart,
   resolvePatternNote = (note) => note,
@@ -18,6 +19,7 @@ export function createInputController({
   const resolveVoiceEngine = getVoiceEngine ?? (() => voiceEngine);
   const voicesByOwner = new Map();
   const ownersByNote = new Map();
+  const pendingOwners = new Map();
 
   function emitActiveNotes() {
     onActiveNotesChange?.(new Set(ownersByNote.keys()));
@@ -68,9 +70,25 @@ export function createInputController({
     return true;
   }
 
+  async function startWhenReady(owner, baseNote) {
+    if (voicesByOwner.has(owner) || pendingOwners.has(owner)) return false;
+    const token = Symbol(owner);
+    pendingOwners.set(owner, token);
+    let ready = false;
+    try {
+      ready = await ensureAudio();
+    } catch {
+      ready = false;
+    }
+    if (pendingOwners.get(owner) !== token) return false;
+    pendingOwners.delete(owner);
+    return ready ? start(owner, baseNote) : false;
+  }
+
   function stop(owner) {
+    const cancelledPending = pendingOwners.delete(owner);
     const active = voicesByOwner.get(owner);
-    if (!active) return false;
+    if (!active) return cancelledPending;
     active.voice.stop();
     voicesByOwner.delete(owner);
     const owners = ownersByNote.get(active.activeNote);
@@ -81,6 +99,7 @@ export function createInputController({
   }
 
   function stopAll() {
+    pendingOwners.clear();
     for (const owner of [...voicesByOwner.keys()]) stop(owner);
   }
 
@@ -106,7 +125,7 @@ export function createInputController({
     const key = KEY_BY_CODE.get(event.code);
     if (!key) return;
     event.preventDefault();
-    start(`keyboard:${event.code}`, key.note);
+    void startWhenReady(`keyboard:${event.code}`, key.note);
   }
 
   function handleKeyUp(event) {
@@ -130,5 +149,14 @@ export function createInputController({
     stopAll();
   }
 
-  return Object.freeze({ dispose, handleKeyDown, handleKeyUp, refreshActiveVoices, start, stop, stopAll });
+  return Object.freeze({
+    dispose,
+    handleKeyDown,
+    handleKeyUp,
+    refreshActiveVoices,
+    start,
+    startWhenReady,
+    stop,
+    stopAll,
+  });
 }

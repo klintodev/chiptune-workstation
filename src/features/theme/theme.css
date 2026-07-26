@@ -16,7 +16,8 @@
   --accent: #f0a6c8;
   --accent-bright: #f8cfe4;
   --accent-soft: #4d3f56;
-  --selection: #f2b48c;
+  --selected: #f2b48c;
+  --playing: #f0a6c8;
   --danger: #ec8a90;
   --black: #211b28;
   --key-white: #b7abc6;
@@ -25,8 +26,9 @@
   --key-black-ink: #e4d8ee;
   --shadow: rgba(0, 0, 0, 0.58);
   --overlay: rgba(15, 10, 20, 0.78);
+  --scanline: rgba(0, 0, 0, 0.065);
   --acid: var(--accent);
-  --orange: var(--selection);
+  --orange: var(--selected);
   --red: var(--danger);
 }
 
@@ -45,10 +47,11 @@
   --ink: #2f2540;
   --muted: #665575;
   --label: #574466;
-  --accent: #9b2f68;
-  --accent-bright: #7d204f;
+  --accent: #92295f;
+  --accent-bright: #731d49;
   --accent-soft: #ecd5e4;
-  --selection: #a6402e;
+  --selected: #95511f;
+  --playing: #92295f;
   --danger: #a9354c;
   --black: #f4eefb;
   --key-white: #ffffff;
@@ -57,9 +60,11 @@
   --key-black-ink: #f3ecf7;
   --shadow: rgba(80, 52, 96, 0.2);
   --overlay: rgba(52, 38, 64, 0.45);
+  --scanline: rgba(65, 40, 79, 0.055);
 }
 
-.theme-toggle {
+.theme-toggle,
+.crt-toggle {
   display: grid;
   width: 36px;
   min-width: 36px;
@@ -71,10 +76,22 @@
   color: var(--accent);
   background: var(--panel);
   font-family: "Silkscreen", "Courier New", monospace;
-  font-size: 0.48rem;
+  font-size: var(--font-pixel-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.crt-toggle svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-width: 1.4;
+}
+
+.crt-toggle[aria-pressed="false"] { color: var(--muted); }
 
 .theme-toggle [data-theme-label] { display: none; }
 

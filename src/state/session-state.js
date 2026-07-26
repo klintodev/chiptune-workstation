@@ -3,7 +3,7 @@ const DEFAULT_SESSION = Object.freeze({
   audio: Object.freeze({ error: null, status: "idle" }),
   editor: Object.freeze({ clearPatternArmed: false, selectedStepIndex: null }),
   transport: Object.freeze({ retainedStepIndex: 0, status: "stopped" }),
-  theme: Object.freeze({ value: "dark" }),
+  theme: Object.freeze({ crt: true, value: "dark" }),
   workspace: Object.freeze({
     activeDockPanel: "sequencer",
     arrangementStartStep: 0,

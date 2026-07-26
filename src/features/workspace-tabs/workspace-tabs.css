@@ -5,6 +5,9 @@
   grid-template-rows: minmax(170px, 1fr) var(--detail-height);
   overflow: hidden;
 }
+.daw-workspace.awaiting-first-clip {
+  grid-template-rows: minmax(112px, 0.28fr) minmax(var(--detail-height), 1fr);
+}
 .daw-workspace.detail-collapsed { grid-template-rows: minmax(170px, 1fr) var(--detail-tabs-height); }
 
 .editor-dock {
@@ -20,7 +23,7 @@
 .dock-context { display: flex; min-width: 0; align-items: center; gap: 9px; padding: 0 14px; border: 0; border-radius: 0; color: inherit; background: transparent; text-align: left; text-transform: none; }
 .dock-context:hover:not(:disabled) { color: inherit; background: color-mix(in srgb, var(--accent) 5%, transparent); }
 #dock-context-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 1px; background: var(--dock-context-colour, var(--accent)); box-shadow: 0 0 7px var(--dock-context-colour, var(--accent)); }
-#dock-context-kicker { color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.5rem; letter-spacing: 0.14em; text-transform: uppercase; }
+#dock-context-kicker { color: var(--label); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); letter-spacing: 0.14em; text-transform: uppercase; }
 #dock-context-title { overflow: hidden; color: var(--ink); font-size: 1.05rem; font-weight: 400; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 .dock-locate-icon { color: var(--muted); font-family: sans-serif; font-size: 0.72rem; opacity: 0.8; }
 .workspace-tabs { display: flex; min-width: 0; align-items: stretch; }

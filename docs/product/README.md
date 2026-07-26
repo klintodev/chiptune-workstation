@@ -23,6 +23,7 @@ These documents define independently demonstrable roadmap releases for a browser
 | [PRD 23](./23-maintainable-application-foundation.md) | Maintainable application foundation | Technical enabler | [PRD23/E83-E86](../epics/prd-23-maintainable-application-foundation.md) | Planned: cross-cutting |
 | [PRD 24](./24-guided-creation-and-remixing.md) | Guided creation and remixing | Extended | [PRD24/E87-E90](../epics/prd-24-guided-creation-and-remixing.md) | Planned: later |
 | [PRD 25](./25-visualiser-palettes-and-customisation.md) | Visualiser palettes and customisation | Extended | [PRD25/E91-E94](../epics/prd-25-visualiser-palettes-and-customisation.md) | In progress: palette presets |
+| [PRD 26](./26-first-session-interface-craft.md) | First-session interface craft | UX enabler | [PRD26/E95-E98](../epics/prd-26-first-session-interface-craft.md) | In review: design audit pass |
 
 PRD 4 is the implementation prerequisite for PRD 5. PRD 6 makes the delivered multi-track workflow usable before persistence is added in PRD 7. The local-first release boundary is PRDs 1-7. PRD 8 adds the optional identity and cloud foundation needed for eventual publishing without gating the workstation. PRD 9 adds a portable audio artifact, while PRDs 10-12 add the audiovisual and sharing experiences. PRD 13 hardens optional accounts by requiring verified email ownership before any private cloud access or publication mutation.
 
@@ -32,6 +33,8 @@ PRD 20 is the next release boundary because it fixes data-loss and audio-failure
 
 PRD 25 extends the visual-learning workspace with project-owned visual identity. Its first three epics add curated palettes and consistent public playback; its custom-colour editor remains a separate later iteration.
 
+PRD 26 records the interface-craft audit delivered over the current beginner workflow: immediate first paint, audio on musical intent, reusable visual tokens, clearer first-session hierarchy, and a deliberate narrow-screen composition surface. It complements rather than replaces PRD 21's broader accessibility and usability acceptance.
+
 Recommended delivery order:
 
 1. Complete PRD20/E70-E73 before expanding project state, cloud behaviour, or creation features.
@@ -40,3 +43,4 @@ Recommended delivery order:
 4. Complete PRD23/E84-E85 and promote the full suite through E86 before increasing project complexity.
 5. Treat PRD 24's epics as independently reviewable later releases in the order E87, E90, E88, then E89 so scale and checkpoint foundations precede their consumers.
 6. Deliver PRD25/E91-E93 as one palette-preset slice, observe how people use the curated roles, then design E94's bounded custom editor from that evidence.
+7. Review PRD26/E95-E98 as one interface-craft slice, then use PRD 21's browser and first-time-user measures to validate the design decisions before declaring the wider beginner release complete.

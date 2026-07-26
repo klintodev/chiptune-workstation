@@ -10,13 +10,14 @@
 .help-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(5px); }
 .help-panel { display: grid; gap: 15px; padding: 18px; border: 1px solid var(--line-bright); border-radius: 6px; background: var(--panel-raised); box-shadow: 0 20px 70px var(--shadow); }
 .help-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.help-panel h2 { margin-top: 3px; font-size: 1.2rem; }
-.help-panel h3 { margin: 0 0 8px; color: var(--accent); font-family: "Silkscreen", monospace; font-size: 0.72rem; }
+.help-panel h2 { margin-top: 3px; font-size: var(--font-pixel-title); }
+.help-panel h3 { margin: 0 0 8px; color: var(--accent); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-title); }
 .help-panel section { padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg-1); }
 .help-panel ol { margin: 0; padding-left: 24px; font-size: 1.05rem; line-height: 1.35; }
 .help-panel dl { display: grid; margin: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .help-panel dl > div { padding: 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
-.help-panel dt { color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.65rem; }
+.help-panel dt { color: var(--label); font-family: "Silkscreen", monospace; font-size: var(--font-pixel-label); }
+.help-panel dt small { margin-left: 5px; color: var(--selected); font-family: "VT323", monospace; font-size: 0.92rem; font-weight: 400; letter-spacing: 0; text-transform: none; }
 .help-panel dd { margin: 4px 0 0; color: var(--muted); font-size: 0.98rem; line-height: 1.25; }
 .help-panel [data-close] { width: 44px; min-width: 44px; min-height: 44px; padding: 0; font-family: sans-serif; font-size: 1.15rem; }
 .help-panel [data-done] { min-height: 44px; border-color: var(--accent); color: var(--black); background: var(--accent); }

@@ -556,6 +556,9 @@ export function createArrangementView({
     const project = projectState.getState();
     const workspace = getWorkspace();
     const patterns = new Map(project.patterns.map((pattern) => [pattern.id, pattern]));
+    elements.canvas.style.setProperty("--timeline-step-width", `${stepWidth}px`);
+    elements.canvas.style.setProperty("--timeline-bar-width", `${stepWidth * 16}px`);
+    elements.canvas.style.setProperty("--timeline-width", `${MAX_ARRANGEMENT_STEPS * stepWidth}px`);
     const rows = [createRuler()];
     project.tracks.forEach((track, trackIndex) => {
       const row = root.createElement("div");

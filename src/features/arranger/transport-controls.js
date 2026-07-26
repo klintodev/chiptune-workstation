@@ -11,6 +11,7 @@ export function hasPlayableArrangement(project) {
 
 export function createTransportControls({
   audioEngine,
+  ensureAudio = async () => audioEngine.isReady(),
   onError = () => {},
   onPlayhead = () => {},
   projectState,
@@ -46,6 +47,11 @@ export function createTransportControls({
   let playheadFrame = null;
   let groupedRange = null;
   let previousAnnouncedStatus = scheduler.getState().status;
+  const startsWithoutClips = !projectState.getState().tracks.some((track) => track.clips.length > 0);
+  if (startsWithoutClips && scheduler.getState().mode === "arrangement") {
+    scheduler.setMode("pattern");
+    sessionState.setWorkspace({ playbackMode: "pattern" });
+  }
 
   function renderPlayhead() {
     const transport = scheduler.getState();
@@ -95,14 +101,14 @@ export function createTransportControls({
     elements.mobileMaster.value = String(project.transport.masterVolume * 100);
     elements.masterValue.value = `${Math.round(project.transport.masterVolume * 100)}%`;
     elements.mobileMasterValue.value = `${Math.round(project.transport.masterVolume * 100)}%`;
-    elements.play.disabled = !audioEngine.isReady() || (transport.mode === "arrangement" && !hasArrangement);
+    elements.play.disabled = transport.mode === "arrangement" && !hasArrangement;
     const playLabel = playing ? "Pause" : transport.status === "paused" ? "Resume" : "Play";
-    elements.play.textContent = playing ? "❙❙" : "▶";
+    elements.play.dataset.transportState = playing ? "playing" : "stopped";
     elements.play.classList.toggle("playing", playing);
     elements.play.setAttribute("aria-label", playLabel);
     elements.play.title = transport.mode === "arrangement" && !hasArrangement
       ? "Add a non-empty loop to the song before playing Song mode."
-      : `${playLabel} (Space from the workspace)`;
+      : `${playLabel}${audioEngine.isReady() ? "" : " and enable sound"} (Space from the workspace)`;
     const selectedPattern = project.patterns.find(({ id }) => (
       id === sessionState.getState().workspace.selectedPatternId
     )) ?? project.patterns[0];
@@ -130,9 +136,9 @@ export function createTransportControls({
     else stopPlayheadDisplay();
   }
 
-  function startPlayback() {
-    if (!audioEngine.isReady()) return false;
+  async function startPlayback() {
     if (elements.mode.value === "arrangement" && !hasPlayableArrangement(projectState.getState())) return false;
+    if (!audioEngine.isReady() && !await ensureAudio()) return false;
     try {
       scheduler.play(elements.mode.value);
       onError("");
@@ -151,7 +157,7 @@ export function createTransportControls({
     return paused;
   }
 
-  function togglePlayback() {
+  async function togglePlayback() {
     return scheduler.getState().status === "playing" ? pausePlayback() : startPlayback();
   }
 
@@ -191,7 +197,9 @@ export function createTransportControls({
     signal: lifecycle.signal,
   });
   elements.start.addEventListener("click", jumpToStart, { signal: lifecycle.signal });
-  elements.play.addEventListener("click", togglePlayback, { signal: lifecycle.signal });
+  elements.play.addEventListener("click", () => {
+    void togglePlayback();
+  }, { signal: lifecycle.signal });
   elements.stop.addEventListener("click", scheduler.stop, { signal: lifecycle.signal });
   elements.loop.addEventListener("click", toggleLoop, { signal: lifecycle.signal });
   root.addEventListener("keydown", (event) => {
@@ -201,7 +209,7 @@ export function createTransportControls({
       !isGlobalShortcutEligible(event, root)
     ) return;
     event.preventDefault();
-    togglePlayback();
+    void togglePlayback();
   }, { signal: lifecycle.signal });
 
   function applyTempo(source = elements.tempo, { reportInvalid = false } = {}) {

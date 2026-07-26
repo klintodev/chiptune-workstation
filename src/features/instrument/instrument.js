@@ -19,7 +19,6 @@ export function createInstrumentFeature({
     releaseValue: queryRequired(root, "#release-value"),
     reset: queryRequired(root, "#reset-instrument"),
     trackName: queryRequired(root, "#instrument-track-name"),
-    voiceType: queryRequired(root, "#voice-type"),
     volume: queryRequired(root, "#volume"),
     volumeValue: queryRequired(root, "#volume-value"),
     voiceOptions: [...root.querySelectorAll("#voice-options [data-voice]")],
@@ -28,7 +27,6 @@ export function createInstrumentFeature({
   function render() {
     const config = instrumentState.getState();
     elements.trackName.textContent = getTrackName();
-    elements.voiceType.value = config.voiceType;
     for (const button of elements.voiceOptions) {
       const selected = button.dataset.voice === config.voiceType;
       button.classList.toggle("selected", selected);
@@ -49,15 +47,27 @@ export function createInstrumentFeature({
 
   function selectVoice(voiceType) {
     instrumentState.setVoiceType(voiceType);
-    elements.voiceType.value = voiceType;
   }
 
-  elements.voiceType.addEventListener("change", () => {
-    selectVoice(elements.voiceType.value);
-    elements.voiceType.blur();
-  }, { signal: lifecycle.signal });
   for (const button of elements.voiceOptions) {
     button.addEventListener("click", () => selectVoice(button.dataset.voice), { signal: lifecycle.signal });
+    button.addEventListener("keydown", (event) => {
+      const currentIndex = elements.voiceOptions.indexOf(button);
+      let nextIndex = null;
+      if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        nextIndex = (currentIndex - 1 + elements.voiceOptions.length) % elements.voiceOptions.length;
+      }
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        nextIndex = (currentIndex + 1) % elements.voiceOptions.length;
+      }
+      if (event.key === "Home") nextIndex = 0;
+      if (event.key === "End") nextIndex = elements.voiceOptions.length - 1;
+      if (nextIndex === null) return;
+      event.preventDefault();
+      const next = elements.voiceOptions[nextIndex];
+      selectVoice(next.dataset.voice);
+      next.focus();
+    }, { signal: lifecycle.signal });
   }
   elements.octaveDown.addEventListener("click", () => {
     instrumentState.setOctaveOffset(instrumentState.getState().octaveOffset - 1);
