@@ -1,7 +1,7 @@
 import {
   normalizeProjectDocument,
   summarizeProjectDocument,
-} from "./project-document.js?v=20260722-1";
+} from "./project-document.js";
 
 const DATABASE_NAME = "chiptune-workstation";
 const DATABASE_VERSION = 1;
@@ -35,9 +35,11 @@ export function createMemoryProjectRepository(initialDocuments = []) {
   }));
 
   return Object.freeze({
+    close() {},
     async delete(id) {
       return documents.delete(id);
     },
+    dispose() {},
     async get(id) {
       const document = documents.get(id);
       return document ? cloneDocument(document) : null;
@@ -73,10 +75,15 @@ export function createIndexedDbProjectRepository({
   indexedDB = globalThis.indexedDB,
 } = {}) {
   if (!indexedDB?.open) throw new Error("IndexedDB is not available in this browser.");
-  let databasePromise;
+  let database = null;
+  let databasePromise = null;
+  let disposed = false;
+  let connectionGeneration = 0;
 
   function getDatabase() {
+    if (disposed) throw new Error("Project storage has been disposed.");
     if (databasePromise) return databasePromise;
+    const generation = ++connectionGeneration;
     databasePromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(databaseName, DATABASE_VERSION);
       request.addEventListener("upgradeneeded", () => {
@@ -86,14 +93,44 @@ export function createIndexedDbProjectRepository({
           store.createIndex("updatedAt", "updatedAt");
         }
       });
-      request.addEventListener("success", () => resolve(request.result), { once: true });
-      request.addEventListener("error", () => reject(request.error ?? new Error("Could not open project storage.")), { once: true });
-      request.addEventListener("blocked", () => reject(new Error("Project storage is blocked by another tab.")), { once: true });
+      request.addEventListener("success", () => {
+        const openedDatabase = request.result;
+        if (disposed || generation !== connectionGeneration) {
+          openedDatabase.close();
+          reject(new Error("Project storage was closed while opening."));
+          return;
+        }
+        database = openedDatabase;
+        openedDatabase.addEventListener("versionchange", () => {
+          openedDatabase.close();
+          if (database !== openedDatabase) return;
+          database = null;
+          databasePromise = null;
+          connectionGeneration += 1;
+        });
+        resolve(openedDatabase);
+      }, { once: true });
+      request.addEventListener("error", () => {
+        databasePromise = null;
+        reject(request.error ?? new Error("Could not open project storage."));
+      }, { once: true });
+      request.addEventListener("blocked", () => {
+        databasePromise = null;
+        reject(new Error("Project storage is blocked by another tab."));
+      }, { once: true });
     });
     return databasePromise;
   }
 
+  function close() {
+    connectionGeneration += 1;
+    database?.close();
+    database = null;
+    databasePromise = null;
+  }
+
   return Object.freeze({
+    close,
     async delete(id) {
       const database = await getDatabase();
       const transaction = database.transaction(PROJECT_STORE, "readwrite");
@@ -124,6 +161,11 @@ export function createIndexedDbProjectRepository({
       transaction.objectStore(PROJECT_STORE).put(normalized);
       await transactionComplete(transaction);
       return cloneDocument(normalized);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      close();
     },
   });
 }

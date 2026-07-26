@@ -1,5 +1,5 @@
 import { queryRequired } from "../../shared/query-required.js";
-import { createPatternEditor } from "./pattern-editor.js?v=20260721-1";
+import { createPatternEditor } from "./pattern-editor.js";
 import { createPatternHistoryShortcut } from "./pattern-shortcuts.js";
 
 export function createPatternFeature({

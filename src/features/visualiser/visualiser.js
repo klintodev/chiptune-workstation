@@ -1,7 +1,7 @@
 import { getTrackColour, getVoiceLabel } from "../../shared/track-presentation.js";
-import { fitCanvas } from "../../visualiser/canvas-renderer.js?v=20260721-3";
-import { buildCompositionProjection } from "../../visualiser/composition-projection.js?v=20260722-1";
-import { renderCompositionFrame } from "../../visualiser/signal-stack-renderer.js?v=20260722-1";
+import { fitCanvas } from "../../visualiser/canvas-renderer.js";
+import { buildCompositionProjection } from "../../visualiser/composition-projection.js";
+import { renderCompositionFrame } from "../../visualiser/signal-stack-renderer.js";
 
 function resolveColour(root, value, fallback) {
   if (!value?.startsWith("var(")) return value || fallback;

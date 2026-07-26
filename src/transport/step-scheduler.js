@@ -1,4 +1,4 @@
-import { midiNoteToFrequency } from "../audio/voice-engine.js?v=20260721-1";
+import { midiNoteToFrequency } from "../audio/voice-engine.js";
 
 export const DEFAULT_BPM = 120;
 export const DEFAULT_LOOK_AHEAD_SECONDS = 0.1;
