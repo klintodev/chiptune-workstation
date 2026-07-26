@@ -17,7 +17,7 @@
 .pattern-menu[open] summary { border-color: var(--accent); color: var(--accent); }
 .pattern-menu > div { position: absolute; z-index: 50; top: calc(100% + 5px); right: 0; display: grid; width: 190px; gap: 5px; padding: 7px; border: 1px solid var(--line-bright); border-radius: 4px; background: var(--panel-raised); box-shadow: 0 12px 30px var(--shadow); }
 .pattern-menu > div button { width: 100%; text-align: left; }
-.pattern-toolbar .armed { color: var(--black) !important; background: var(--danger) !important; }
+.pattern-toolbar .armed { color: var(--black) !important; background: var(--danger) !important; outline: 3px dashed var(--danger); outline-offset: 2px; }
 .pattern-commandbar { gap: 4px; background: var(--surface); }
 .pattern-commandbar > span { margin-right: 2px; color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.62rem; text-transform: uppercase; }
 .pattern-commandbar .place-target { margin-left: auto; font-family: "VT323", monospace; font-size: 0.9rem; text-transform: none; }
@@ -50,9 +50,14 @@
 .pattern-step:hover { background: var(--surface-soft); }
 .pattern-step.has-note .pattern-step-set strong { color: var(--accent); text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent); }
 .pattern-step.selected { background: color-mix(in srgb, var(--selection) 11%, var(--surface)); box-shadow: inset 0 0 0 2px var(--selection); }
+.pattern-step.playback-step { box-shadow: inset 0 -5px 0 var(--accent); }
+.pattern-step.playback-step::before { position: absolute; z-index: 3; top: 3px; left: 4px; color: var(--accent); font-family: sans-serif; font-size: 0.62rem; content: "▶"; }
+.pattern-step.playback-step[data-playback-state="paused"]::before { content: "❙❙"; }
+.pattern-step.selected.playback-step { outline: 2px dashed var(--selection); outline-offset: -5px; box-shadow: inset 0 -5px 0 var(--accent); }
 .pattern-step.playhead { outline: 3px double var(--accent); outline-offset: -4px; }
 .pattern-step.playhead .pattern-step-set > span:first-child::after { color: var(--accent); content: " \25b6"; }
 .pattern-step-set { display: grid; width: 100%; height: 100%; min-height: 78px; grid-template-rows: auto 1fr 4px; place-items: center; gap: 3px; padding: 6px 4px 4px; border: 0; border-radius: 0; color: var(--ink); background: transparent; text-align: center; }
+.pattern-step-set:focus-visible { outline: 3px double var(--ink); outline-offset: -5px; }
 .pattern-step-set > span:first-child { color: var(--muted); font-family: "Silkscreen", monospace; font-size: 0.62rem; }
 .pattern-step-set strong { display: grid; place-items: center; overflow: hidden; color: var(--muted); font-family: "VT323", monospace; font-size: 1.18rem; font-weight: 400; text-overflow: ellipsis; }
 .pattern-step.selected .pattern-step-set > span:first-child { color: var(--selection); }

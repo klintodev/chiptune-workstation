@@ -30,6 +30,7 @@ import {
 } from "./persistence/project-persistence.js";
 import { createSessionState } from "./state/session-state.js";
 import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
+import { resolveProjectedNoteSource } from "./visualiser/visual-learning-model.js";
 
 const projectPreferences = createProjectPreferences();
 let projectRepository;
@@ -155,6 +156,21 @@ arrangerFeature = createArrangerFeature({
   scheduler,
   sessionState,
 });
+
+export function editProjectedNote(note) {
+  const source = resolveProjectedNoteSource(projectState.getState(), note);
+  if (!source) return false;
+  sessionState.setWorkspace({
+    activeDockPanel: source.activeDockPanel,
+    detailPanelCollapsed: source.detailPanelCollapsed,
+    selectedClipId: source.selectedClipId,
+    selectedPatternId: source.selectedPatternId,
+    selectedTrackId: source.selectedTrackId,
+  });
+  sessionState.setEditor({ selectedStepIndex: source.selectedStepIndex });
+  patternFeature.render();
+  return patternFeature.inspectStep(source.selectedStepIndex);
+}
 const projectLibraryFeature = createProjectLibraryFeature({
   onBeforeProjectChange: stopAllSound,
   persistence: projectPersistence,

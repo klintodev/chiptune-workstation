@@ -40,6 +40,7 @@ export function createPatternEditor({
   noteUpButton,
   octaveSelect,
   onEditAction,
+  onSelectionChange = () => {},
   onStepCleared = () => {},
   patternState,
   pitchSelect,
@@ -71,6 +72,7 @@ export function createPatternEditor({
   let bankIndex = 0;
   let dialogReturnFocus = null;
   let inspectorOpen = false;
+  let playbackStatus = "stopped";
   let playheadStepIndex = null;
   let selectedStepIndex = null;
 
@@ -121,6 +123,7 @@ export function createPatternEditor({
   function selectStep(index, shouldPreview = false) {
     onEditAction?.();
     selectedStepIndex = index;
+    onSelectionChange(index);
     if ((globalThis.innerWidth ?? 1280) <= 900) {
       const bankSize = (globalThis.innerWidth ?? 1280) <= 560 ? 4 : 8;
       bankIndex = Math.floor(index / bankSize);
@@ -188,6 +191,7 @@ export function createPatternEditor({
       event.preventDefault();
       closeInspector({ restoreFocus: false });
       selectedStepIndex = null;
+      onSelectionChange(null);
       onEditAction?.();
       patternState.clearStep(index);
       onStepCleared(index);
@@ -207,6 +211,7 @@ export function createPatternEditor({
     if (selectedStepIndex !== null && selectedStepIndex >= length) {
       inspectorOpen = false;
       selectedStepIndex = null;
+      onSelectionChange(null);
     }
 
     grid.setAttribute("aria-label", `${length}-step pattern`);
@@ -283,6 +288,7 @@ export function createPatternEditor({
       activePatternId = pattern.patternId;
       closeInspector({ restoreFocus: false });
       selectedStepIndex = null;
+      onSelectionChange(null);
       activeVolumeStepIndex = null;
       bankIndex = 0;
     }
@@ -295,7 +301,9 @@ export function createPatternEditor({
       const noteLabel = hasNote ? getNoteName(step.note) : "Rest";
       elements.container.classList.toggle("has-note", hasNote);
       elements.container.classList.toggle("selected", index === selectedStepIndex);
-      elements.container.classList.toggle("playhead", index === playheadStepIndex);
+      const isPlayhead = index === playheadStepIndex;
+      elements.container.classList.toggle("playback-step", isPlayhead);
+      elements.container.dataset.playbackState = isPlayhead ? playbackStatus : "";
       elements.editButton.textContent = hasNote ? "\u2699" : "+";
       elements.editButton.title = hasNote ? "Edit note" : "Add or choose a note";
       elements.editButton.setAttribute(
@@ -305,6 +313,11 @@ export function createPatternEditor({
 
       elements.setButton.tabIndex = index === (selectedStepIndex ?? 0) ? 0 : -1;
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
+      if (isPlayhead && playbackStatus !== "stopped") {
+        elements.setButton.setAttribute("aria-current", "step");
+      } else {
+        elements.setButton.removeAttribute("aria-current");
+      }
       elements.setButton.title = hasNote ? "Right-click to clear this note." : "";
       elements.value.textContent = hasNote ? noteLabel : "+ Note";
       elements.meter.style.width = hasNote ? `${Math.round(step.volume * 100)}%` : "0%";
@@ -343,6 +356,7 @@ export function createPatternEditor({
       return;
     }
     selectedStepIndex = currentIndex;
+    onSelectionChange(currentIndex);
     onEditAction?.();
     if (isAssign) {
       const note = getSelectedNote();
@@ -482,24 +496,43 @@ export function createPatternEditor({
     patternState.removeEventListener("change", render);
   }
 
-  return Object.freeze({
-    dispose,
-    render,
-    setPlayhead(stepIndex, status, mode) {
-      const nextStepIndex = mode === "pattern" && status !== "stopped" ? stepIndex : null;
-      if (nextStepIndex === playheadStepIndex) return;
-      if (playheadStepIndex !== null) {
-        stepElements[playheadStepIndex]?.container.classList.remove("playhead");
-      }
-      playheadStepIndex = nextStepIndex;
-      if (playheadStepIndex === null) return;
-      stepElements[playheadStepIndex]?.container.classList.add("playhead");
-      if ((globalThis.innerWidth ?? 1280) <= 900) {
-        const bankSize = (globalThis.innerWidth ?? 1280) <= 560 ? 4 : 8;
-        const playheadBank = Math.floor(playheadStepIndex / bankSize);
-        if (playheadBank !== bankIndex) showBank(playheadBank);
-      }
-    },
-    setSelectedNote,
-  });
+  function inspectStep(index, { focus = true } = {}) {
+    if (!Number.isInteger(index) || index < 0 || index >= patternState.getState().length) return false;
+    openInspector(index, focus ? stepElements[index]?.setButton : null);
+    if (focus) {
+      globalThis.requestAnimationFrame?.(() => {
+        (patternState.getState().steps[index] ? noteDownButton : addButton).focus();
+      });
+    }
+    return true;
+  }
+
+  function setPlayhead(stepIndex, status, mode) {
+    const length = patternState.getState().length;
+    const nextStatus = mode === "pattern" ? status : "stopped";
+    const nextStepIndex = nextStatus === "stopped"
+      ? null
+      : ((stepIndex % length) + length) % length;
+    if (nextStepIndex === playheadStepIndex && nextStatus === playbackStatus) return;
+    if (playheadStepIndex !== null) {
+      const previous = stepElements[playheadStepIndex];
+      previous?.container.classList.remove("playback-step");
+      if (previous) previous.container.dataset.playbackState = "";
+      previous?.setButton.removeAttribute("aria-current");
+    }
+    playbackStatus = nextStatus;
+    playheadStepIndex = nextStepIndex;
+    if (playheadStepIndex === null) return;
+    const next = stepElements[playheadStepIndex];
+    next?.container.classList.add("playback-step");
+    if (next) next.container.dataset.playbackState = playbackStatus;
+    next?.setButton.setAttribute("aria-current", "step");
+    if ((globalThis.innerWidth ?? 1280) <= 900) {
+      const bankSize = (globalThis.innerWidth ?? 1280) <= 560 ? 4 : 8;
+      const playheadBank = Math.floor(playheadStepIndex / bankSize);
+      if (playheadBank !== bankIndex) showBank(playheadBank);
+    }
+  }
+
+  return Object.freeze({ dispose, inspectStep, render, setPlayhead, setSelectedNote });
 }

@@ -22,6 +22,7 @@ import {
 } from "./firebase/publication-link-repository.js";
 import { createPublicationService } from "./firebase/publication-service.js";
 import {
+  editProjectedNote,
   projectPersistence,
   projectPreferences,
   projectRepository,
@@ -35,6 +36,7 @@ const audioExportFeature = createAudioExportFeature({
   projectState,
 });
 const visualiserFeature = createVisualiserFeature({
+  onEditNote: editProjectedNote,
   projectState,
   scheduler,
   sessionState,

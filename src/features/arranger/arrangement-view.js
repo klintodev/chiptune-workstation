@@ -1,12 +1,24 @@
 import {
   MAX_ARRANGEMENT_STEPS,
   MAX_PROJECT_TRACKS,
+  isTrackAudible,
 } from "../../state/project-state.js";
+import { getNoteName } from "../../music/note.js";
 import { queryRequired } from "../../shared/query-required.js";
 import { getTrackColour, getVoiceLabel } from "../../shared/track-presentation.js";
+import { createClipContour } from "../../visualiser/visual-learning-model.js";
 import { createClipDragController, getTimelineStep } from "./clip-drag-controller.js";
+import {
+  DEFAULT_TIMELINE_STEP_WIDTH,
+  MAX_TIMELINE_STEP_WIDTH,
+  MIN_TIMELINE_STEP_WIDTH,
+  clampTimelineStepWidth,
+  getFitSongStepWidth,
+  getOverviewScrollLeft,
+  getTimelineViewport,
+} from "./timeline-navigation.js";
 
-const STEP_WIDTH = 14;
+const RULER_HEIGHT = 26;
 
 function formatPan(value) {
   const amount = Math.round(Math.abs(value) * 100);
@@ -71,6 +83,51 @@ function createClipContextMenu(root) {
   return Object.freeze({ menu, newPattern, variation });
 }
 
+function createTimelineNavigation(root) {
+  const controls = root.createElement("div");
+  controls.className = "arrangement-navigation";
+  controls.setAttribute("aria-label", "Timeline navigation");
+  const zoomOut = createButton(root, "−", "zoom-out");
+  zoomOut.setAttribute("aria-label", "Zoom timeline out");
+  const zoomReset = createButton(root, "100%", "zoom-reset");
+  zoomReset.setAttribute("aria-label", "Reset timeline zoom");
+  const zoomIn = createButton(root, "+", "zoom-in");
+  zoomIn.setAttribute("aria-label", "Zoom timeline in");
+  const fitSong = createButton(root, "Fit song", "fit-song");
+  controls.append(zoomOut, zoomReset, zoomIn, fitSong);
+
+  const overview = root.createElement("div");
+  overview.className = "arrangement-overview";
+  overview.tabIndex = 0;
+  overview.setAttribute("role", "slider");
+  overview.setAttribute("aria-label", "Arrangement overview viewport");
+  overview.setAttribute("aria-valuemin", "1");
+  const content = root.createElement("div");
+  content.className = "arrangement-overview-content";
+  const loop = root.createElement("span");
+  loop.className = "arrangement-overview-loop";
+  const clips = root.createElement("div");
+  clips.className = "arrangement-overview-clips";
+  const playhead = root.createElement("span");
+  playhead.className = "arrangement-overview-playhead";
+  const viewport = root.createElement("span");
+  viewport.className = "arrangement-overview-viewport";
+  content.append(loop, clips, playhead, viewport);
+  overview.append(content);
+  return Object.freeze({
+    clips,
+    controls,
+    fitSong,
+    loop,
+    overview,
+    playhead,
+    viewport,
+    zoomIn,
+    zoomOut,
+    zoomReset,
+  });
+}
+
 export function createArrangementView({
   onBeforeSelectionChange = () => {},
   onError = () => {},
@@ -82,6 +139,7 @@ export function createArrangementView({
   const lifecycle = new AbortController();
   const deleteDialog = createTrackDeleteDialog(root);
   const clipContextMenu = createClipContextMenu(root);
+  const timelineNavigation = createTimelineNavigation(root);
   const dialogHost = root.body ?? root;
   dialogHost.append(deleteDialog.overlay, clipContextMenu.menu);
   const addTrack = root.createElement("button");
@@ -103,20 +161,28 @@ export function createArrangementView({
     clipTrack: queryRequired(root, "#selected-clip-track"),
     clipVariation: queryRequired(root, "#selected-clip-variation"),
     empty: queryRequired(root, "#arrangement-empty"),
+    heading: queryRequired(root, ".arrangement-heading"),
     scroll: queryRequired(root, ".arrangement-scroll"),
+    stage: queryRequired(root, ".arrangement-stage"),
     trackDown: queryRequired(root, "#selected-track-down"),
     trackMenu: queryRequired(root, "#selected-track-menu"),
     trackName: queryRequired(root, "#selected-track-name"),
     trackRemove: queryRequired(root, "#selected-track-remove"),
     trackUp: queryRequired(root, "#selected-track-up"),
   };
+  elements.heading.append(timelineNavigation.controls);
+  elements.stage.append(timelineNavigation.overview);
   let activeRangeTrackId = null;
   let contextClipId = null;
   let contextPlacement = null;
   let dialogReturnFocus = null;
+  let activityMode = "arrangement";
+  let activityStatus = "stopped";
+  let activityStepIndex = 0;
   let pendingTrackId = null;
   let playheadStepIndex = sessionState.getState().workspace.arrangementStartStep;
   let playbackStatus = "stopped";
+  let stepWidth = DEFAULT_TIMELINE_STEP_WIDTH;
 
   function getWorkspace() {
     return sessionState.getState().workspace;
@@ -136,6 +202,7 @@ export function createArrangementView({
   function createRuler() {
     const row = root.createElement("div");
     row.className = "arrangement-ruler-row";
+    row.style.gridTemplateColumns = `var(--track-header-width) ${MAX_ARRANGEMENT_STEPS * stepWidth}px`;
     const label = root.createElement("div");
     label.className = "arrangement-ruler-label";
     const labelText = root.createElement("span");
@@ -155,18 +222,26 @@ export function createArrangementView({
     ruler.setAttribute("aria-valuemin", "1");
     ruler.setAttribute("aria-valuemax", String(MAX_ARRANGEMENT_STEPS));
     ruler.setAttribute("aria-valuenow", String(playheadStepIndex + 1));
-    ruler.style.width = `${MAX_ARRANGEMENT_STEPS * STEP_WIDTH}px`;
-    for (let step = 0; step < MAX_ARRANGEMENT_STEPS; step += 16) {
+    ruler.style.width = `${MAX_ARRANGEMENT_STEPS * stepWidth}px`;
+    ruler.style.setProperty(
+      "--arrangement-playhead-height",
+      `calc(${RULER_HEIGHT}px + (var(--track-height) * ${projectState.getState().tracks.length}))`,
+    );
+    for (let step = 0; step < MAX_ARRANGEMENT_STEPS; step += 4) {
       const marker = root.createElement("span");
       marker.className = "arrangement-ruler-marker";
-      marker.style.left = `${step * STEP_WIDTH}px`;
-      marker.textContent = String(step + 1).padStart(3, "0");
+      marker.classList.toggle("bar", step % 16 === 0);
+      marker.style.left = `${step * stepWidth}px`;
+      const bar = Math.floor(step / 16) + 1;
+      const beat = Math.floor((step % 16) / 4) + 1;
+      marker.textContent = step % 16 === 0 ? `Bar ${bar}` : `${bar}.${beat}`;
+      marker.title = `Absolute step ${step + 1}`;
       ruler.append(marker);
     }
     const playhead = root.createElement("span");
     playhead.className = "arrangement-ruler-playhead";
     playhead.classList.toggle("playing", playbackStatus === "playing");
-    playhead.style.left = `${playheadStepIndex * STEP_WIDTH}px`;
+    playhead.style.left = `${playheadStepIndex * stepWidth}px`;
     playhead.setAttribute("aria-hidden", "true");
     ruler.append(playhead);
     row.append(label, ruler);
@@ -176,6 +251,7 @@ export function createArrangementView({
   function createAddTrackRow() {
     const row = root.createElement("div");
     row.className = "arrangement-add-track-row";
+    row.style.gridTemplateColumns = `var(--track-header-width) ${MAX_ARRANGEMENT_STEPS * stepWidth}px`;
     const action = root.createElement("div");
     action.className = "arrangement-add-track-cell";
     action.append(elements.addTrack);
@@ -196,6 +272,11 @@ export function createArrangementView({
     const channel = root.createElement("span");
     channel.className = "track-channel";
     channel.textContent = `Track ${trackIndex + 1}`;
+    const activity = root.createElement("output");
+    activity.className = "track-activity";
+    activity.dataset.trackActivity = track.id;
+    activity.value = "Inactive";
+    activity.setAttribute("aria-label", `${track.name} activity`);
     const switches = root.createElement("div");
     switches.className = "track-switches";
     const mute = createButton(root, "M", "mute-track", track.id);
@@ -207,7 +288,7 @@ export function createArrangementView({
     solo.setAttribute("aria-pressed", String(track.mixer.solo));
     solo.setAttribute("aria-label", `Solo ${track.name}`);
     switches.append(mute, solo);
-    primary.append(channel, switches);
+    primary.append(channel, activity, switches);
 
     const name = root.createElement("input");
     name.className = "track-name-input";
@@ -261,7 +342,7 @@ export function createArrangementView({
     const lane = root.createElement("div");
     lane.className = "track-lane";
     lane.dataset.trackId = track.id;
-    lane.style.width = `${MAX_ARRANGEMENT_STEPS * STEP_WIDTH}px`;
+    lane.style.width = `${MAX_ARRANGEMENT_STEPS * stepWidth}px`;
     lane.setAttribute("aria-label", `${track.name} arrangement lane`);
     for (const clip of track.clips) {
       const pattern = patterns.get(clip.patternId);
@@ -272,8 +353,8 @@ export function createArrangementView({
       clipElement.dataset.clipId = clip.id;
       clipElement.dataset.patternId = clip.patternId;
       clipElement.dataset.trackId = track.id;
-      clipElement.style.left = `${clip.startStep * STEP_WIDTH}px`;
-      clipElement.style.width = `${pattern.steps.length * STEP_WIDTH}px`;
+      clipElement.style.left = `${clip.startStep * stepWidth}px`;
+      clipElement.style.width = `${pattern.steps.length * stepWidth}px`;
       clipElement.tabIndex = 0;
       clipElement.setAttribute("role", "button");
       clipElement.setAttribute("aria-pressed", String(clip.id === selectedClipId));
@@ -284,7 +365,18 @@ export function createArrangementView({
       name.textContent = pattern.name;
       const detail = root.createElement("small");
       detail.textContent = `${clip.startStep + 1}-${clip.startStep + pattern.steps.length}`;
-      clipElement.append(name, detail);
+      const contour = root.createElement("span");
+      contour.className = "arrangement-clip-contour";
+      contour.setAttribute("aria-hidden", "true");
+      contour.append(...createClipContour(pattern).map((mark) => {
+        const note = root.createElement("i");
+        note.style.left = `${mark.step * 100}%`;
+        note.style.bottom = `${3 + mark.pitch * 13}px`;
+        note.style.width = `${Math.max(1.5, mark.width * 100)}%`;
+        note.style.opacity = String(0.35 + mark.emphasis * 0.65);
+        return note;
+      }));
+      clipElement.append(contour, name, detail);
       lane.append(clipElement);
     }
     return lane;
@@ -297,6 +389,123 @@ export function createArrangementView({
     elements.trackDown.disabled = index < 0 || index >= project.tracks.length - 1;
     elements.trackRemove.disabled = project.tracks.length === 1;
     elements.trackMenu.querySelector("summary").textContent = `${track.name} options`;
+  }
+
+  function getTrackActivity(project, track) {
+    if (activityStatus !== "playing" || !isTrackAudible(project, track.id)) return null;
+    const workspace = getWorkspace();
+    let pattern = null;
+    let patternStepIndex = null;
+    if (activityMode === "pattern") {
+      if (track.id !== workspace.selectedTrackId) return null;
+      pattern = project.patterns.find((candidate) => candidate.id === workspace.selectedPatternId);
+      patternStepIndex = pattern ? activityStepIndex % pattern.steps.length : null;
+    } else {
+      const patterns = new Map(project.patterns.map((candidate) => [candidate.id, candidate]));
+      const clip = track.clips.find((candidate) => {
+        const candidatePattern = patterns.get(candidate.patternId);
+        return candidate.startStep <= activityStepIndex
+          && activityStepIndex < candidate.startStep + candidatePattern.steps.length;
+      });
+      if (clip) {
+        pattern = patterns.get(clip.patternId);
+        patternStepIndex = activityStepIndex - clip.startStep;
+      }
+    }
+    const step = patternStepIndex === null ? null : pattern?.steps[patternStepIndex];
+    return step && step.volume > 0
+      ? getNoteName(step.note + track.instrument.octaveOffset * 12)
+      : null;
+  }
+
+  function syncTrackActivity() {
+    const project = projectState.getState();
+    for (const track of project.tracks) {
+      const output = elements.canvas.querySelector(`[data-track-activity="${track.id}"]`);
+      if (!output) continue;
+      const noteLabel = getTrackActivity(project, track);
+      const value = noteLabel ?? (isTrackAudible(project, track.id) ? "Inactive" : "Muted");
+      if (output.value !== value) output.value = value;
+      output.classList.toggle("active", Boolean(noteLabel));
+      output.closest(".track-header")?.classList.toggle("track-sounding", Boolean(noteLabel));
+    }
+  }
+
+  function renderOverview(project = projectState.getState(), { rebuildClips = true } = {}) {
+    const occupiedSteps = Math.max(1, projectState.getArrangementEnd());
+    const trackHeaderWidth = elements.canvas.querySelector(".track-header")?.getBoundingClientRect().width
+      || 224;
+    const viewportWidth = Math.max(1, elements.scroll.clientWidth - trackHeaderWidth);
+    const visibleEndStep = Math.ceil((elements.scroll.scrollLeft + viewportWidth) / stepWidth);
+    const overviewSteps = Math.min(
+      MAX_ARRANGEMENT_STEPS,
+      Math.max(16, occupiedSteps, visibleEndStep, playheadStepIndex + 1),
+    );
+    const viewport = getTimelineViewport({
+      maximumSteps: overviewSteps,
+      scrollLeft: elements.scroll.scrollLeft,
+      stepWidth,
+      viewportWidth,
+    });
+    timelineNavigation.viewport.style.left = `${viewport.start * 100}%`;
+    timelineNavigation.viewport.style.width = `${viewport.width * 100}%`;
+    timelineNavigation.playhead.style.left = `${playheadStepIndex / overviewSteps * 100}%`;
+    const loop = project.transport.loop;
+    timelineNavigation.loop.hidden = !loop.enabled;
+    timelineNavigation.loop.style.left = `${loop.startStep / overviewSteps * 100}%`;
+    timelineNavigation.loop.style.width = `${(loop.endStep - loop.startStep) / overviewSteps * 100}%`;
+    timelineNavigation.overview.setAttribute("aria-valuemax", String(overviewSteps));
+    timelineNavigation.overview.setAttribute(
+      "aria-valuenow",
+      String(Math.round(viewport.start * overviewSteps) + 1),
+    );
+    timelineNavigation.overview.dataset.steps = String(overviewSteps);
+    const selectedClipId = getWorkspace().selectedClipId;
+    for (const mark of timelineNavigation.clips.children) {
+      mark.classList.toggle("selected", mark.dataset.clipId === selectedClipId);
+      mark.classList.toggle(
+        "playing",
+        playbackStatus === "playing"
+          && Number(mark.dataset.startStep) <= playheadStepIndex
+          && playheadStepIndex < Number(mark.dataset.endStep),
+      );
+    }
+    if (!rebuildClips) return;
+    timelineNavigation.clips.replaceChildren(...project.tracks.flatMap((track, trackIndex) => (
+      track.clips.map((clip) => {
+        const pattern = project.patterns.find((candidate) => candidate.id === clip.patternId);
+        const mark = root.createElement("span");
+        mark.style.left = `${clip.startStep / overviewSteps * 100}%`;
+        mark.style.width = `${pattern.steps.length / overviewSteps * 100}%`;
+        mark.style.top = `${2 + trackIndex * 3}px`;
+        mark.style.setProperty("--track-color", getTrackColour(trackIndex));
+        mark.dataset.clipId = clip.id;
+        mark.dataset.endStep = String(clip.startStep + pattern.steps.length);
+        mark.dataset.startStep = String(clip.startStep);
+        mark.classList.toggle("selected", clip.id === selectedClipId);
+        mark.classList.toggle(
+          "playing",
+          playbackStatus === "playing"
+            && clip.startStep <= playheadStepIndex
+            && playheadStepIndex < clip.startStep + pattern.steps.length,
+        );
+        return mark;
+      })
+    )));
+  }
+
+  function setTimelineStepWidth(nextWidth) {
+    const next = clampTimelineStepWidth(nextWidth);
+    if (next === stepWidth) return false;
+    const centreStep = (elements.scroll.scrollLeft + elements.scroll.clientWidth / 2) / stepWidth;
+    stepWidth = next;
+    render();
+    elements.scroll.scrollLeft = Math.max(0, centreStep * stepWidth - elements.scroll.clientWidth / 2);
+    timelineNavigation.zoomOut.disabled = stepWidth <= MIN_TIMELINE_STEP_WIDTH;
+    timelineNavigation.zoomIn.disabled = stepWidth >= MAX_TIMELINE_STEP_WIDTH;
+    timelineNavigation.zoomReset.textContent = `${Math.round(stepWidth / DEFAULT_TIMELINE_STEP_WIDTH * 100)}%`;
+    renderOverview(undefined, { rebuildClips: false });
+    return true;
   }
 
   function renderClipInspector(project, workspace) {
@@ -351,6 +560,7 @@ export function createArrangementView({
     project.tracks.forEach((track, trackIndex) => {
       const row = root.createElement("div");
       row.className = "arrangement-track-row";
+      row.style.gridTemplateColumns = `var(--track-header-width) ${MAX_ARRANGEMENT_STEPS * stepWidth}px`;
       row.style.setProperty("--track-color", getTrackColour(trackIndex));
       row.classList.toggle("selected", track.id === workspace.selectedTrackId);
       row.append(
@@ -366,6 +576,11 @@ export function createArrangementView({
       patterns.get(clip.patternId)?.steps.some((step) => step !== null && step.volume > 0)
     )));
     renderTrackMenu(project, workspace);
+    timelineNavigation.zoomOut.disabled = stepWidth <= MIN_TIMELINE_STEP_WIDTH;
+    timelineNavigation.zoomIn.disabled = stepWidth >= MAX_TIMELINE_STEP_WIDTH;
+    timelineNavigation.zoomReset.textContent = `${Math.round(stepWidth / DEFAULT_TIMELINE_STEP_WIDTH * 100)}%`;
+    syncTrackActivity();
+    renderOverview(project);
     renderClipInspector(project, workspace);
     if (focusedClipId) {
       elements.canvas.querySelector(`[data-clip-id="${focusedClipId}"]`)?.focus();
@@ -377,7 +592,7 @@ export function createArrangementView({
       clientX,
       laneLeft: ruler.getBoundingClientRect().left,
       maxStep: MAX_ARRANGEMENT_STEPS - 1,
-      stepWidth: STEP_WIDTH,
+      stepWidth,
     });
     onSeek(stepIndex);
   }
@@ -420,7 +635,7 @@ export function createArrangementView({
       clientX,
       laneLeft: lane.getBoundingClientRect().left,
       maxStep: MAX_ARRANGEMENT_STEPS - 1,
-      stepWidth: STEP_WIDTH,
+      stepWidth,
     });
     contextClipId = null;
     contextPlacement = { startStep, trackId: lane.dataset.trackId };
@@ -513,7 +728,8 @@ export function createArrangementView({
     projectState,
     root,
     scrollElement: elements.scroll,
-    stepWidth: STEP_WIDTH,
+    getStepWidth: () => stepWidth,
+    stepWidth,
   });
 
   function handleClick(event) {
@@ -554,7 +770,7 @@ export function createArrangementView({
       const startStep = getTimelineStep({
         clientX: event.clientX,
         laneLeft: lane.getBoundingClientRect().left,
-        stepWidth: STEP_WIDTH,
+        stepWidth,
       });
       const workspace = getWorkspace();
       try {
@@ -790,6 +1006,63 @@ export function createArrangementView({
       onError(error.message);
     }
   }, { signal: lifecycle.signal });
+  timelineNavigation.zoomOut.addEventListener("click", () => {
+    setTimelineStepWidth(stepWidth - 2);
+  }, { signal: lifecycle.signal });
+  timelineNavigation.zoomIn.addEventListener("click", () => {
+    setTimelineStepWidth(stepWidth + 2);
+  }, { signal: lifecycle.signal });
+  timelineNavigation.zoomReset.addEventListener("click", () => {
+    setTimelineStepWidth(DEFAULT_TIMELINE_STEP_WIDTH);
+  }, { signal: lifecycle.signal });
+  timelineNavigation.fitSong.addEventListener("click", () => {
+    setTimelineStepWidth(getFitSongStepWidth(
+      projectState.getArrangementEnd(),
+      elements.scroll.clientWidth,
+      root.defaultView?.getComputedStyle(elements.canvas)
+        .getPropertyValue("--track-header-width")
+        .replace("px", "") || 224,
+    ));
+    elements.scroll.scrollLeft = 0;
+    renderOverview(undefined, { rebuildClips: false });
+  }, { signal: lifecycle.signal });
+  function moveViewportFromOverview(clientX) {
+    const bounds = timelineNavigation.overview.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - bounds.left) / Math.max(1, bounds.width)));
+    const overviewSteps = Number(timelineNavigation.overview.dataset.steps)
+      || MAX_ARRANGEMENT_STEPS;
+    elements.scroll.scrollLeft = getOverviewScrollLeft({
+      clientRatio: ratio,
+      maximumSteps: overviewSteps,
+      stepWidth,
+      viewportWidth: elements.scroll.clientWidth,
+    });
+    renderOverview(undefined, { rebuildClips: false });
+  }
+  timelineNavigation.overview.addEventListener("pointerdown", (event) => {
+    timelineNavigation.overview.setPointerCapture?.(event.pointerId);
+    moveViewportFromOverview(event.clientX);
+  }, { signal: lifecycle.signal });
+  timelineNavigation.overview.addEventListener("pointermove", (event) => {
+    if (!timelineNavigation.overview.hasPointerCapture?.(event.pointerId)) return;
+    moveViewportFromOverview(event.clientX);
+  }, { signal: lifecycle.signal });
+  timelineNavigation.overview.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === "Home") elements.scroll.scrollLeft = 0;
+    else if (event.key === "End") elements.scroll.scrollLeft = elements.scroll.scrollWidth;
+    else elements.scroll.scrollLeft += event.key === "ArrowLeft"
+      ? -elements.scroll.clientWidth / 4
+      : elements.scroll.clientWidth / 4;
+    renderOverview(undefined, { rebuildClips: false });
+  }, { signal: lifecycle.signal });
+  elements.scroll.addEventListener("scroll", () => {
+    renderOverview(undefined, { rebuildClips: false });
+  }, { signal: lifecycle.signal });
+  root.defaultView?.addEventListener("resize", () => {
+    renderOverview(undefined, { rebuildClips: false });
+  }, { signal: lifecycle.signal });
   elements.trackName.addEventListener("change", () => {
     try {
       projectState.renameTrack(getWorkspace().selectedTrackId, elements.trackName.value);
@@ -896,9 +1169,14 @@ export function createArrangementView({
       clipDragController.dispose();
       clipContextMenu.menu.remove();
       deleteDialog.overlay.remove();
+      timelineNavigation.controls.remove();
+      timelineNavigation.overview.remove();
     },
     render,
     setPlayhead(stepIndex, status, mode) {
+      activityMode = mode;
+      activityStatus = status;
+      activityStepIndex = stepIndex;
       if (mode === "arrangement") {
         playheadStepIndex = stepIndex;
         playbackStatus = status;
@@ -910,8 +1188,10 @@ export function createArrangementView({
       const playhead = elements.canvas.querySelector(".arrangement-ruler-playhead");
       if (!ruler || !playhead) return;
       ruler.setAttribute("aria-valuenow", String(playheadStepIndex + 1));
-      playhead.style.left = `${playheadStepIndex * STEP_WIDTH}px`;
+      playhead.style.left = `${playheadStepIndex * stepWidth}px`;
       playhead.classList.toggle("playing", playbackStatus === "playing");
+      syncTrackActivity();
+      renderOverview(undefined, { rebuildClips: false });
     },
   });
 }

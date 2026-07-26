@@ -106,6 +106,7 @@ export function createPatternFeature({
     noteUpButton: elements.noteUp,
     octaveSelect: elements.octave,
     onEditAction: disarmClear,
+    onSelectionChange: (selectedStepIndex) => sessionState.setEditor({ selectedStepIndex }),
     onStepCleared: showUndoToast,
     patternState,
     pitchSelect: elements.pitch,
@@ -202,6 +203,7 @@ export function createPatternFeature({
       globalThis.clearTimeout(undoToastTimer);
       editor.dispose();
     },
+    inspectStep: editor.inspectStep,
     render,
     setPlayhead: editor.setPlayhead,
     setSelectedNote: editor.setSelectedNote,
