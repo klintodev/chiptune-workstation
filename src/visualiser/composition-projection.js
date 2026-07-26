@@ -64,6 +64,7 @@ function createProjectedNote({
     noteLabel: getNoteName(producedNote),
     pan: track.mixer.pan,
     patternId: pattern.id,
+    patternName: pattern.name,
     patternStepIndex,
     pitch: clamp((producedNote - 36) / 76),
     stepsUntilStart,

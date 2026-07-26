@@ -36,7 +36,11 @@ export function buildProjectionSummary(projection, { maximumUpcoming = 12 } = {}
   const groups = new Map();
   for (const note of upcoming) {
     if (!groups.has(note.trackName)) groups.set(note.trackName, []);
-    groups.get(note.trackName).push(`${note.noteLabel} in ${Math.max(0, note.stepsUntilStart).toFixed(2)} steps`);
+    const distance = Math.max(0, note.stepsUntilStart);
+    const timing = distance < 0.01
+      ? "at the playhead"
+      : `in ${Number(distance.toFixed(2))} ${Math.abs(distance - 1) < 0.01 ? "step" : "steps"}`;
+    groups.get(note.trackName).push(`${note.noteLabel} ${timing}`);
   }
   const upcomingText = groups.size === 0
     ? " No upcoming notes in view."
@@ -53,7 +57,7 @@ export function getProjectedNoteDetails(note) {
     gate: `${Math.round(note.gate * 100)}% of a step`,
     note: note.noteLabel,
     pan,
-    pattern: note.patternId,
+    pattern: note.patternName ?? note.patternId,
     patternStep: String(note.patternStepIndex + 1),
     track: note.trackName,
     velocity: `${Math.round(note.velocity * 100)}%`,

@@ -26,6 +26,7 @@ function projectedNote(overrides = {}) {
     noteLabel: "C4",
     pan: -0.5,
     patternId: DEFAULT_PATTERN_ID,
+    patternName: "Pattern 1",
     patternStepIndex: 8,
     stepsUntilStart: 2,
     timingState: "upcoming",
@@ -62,7 +63,7 @@ test("projected notes expose stable, beginner-readable DOM names and inspector v
     gate: "75% of a step",
     note: "C4",
     pan: "50% left",
-    pattern: DEFAULT_PATTERN_ID,
+    pattern: "Pattern 1",
     patternStep: "9",
     track: "Pulse 1",
     velocity: "70%",
@@ -83,8 +84,8 @@ test("text summaries group bounded upcoming notes while reporting active notes a
   });
   assert.match(summary, /^Arrangement step 9, playing\./);
   assert.match(summary, /Active: Pulse 1 C4/);
-  assert.match(summary, /Pulse 1: E4 in 3\.00 steps/);
-  assert.match(summary, /Bass: G4 in 6\.00 steps/);
+  assert.match(summary, /Pulse 1: E4 in 3 steps/);
+  assert.match(summary, /Bass: G4 in 6 steps/);
 });
 
 test("text summaries do not describe muted or solo-excluded notes as upcoming", () => {
@@ -104,7 +105,21 @@ test("text summaries do not describe muted or solo-excluded notes as upcoming", 
     stepIndex: 8,
   });
   assert.doesNotMatch(summary, /Muted lead|D4/);
-  assert.match(summary, /Pulse 1: E4 in 2\.00 steps/);
+  assert.match(summary, /Pulse 1: E4 in 2 steps/);
+});
+
+test("text summaries explain the playhead and singular step without decimal noise", () => {
+  const summary = buildProjectionSummary({
+    mode: "pattern",
+    notes: [
+      projectedNote({ stepsUntilStart: 0 }),
+      projectedNote({ id: "next", noteLabel: "D4", stepsUntilStart: 1 }),
+    ],
+    status: "stopped",
+    stepIndex: 0,
+  });
+  assert.match(summary, /C4 at the playhead/);
+  assert.match(summary, /D4 in 1 step/);
 });
 
 test("edit handoff resolves authoritative IDs and fails closed for stale notes", () => {
