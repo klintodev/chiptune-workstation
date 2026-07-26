@@ -22,6 +22,7 @@ export function createPatternEditor({
   noteUpButton,
   octaveSelect,
   onEditAction,
+  onSelectionChange = () => {},
   onStepCleared = () => {},
   patternState,
   pitchSelect,
@@ -52,6 +53,8 @@ export function createPatternEditor({
   let activePatternId = patternState.getState().patternId;
   let activeVolumeStepIndex = null;
   let inspectorOpen = false;
+  let playbackStatus = "stopped";
+  let playbackStepIndex = 0;
   let selectedStepIndex = null;
 
   function getSelectedNote() {
@@ -101,6 +104,7 @@ export function createPatternEditor({
   function selectStep(index, shouldPreview = false) {
     onEditAction?.();
     selectedStepIndex = index;
+    onSelectionChange(index);
     const step = patternState.getState().steps[index];
     if (step !== null) {
       loadStepControls(step);
@@ -144,6 +148,7 @@ export function createPatternEditor({
       event.preventDefault();
       inspectorOpen = false;
       selectedStepIndex = null;
+      onSelectionChange(null);
       onEditAction?.();
       patternState.clearStep(index);
       onStepCleared(index);
@@ -164,6 +169,7 @@ export function createPatternEditor({
     if (selectedStepIndex !== null && selectedStepIndex >= length) {
       inspectorOpen = false;
       selectedStepIndex = null;
+      onSelectionChange(null);
     }
 
     grid.setAttribute("aria-label", `${length}-step pattern`);
@@ -241,6 +247,7 @@ export function createPatternEditor({
       activePatternId = pattern.patternId;
       inspectorOpen = false;
       selectedStepIndex = null;
+      onSelectionChange(null);
       activeVolumeStepIndex = null;
     }
     syncStepElements(pattern.steps.length);
@@ -251,11 +258,19 @@ export function createPatternEditor({
       const noteLabel = hasNote ? getNoteName(step.note) : "Rest";
       elements.container.classList.toggle("has-note", hasNote);
       elements.container.classList.toggle("selected", index === selectedStepIndex);
+      const isPlayhead = index === playbackStepIndex;
+      elements.container.classList.toggle("playback-step", isPlayhead);
+      elements.container.dataset.playbackState = isPlayhead ? playbackStatus : "";
       elements.editButton.hidden = !hasNote;
       elements.editButton.setAttribute("aria-label", `Edit step ${index + 1}, ${noteLabel}`);
 
       elements.setButton.tabIndex = index === (selectedStepIndex ?? 0) ? 0 : -1;
       elements.setButton.setAttribute("aria-pressed", String(index === selectedStepIndex));
+      if (isPlayhead && playbackStatus !== "stopped") {
+        elements.setButton.setAttribute("aria-current", "step");
+      } else {
+        elements.setButton.removeAttribute("aria-current");
+      }
       elements.setButton.title = hasNote ? "Right-click to clear this note." : "";
       elements.value.textContent = noteLabel;
       elements.meter.style.width = hasNote ? `${Math.round(step.volume * 100)}%` : "0%";
@@ -294,6 +309,7 @@ export function createPatternEditor({
       return;
     }
     selectedStepIndex = currentIndex;
+    onSelectionChange(currentIndex);
     onEditAction?.();
     if (isAssign) {
       const note = getSelectedNote();
@@ -406,5 +422,22 @@ export function createPatternEditor({
     patternState.removeEventListener("change", render);
   }
 
-  return Object.freeze({ dispose, render, setSelectedNote });
+  function inspectStep(index, { focus = true } = {}) {
+    if (!Number.isInteger(index) || index < 0 || index >= patternState.getState().length) return false;
+    inspectorOpen = true;
+    selectStep(index);
+    if (focus) focusStep(index);
+    return true;
+  }
+
+  function setPlayhead(stepIndex, status, mode) {
+    const length = patternState.getState().length;
+    playbackStatus = mode === "pattern" ? status : "stopped";
+    playbackStepIndex = playbackStatus === "stopped"
+      ? 0
+      : ((stepIndex % length) + length) % length;
+    render();
+  }
+
+  return Object.freeze({ dispose, inspectStep, render, setPlayhead, setSelectedNote });
 }

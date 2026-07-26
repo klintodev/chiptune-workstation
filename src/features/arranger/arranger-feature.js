@@ -7,6 +7,7 @@ export function createArrangerFeature({
   audioEngine,
   inputController,
   notePreview,
+  onPatternPlayhead = () => {},
   projectState,
   root = document,
   scheduler,
@@ -78,7 +79,10 @@ export function createArrangerFeature({
   const transportControls = createTransportControls({
     audioEngine,
     onError: showError,
-    onPlayhead: arrangementView.setPlayhead,
+    onPlayhead(stepIndex, status, mode) {
+      arrangementView.setPlayhead(stepIndex, status, mode);
+      onPatternPlayhead(stepIndex, status, mode);
+    },
     projectState,
     root,
     scheduler,

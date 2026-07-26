@@ -30,8 +30,10 @@ function findArrangementNote(project, patterns, track, stepIndex) {
 }
 
 function createProjectedNote({
+  audible,
   clipId,
   horizonSteps,
+  isPlaying,
   occurrence,
   pattern,
   patternStepIndex,
@@ -43,14 +45,18 @@ function createProjectedNote({
 }) {
   if (step === null || step.volume === 0) return null;
   const stepsUntilStart = occurrence - stepProgress;
-  const active = occurrence === 0 && stepProgress >= 0 && stepProgress <= step.gate;
+  const active = audible && isPlaying && occurrence === 0
+    && stepProgress >= 0 && stepProgress <= step.gate;
   if (occurrence === 0 && stepProgress > step.gate) return null;
   const depth = active ? 0 : clamp(Math.max(0, stepsUntilStart) / horizonSteps);
   const producedNote = step.note + track.instrument.octaveOffset * 12;
   return Object.freeze({
     active,
+    arrangementStepIndex: timelineStep,
+    audible,
     clipId,
     depth,
+    durationSteps: step.gate,
     gate: step.gate,
     id: `${track.id}:${clipId ?? pattern.id}:${timelineStep}:${occurrence}`,
     life: active ? clamp(1 - stepProgress / step.gate) : 1,
@@ -61,6 +67,7 @@ function createProjectedNote({
     patternStepIndex,
     pitch: clamp((producedNote - 36) / 76),
     stepsUntilStart,
+    timingState: active ? "active" : audible ? "upcoming" : "inactive",
     trackId: track.id,
     trackIndex,
     trackName: track.name,
@@ -78,12 +85,13 @@ function projectArrangement(project, timeline, horizonSteps) {
     if (!project.transport.loop.enabled && rawStep >= arrangementEnd) break;
     const timelineStep = getArrangementStep(project, rawStep);
     project.tracks.forEach((track, trackIndex) => {
-      if (!isTrackAudible(project, track.id)) return;
       const found = findArrangementNote(project, patterns, track, timelineStep);
       if (!found) return;
       const note = createProjectedNote({
         ...found,
+        audible: isTrackAudible(project, track.id),
         horizonSteps,
+        isPlaying: timeline.status === "playing",
         occurrence,
         stepProgress: timeline.stepProgress,
         timelineStep,
@@ -102,13 +110,14 @@ function projectPattern(project, timeline, horizonSteps, selectedPatternId, sele
   const pattern = project.patterns.find((candidate) => candidate.id === patternId) ?? project.patterns[0];
   const trackIndex = Math.max(0, project.tracks.findIndex((candidate) => candidate.id === trackId));
   const track = project.tracks[trackIndex] ?? project.tracks[0];
-  if (!isTrackAudible(project, track.id)) return [];
   const notes = [];
   for (let occurrence = 0; occurrence <= horizonSteps; occurrence += 1) {
     const patternStepIndex = (timeline.stepIndex + occurrence) % pattern.steps.length;
     const note = createProjectedNote({
+      audible: isTrackAudible(project, track.id),
       clipId: null,
       horizonSteps,
+      isPlaying: timeline.status === "playing",
       occurrence,
       pattern,
       patternStepIndex,
@@ -134,7 +143,25 @@ export function buildCompositionProjection(project, timeline, {
   const notes = timeline.mode === "pattern"
     ? projectPattern(project, timeline, horizonSteps, selectedPatternId, selectedTrackId)
     : projectArrangement(project, timeline, horizonSteps);
+  notes.sort((left, right) => (
+    left.stepsUntilStart - right.stepsUntilStart
+    || left.trackIndex - right.trackIndex
+    || left.note - right.note
+    || left.id.localeCompare(right.id)
+  ));
+  const activity = project.tracks.map((track, trackIndex) => {
+    const activeNote = notes.find((note) => note.trackId === track.id && note.active);
+    return Object.freeze({
+      active: Boolean(activeNote),
+      audible: isTrackAudible(project, track.id),
+      noteLabel: activeNote?.noteLabel ?? null,
+      trackId: track.id,
+      trackIndex,
+      trackName: track.name,
+    });
+  });
   return Object.freeze({
+    activity: Object.freeze(activity),
     horizonSteps,
     mode: timeline.mode,
     notes: Object.freeze(notes),

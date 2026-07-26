@@ -13,6 +13,7 @@ import {
   createProjectPreferences,
 } from "./persistence/project-repository.js?v=20260722-1";
 import {
+  editProjectedNote,
   projectPersistence,
   projectState,
   scheduler,
@@ -24,6 +25,7 @@ const audioExportFeature = createAudioExportFeature({
   projectState,
 });
 const visualiserFeature = createVisualiserFeature({
+  onEditNote: editProjectedNote,
   projectState,
   scheduler,
   sessionState,

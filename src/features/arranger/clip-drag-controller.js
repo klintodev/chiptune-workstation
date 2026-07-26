@@ -26,6 +26,7 @@ export function createClipDragController({
   projectState,
   root = document,
   scrollElement,
+  getStepWidth = () => stepWidth,
   stepWidth,
 }) {
   const lifecycle = new AbortController();
@@ -110,7 +111,7 @@ export function createClipDragController({
       maxStep: maxArrangementSteps - drag.patternLength,
       pointerOffset: drag.pointerOffset,
       rounding: "nearest",
-      stepWidth,
+      stepWidth: getStepWidth(),
     });
     const trackId = lane.dataset.trackId;
     const valid = projectState.canMoveClip(drag.clipId, trackId, startStep);
@@ -118,7 +119,7 @@ export function createClipDragController({
     lane.classList.add("drag-target");
     lane.classList.toggle("invalid-drop", !valid);
     drag.ghost.classList.toggle("invalid-drop", !valid);
-    drag.ghost.style.left = `${laneRect.left + startStep * stepWidth}px`;
+    drag.ghost.style.left = `${laneRect.left + startStep * getStepWidth()}px`;
     drag.ghost.style.top = `${laneRect.top + drag.sourceTopOffset}px`;
     const detail = drag.ghost.querySelector("small");
     if (detail) detail.textContent = `${startStep + 1}-${startStep + drag.patternLength}`;

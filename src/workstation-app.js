@@ -29,6 +29,7 @@ import {
 } from "./persistence/project-persistence.js?v=20260722-1";
 import { createSessionState } from "./state/session-state.js";
 import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260722-1";
+import { resolveProjectedNoteSource } from "./visualiser/visual-learning-model.js?v=20260726-1";
 
 const projectPreferences = createProjectPreferences();
 let projectRepository;
@@ -147,10 +148,26 @@ arrangerFeature = createArrangerFeature({
   audioEngine,
   inputController,
   notePreview,
+  onPatternPlayhead: patternFeature.setPlayhead,
   projectState,
   scheduler,
   sessionState,
 });
+
+export function editProjectedNote(note) {
+  const source = resolveProjectedNoteSource(projectState.getState(), note);
+  if (!source) return false;
+  sessionState.setWorkspace({
+    activeDockPanel: source.activeDockPanel,
+    detailPanelCollapsed: source.detailPanelCollapsed,
+    selectedClipId: source.selectedClipId,
+    selectedPatternId: source.selectedPatternId,
+    selectedTrackId: source.selectedTrackId,
+  });
+  sessionState.setEditor({ selectedStepIndex: source.selectedStepIndex });
+  patternFeature.render();
+  return patternFeature.inspectStep(source.selectedStepIndex);
+}
 const projectLibraryFeature = createProjectLibraryFeature({
   onBeforeProjectChange: stopAllSound,
   persistence: projectPersistence,
