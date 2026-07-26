@@ -184,7 +184,7 @@ export function createPatternEditor({
       const step = patternState.getState().steps[index];
       selectStep(index, step !== null);
       if (step === null) {
-        const note = getSelectedNote();
+        const note = resolveNewNote(getSelectedNote());
         patternState.setStep(index, note);
         previewSelectedNote(note, patternState.getState().steps[index].volume);
         render();
