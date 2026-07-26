@@ -67,13 +67,18 @@ test("delivery actions are immutable and Dependabot covers the supply chain", as
   ].map((name) => readFile(new URL(`.github/workflows/${name}`, root), "utf8")));
   for (const workflow of workflows) {
     for (const line of workflow.match(/^\s*-?\s*uses:\s*.+$/gm) ?? []) {
-      assert.match(line, /@[a-f0-9]{40}(?:\s+#\s+v\d+)?$/);
+      assert.match(line, /@[a-f0-9]{40}(?:\s+#\s+v\d+(?:\.\d+){0,2})?$/);
     }
     assert.doesNotMatch(workflow, /uses:\s*[^\s]+@v\d/);
   }
   const dependabot = await readFile(new URL(".github/dependabot.yml", root), "utf8");
   assert.match(dependabot, /package-ecosystem: github-actions/);
   assert.match(dependabot, /package-ecosystem: npm/);
+});
+
+test("Dependabot pull requests run checks without requesting Firebase secrets", async () => {
+  const workflow = await readFile(new URL(".github/workflows/firebase-hosting-pull-request.yml", root), "utf8");
+  assert.match(workflow, /if:\s*\$\{\{\s*github\.actor != 'dependabot\[bot\]'\s*\}\}/);
 });
 
 test("fonts and browser policy no longer depend on Google Fonts", async () => {
