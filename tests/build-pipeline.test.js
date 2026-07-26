@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const root = new URL("../", import.meta.url);
@@ -40,4 +40,26 @@ test("production build bundles pages and Firebase serves only generated output",
   for (const stylesheet of ["account", "audio-export", "publishing", "visualiser"]) {
     assert.match(styles, new RegExp(`${stylesheet}\\.css`));
   }
+});
+
+test("source modules use canonical identities and production assets are fingerprinted once", async () => {
+  const sourceFiles = [
+    new URL("src/", root),
+  ];
+  const pending = [...sourceFiles];
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const url = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, directory);
+      if (entry.isDirectory()) pending.push(url);
+      else if (entry.name.endsWith(".js")) {
+        assert.doesNotMatch(await readFile(url, "utf8"), /(?:from\s+|import\()["'][^"']+\?v=/);
+      }
+    }
+  }
+
+  const fontFiles = await readdir(new URL("dist/assets/fonts/", root));
+  assert.ok(fontFiles.length > 0);
+  assert.ok(fontFiles.every((filename) => /-[A-Z0-9]+\.woff2$/i.test(filename)));
+  assert.equal(fontFiles.some((filename) => filename === "vt323-latin-400.woff2"), false);
 });

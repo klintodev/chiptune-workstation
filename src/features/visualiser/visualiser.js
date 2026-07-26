@@ -1,14 +1,14 @@
 import { getTrackColour } from "../../shared/track-presentation.js";
-import { fitCanvas } from "../../visualiser/canvas-renderer.js?v=20260721-3";
-import { buildCompositionProjection } from "../../visualiser/composition-projection.js?v=20260722-2";
-import { renderCompositionFrame } from "../../visualiser/signal-stack-renderer.js?v=20260726-1";
+import { fitCanvas } from "../../visualiser/canvas-renderer.js";
+import { buildCompositionProjection } from "../../visualiser/composition-projection.js";
+import { renderCompositionFrame } from "../../visualiser/signal-stack-renderer.js";
 import {
   buildProjectionSummary,
   getProjectedNoteAccessibleName,
   getProjectedNoteDetails,
   normalizeVisualPreferences,
   resolveProjectedNoteSource,
-} from "../../visualiser/visual-learning-model.js?v=20260726-1";
+} from "../../visualiser/visual-learning-model.js";
 
 const PREFERENCE_KEY = "klinto-visual-learning-preferences";
 

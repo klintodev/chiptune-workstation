@@ -2,34 +2,34 @@ import {
   createAudioEngine,
   createAudioEngineError,
   isAudioEngineError,
-} from "./audio/audio-engine.js?v=20260721-3";
-import { createNotePreview } from "./audio/note-preview.js?v=20260721-1";
-import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260722-1";
-import { createAudioStatusFeature } from "./features/audio-status/audio-status.js?v=20260721-2";
-import { createArrangerFeature } from "./features/arranger/arranger-feature.js?v=20260722-1";
+} from "./audio/audio-engine.js";
+import { createNotePreview } from "./audio/note-preview.js";
+import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
+import { createAudioStatusFeature } from "./features/audio-status/audio-status.js";
+import { createArrangerFeature } from "./features/arranger/arranger-feature.js";
 import { createInstrumentFeature } from "./features/instrument/instrument.js";
-import { createInputController } from "./features/keyboard/input-controller.js?v=20260721-1";
+import { createInputController } from "./features/keyboard/input-controller.js";
 import { createKeyboardFeature } from "./features/keyboard/keyboard.js";
-import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js?v=20260721-3";
-import { createProjectLibraryFeature } from "./features/project-library/project-library.js?v=20260722-1";
+import { createPatternFeature } from "./features/pattern-editor/pattern-feature.js";
+import { createProjectLibraryFeature } from "./features/project-library/project-library.js";
 import { createThemeFeature } from "./features/theme/theme.js";
-import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js?v=20260721-3";
+import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js";
 import { getNoteName } from "./music/note.js";
 import { createInstrumentState } from "./state/instrument-state.js";
 import { DEFAULT_PATTERN_ROOT_OCTAVE, createPatternState } from "./state/pattern-state.js";
-import { createProjectState } from "./state/project-state.js?v=20260722-1";
+import { createProjectState } from "./state/project-state.js";
 import {
   createIndexedDbProjectRepository,
   createMemoryProjectRepository,
   createProjectPreferences,
-} from "./persistence/project-repository.js?v=20260722-1";
+} from "./persistence/project-repository.js";
 import {
   createProjectPersistence,
   loadInitialProjectDocument,
-} from "./persistence/project-persistence.js?v=20260722-1";
+} from "./persistence/project-persistence.js";
 import { createSessionState } from "./state/session-state.js";
-import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260722-1";
-import { resolveProjectedNoteSource } from "./visualiser/visual-learning-model.js?v=20260726-1";
+import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
+import { resolveProjectedNoteSource } from "./visualiser/visual-learning-model.js";
 
 const projectPreferences = createProjectPreferences();
 let projectRepository;
