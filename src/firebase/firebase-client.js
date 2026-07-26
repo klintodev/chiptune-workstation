@@ -3,14 +3,14 @@ import {
   createCloudProjectRecord,
   normalizeCloudProjectRecord,
   summarizeCloudProjectRecord,
-} from "./cloud-project.js?v=20260722-1";
+} from "./cloud-project.js";
 import { FIREBASE_CONFIG, isFirebaseConfigured } from "./firebase-config.js";
 import {
   createPublicationRecord,
   LEGACY_PUBLICATION_VERSION,
   normalizePublicationRecord,
   PUBLICATION_SLOTS,
-} from "./publication.js?v=20260722-1";
+} from "./publication.js";
 import { FIREBASE_APP_CHECK_CONFIG } from "./firebase-config.js";
 
 const FIREBASE_SDK_VERSION = "12.16.0";

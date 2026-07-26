@@ -1,4 +1,4 @@
-import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js?v=20260722-1";
+import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js";
 import { downloadProjectFile } from "../../persistence/project-download.js";
 import { queryRequired } from "../../shared/query-required.js";
 

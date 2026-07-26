@@ -1,13 +1,13 @@
-import { createAudioEngine } from "./audio/audio-engine.js?v=20260721-3";
-import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js?v=20260722-1";
-import { createFirebaseClient } from "./firebase/firebase-client.js?v=20260722-1";
+import { createAudioEngine } from "./audio/audio-engine.js";
+import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
+import { createFirebaseClient } from "./firebase/firebase-client.js";
 import { getTrackColour } from "./shared/track-presentation.js";
 import { publicErrorMessage } from "./shared/public-error.js";
-import { createProjectState, getArrangementEnd } from "./state/project-state.js?v=20260722-1";
-import { createArrangementScheduler } from "./transport/arrangement-scheduler.js?v=20260722-1";
-import { fitCanvas } from "./visualiser/canvas-renderer.js?v=20260721-3";
-import { buildCompositionProjection } from "./visualiser/composition-projection.js?v=20260722-1";
-import { renderCompositionFrame } from "./visualiser/signal-stack-renderer.js?v=20260722-1";
+import { createProjectState, getArrangementEnd } from "./state/project-state.js";
+import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
+import { fitCanvas } from "./visualiser/canvas-renderer.js";
+import { buildCompositionProjection } from "./visualiser/composition-projection.js";
+import { renderCompositionFrame } from "./visualiser/signal-stack-renderer.js";
 
 const elements = {
   canvas: document.querySelector("#player-canvas"),

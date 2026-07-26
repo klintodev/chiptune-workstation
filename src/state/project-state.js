@@ -5,7 +5,7 @@ import {
   createDefaultVisualiser,
   normalizeVisualiser,
   validateVisualiser,
-} from "../visualiser/visualiser-config.js?v=20260721-3";
+} from "../visualiser/visualiser-config.js";
 import {
   DEFAULT_PATTERN_LENGTH,
   DEFAULT_PATTERN_ROOT_OCTAVE,

@@ -6,7 +6,7 @@ import {
   parseProjectDocument,
   reviseProjectDocument,
   serializeProjectDocument,
-} from "./project-document.js?v=20260722-1";
+} from "./project-document.js";
 import { createBoundedUniqueName } from "../shared/bounded-name.js";
 import {
   MAX_PROJECT_TITLE_LENGTH,

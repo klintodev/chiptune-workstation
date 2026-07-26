@@ -1,7 +1,7 @@
 import {
   normalizeProjectDocument,
   summarizeProjectDocument,
-} from "../persistence/project-document.js?v=20260722-1";
+} from "../persistence/project-document.js";
 
 export const MAX_CLOUD_PROJECT_BYTES = 900_000;
 export const CLOUD_PROJECT_FORMAT = "chiptune-workstation-cloud";

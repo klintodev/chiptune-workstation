@@ -1,17 +1,17 @@
-import { createAudioExportFeature } from "./features/audio-export/audio-export.js?v=20260721-3";
-import { createAccountFeature } from "./features/account/account.js?v=20260721-5";
-import { createVisualiserFeature } from "./features/visualiser/visualiser.js?v=20260722-1";
-import { createPublishingFeature } from "./features/publishing/publishing.js?v=20260721-4";
+import { createAudioExportFeature } from "./features/audio-export/audio-export.js";
+import { createAccountFeature } from "./features/account/account.js";
+import { createVisualiserFeature } from "./features/visualiser/visualiser.js";
+import { createPublishingFeature } from "./features/publishing/publishing.js";
 import {
   createAccountService,
   createAccountSessionPreference,
-} from "./firebase/account-service.js?v=20260721-3";
+} from "./firebase/account-service.js";
 import {
   createFallbackCloudLinkRepository,
   createIndexedDbCloudLinkRepository,
   createMemoryCloudLinkRepository,
-} from "./firebase/cloud-link-repository.js?v=20260722-1";
-import { createCloudProjectService } from "./firebase/cloud-project-service.js?v=20260722-1";
+} from "./firebase/cloud-link-repository.js";
+import { createCloudProjectService } from "./firebase/cloud-project-service.js";
 import {
   createLazyCloudProjectService,
   createLazyPublicationService,
@@ -20,7 +20,7 @@ import {
   createLocalPublicationLinkRepository,
   createMemoryPublicationLinkRepository,
 } from "./firebase/publication-link-repository.js";
-import { createPublicationService } from "./firebase/publication-service.js?v=20260722-1";
+import { createPublicationService } from "./firebase/publication-service.js";
 import {
   projectPersistence,
   projectPreferences,
@@ -28,7 +28,7 @@ import {
   projectState,
   scheduler,
   sessionState,
-} from "./workstation-app.js?v=20260722-1";
+} from "./workstation-app.js";
 
 const audioExportFeature = createAudioExportFeature({
   persistence: projectPersistence,
@@ -42,7 +42,7 @@ const visualiserFeature = createVisualiserFeature({
 const accountSessionPreference = createAccountSessionPreference();
 const accountService = createAccountService({
   async loadClient() {
-    const { createFirebaseClient } = await import("./firebase/firebase-client.js?v=20260722-1");
+    const { createFirebaseClient } = await import("./firebase/firebase-client.js");
     return createFirebaseClient();
   },
   sessionPreference: accountSessionPreference,
