@@ -7,6 +7,26 @@ function clearRemixIntent(history, location) {
   history.replaceState({}, "", url.href);
 }
 
+export async function importAndOpenRemix({
+  intent,
+  onBeforeProjectChange = () => {},
+  persistence,
+  remixService,
+}) {
+  if (intent?.error) throw intent.error;
+  const imported = await remixService.importPublication(
+    intent.publicationId,
+    intent.publicationRevision,
+  );
+  try {
+    onBeforeProjectChange();
+    await persistence.openProject(imported.document.id);
+    return Object.freeze({ imported, status: "opened" });
+  } catch (error) {
+    return Object.freeze({ error, imported, status: "saved-not-opened" });
+  }
+}
+
 export function createRemixImportFeature({
   history = globalThis.history,
   location = globalThis.location,
@@ -72,21 +92,28 @@ export function createRemixImportFeature({
     dialog.querySelector("h2").textContent = "Creating your local copy…";
     message.textContent = "Checking the exact public revision and the creator’s current remix permission.";
     try {
-      if (intent.error) throw intent.error;
-      const imported = await remixService.importPublication(
-        intent.publicationId,
-        intent.publicationRevision,
-      );
-      onBeforeProjectChange();
-      await persistence.openProject(imported.document.id);
+      const result = await importAndOpenRemix({
+        intent,
+        onBeforeProjectChange,
+        persistence,
+        remixService,
+      });
+      const { imported } = result;
       clearRemixIntent(history, location);
-      dialog.querySelector("h2").textContent = "Local remix created";
-      message.textContent = "The source is unchanged. This project is saved only in this browser and has not been uploaded or published.";
       source.hidden = false;
       source.innerHTML = `<strong></strong><span></span>`;
       source.querySelector("strong").textContent = imported.provenance.sourceTitle;
       source.querySelector("span").textContent = `by ${imported.provenance.creatorName} · public revision ${imported.provenance.publicationRevision} · publication ${imported.provenance.publicationId}`;
-      action.textContent = "Continue in studio";
+      if (result.status === "opened") {
+        dialog.querySelector("h2").textContent = "Local remix created";
+        message.textContent = "The source is unchanged. This project is saved only in this browser and has not been uploaded or published.";
+        action.textContent = "Continue in studio";
+      } else {
+        dialog.querySelector("h2").textContent = "Local remix saved, but not opened";
+        message.textContent = `Your local remix was created successfully, but Klinto Studio could not switch to it. It remains available in the project library as “${imported.document.project.metadata.title}”. ${result.error?.message ?? ""}`.trim();
+        message.classList.add("error");
+        action.textContent = "Return to studio";
+      }
     } catch (error) {
       clearRemixIntent(history, location);
       dialog.querySelector("h2").textContent = "Remix could not be created";

@@ -194,6 +194,19 @@ export function createProjectPersistence({
     return activate(saved, { flushCurrent: false });
   }
 
+  async function createProjectFromTemplate(project) {
+    await saveNow();
+    const summaries = await repository.list();
+    const template = JSON.parse(JSON.stringify(project));
+    template.metadata.title = uniqueTitle(template.metadata.title, summaries);
+    const document = createProjectDocument(template, { id: createId(), now: now() });
+    const saved = await repository.save(document);
+    return activate(saved, {
+      detail: { operation: "create-project-from-template" },
+      flushCurrent: false,
+    });
+  }
+
   async function duplicateProject() {
     await saveNow();
     const summaries = await repository.list();
@@ -261,6 +274,7 @@ export function createProjectPersistence({
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
     createProject,
+    createProjectFromTemplate,
     deleteProject,
     dispose() {
       disposed = true;

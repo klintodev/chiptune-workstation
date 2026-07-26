@@ -644,6 +644,13 @@ export function createProjectState(initialProject = createDefaultProject()) {
     return id;
   }
 
+  function applyProjectTransform(nextProject, detail = {}) {
+    return commit(nextProject, {
+      operation: "project-transform",
+      ...detail,
+    });
+  }
+
   function setPatternRootOctave(patternId, rootOctave) {
     if (
       !Number.isInteger(rootOctave) ||
@@ -896,6 +903,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
     addEventListener: events.addEventListener.bind(events),
     addTrack,
     applyPatternTransform,
+    applyProjectTransform,
     beginHistoryGroup,
     canMoveClip,
     createClipVariation,

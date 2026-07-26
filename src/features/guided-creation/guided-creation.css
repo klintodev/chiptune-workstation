@@ -1,5 +1,6 @@
 .guided-dialog,
-.guided-restore-dialog {
+.guided-restore-dialog,
+.guided-starter-replace-dialog {
   position: fixed;
   z-index: 390;
   inset: 50% auto auto 50%;
@@ -12,9 +13,11 @@
   transform: translate(-50%, -50%);
 }
 .guided-dialog { width: min(760px, calc(100vw - 28px)); }
-.guided-restore-dialog { width: min(460px, calc(100vw - 28px)); }
+.guided-restore-dialog,
+.guided-starter-replace-dialog { width: min(460px, calc(100vw - 28px)); }
 .guided-dialog::backdrop,
-.guided-restore-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(5px); }
+.guided-restore-dialog::backdrop,
+.guided-starter-replace-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(5px); }
 .guided-panel,
 .guided-restore-panel {
   display: grid;
@@ -63,11 +66,18 @@
 .guided-idea-controls fieldset { display: flex; min-height: 58px; align-items: center; gap: 9px; margin: 0; padding: 6px 8px; border: 1px solid var(--line); }
 .guided-idea-controls fieldset label { display: flex; align-items: center; gap: 3px; color: var(--label); font-size: 0.86rem; }
 .guided-variation-bounds { border: 1px dashed var(--line-strong); border-radius: 4px; background: var(--bg-1); }
-.guided-variation-bounds summary { padding: 8px 10px; color: var(--label); cursor: pointer; }
-.guided-variation-bounds > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 10px 10px; }
+.guided-recipe-controls { border: 1px dashed var(--line-strong); border-radius: 4px; background: var(--bg-1); }
+.guided-variation-bounds summary,
+.guided-recipe-controls summary { padding: 8px 10px; color: var(--label); cursor: pointer; }
+.guided-variation-bounds > div,
+.guided-recipe-controls > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 10px 10px; }
 .guided-variation-bounds > div > label:not(.guided-check) { display: grid; gap: 3px; color: var(--muted); font-size: 0.78rem; }
+.guided-recipe-controls label { display: grid; min-width: 0; gap: 3px; color: var(--muted); font-size: 0.78rem; }
 .guided-variation-bounds input[type="number"] { min-width: 0; min-height: 34px; padding: 4px 6px; }
+.guided-recipe-controls input[type="number"],
+.guided-recipe-controls select { width: 100%; min-width: 0; min-height: 34px; padding: 4px 6px; }
 .guided-variation-bounds input[type="range"] { width: 100%; min-width: 0; }
+.guided-recipe-controls input[type="range"] { width: 100%; min-width: 0; }
 .guided-variation-bounds fieldset { display: flex; align-items: center; gap: 6px; margin: 0; padding: 5px 7px; border: 1px solid var(--line); }
 .guided-variation-bounds fieldset legend { color: var(--muted); font-size: 0.72rem; }
 .guided-variation-bounds fieldset label { display: flex; align-items: center; gap: 2px; font-size: 0.78rem; }
@@ -76,6 +86,27 @@
 .guided-preview strong { display: block; margin-top: 3px; color: var(--selection); font-size: 1.02rem; font-weight: 400; }
 .guided-preview p { margin: 2px 0 0; color: var(--muted); line-height: 1.25; }
 .guided-preview > div:last-child { display: flex; flex: 0 0 auto; gap: 6px; }
+.guided-starter-controls { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(300px, 1.7fr) auto; align-items: end; gap: 8px; }
+.guided-starter-controls > label { display: grid; gap: 4px; }
+.guided-starter-controls > label > span,
+.guided-starter-controls legend {
+  color: var(--muted);
+  font-family: "Silkscreen", monospace;
+  font-size: 0.52rem;
+  text-transform: uppercase;
+}
+.guided-starter-controls select { min-height: 36px; padding: 5px 7px; }
+.guided-starter-controls fieldset { display: flex; min-height: 58px; align-items: center; gap: 10px; margin: 0; padding: 6px 8px; border: 1px solid var(--line); }
+.guided-starter-controls fieldset label { display: flex; align-items: center; gap: 3px; color: var(--label); font-size: 0.82rem; }
+.guided-starter-preview { display: grid; gap: 10px; padding: 11px; border: 1px solid var(--selection); border-radius: 4px; background: color-mix(in srgb, var(--selection) 8%, var(--bg-1)); }
+.guided-starter-summary strong { display: block; margin-top: 3px; color: var(--selection); font-size: 1.02rem; font-weight: 400; }
+.guided-starter-summary p { margin: 3px 0 0; color: var(--muted); line-height: 1.28; }
+.guided-starter-preview dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 10px; margin: 0; }
+.guided-starter-preview dt { color: var(--label); font-family: "Silkscreen", monospace; font-size: 0.56rem; text-transform: uppercase; }
+.guided-starter-preview dd { margin: 0; color: var(--muted); line-height: 1.25; }
+.guided-starter-sections { display: flex; flex-wrap: wrap; gap: 5px; }
+.guided-starter-sections span { padding: 4px 6px; border: 1px solid var(--line); border-radius: 3px; color: var(--label); background: var(--bg-1); font-size: 0.8rem; }
+.guided-starter-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .guided-checkpoint-create { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
 .guided-checkpoint-list { display: grid; max-height: 210px; gap: 5px; overflow-y: auto; }
 .guided-checkpoint-empty { margin: 0; padding: 8px; color: var(--muted); text-align: center; }
@@ -149,7 +180,9 @@
   .guided-idea-controls { grid-template-columns: 1fr 1fr; }
   .guided-preview { align-items: stretch; flex-direction: column; }
   .guided-preview > div:last-child { display: grid; grid-template-columns: repeat(3, 1fr); }
-  .guided-variation-bounds > div { grid-template-columns: 1fr 1fr; }
+  .guided-variation-bounds > div,
+  .guided-recipe-controls > div { grid-template-columns: 1fr 1fr; }
+  .guided-starter-controls { grid-template-columns: 1fr; }
 }
 @media (max-width: 500px) {
   .guided-scale-controls,
@@ -157,5 +190,10 @@
   .guided-checkpoint-create { grid-template-columns: 1fr; }
   .guided-section-heading { align-items: stretch; flex-direction: column; }
   .guided-section-heading output { text-align: left; }
-  .guided-variation-bounds > div { grid-template-columns: 1fr; }
+  .guided-variation-bounds > div,
+  .guided-recipe-controls > div { grid-template-columns: 1fr; }
+  .guided-starter-controls fieldset { align-items: stretch; flex-direction: column; }
+  .guided-starter-preview dl { grid-template-columns: 1fr; gap: 3px; }
+  .guided-starter-preview dd { margin-bottom: 5px; }
+  .guided-starter-actions { display: grid; grid-template-columns: 1fr; }
 }

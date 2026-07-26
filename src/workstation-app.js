@@ -14,6 +14,7 @@ import { createPatternFeature } from "./features/pattern-editor/pattern-feature.
 import { createProjectLibraryFeature } from "./features/project-library/project-library.js?v=20260722-1";
 import { createGuidedCreationFeature } from "./features/guided-creation/guided-creation.js";
 import { createScaleEntryController } from "./features/guided-creation/scale-entry-controller.js";
+import { createStarterService } from "./features/guided-creation/starter-service.js";
 import { createThemeFeature } from "./features/theme/theme.js";
 import { createWorkspaceTabs } from "./features/workspace-tabs/workspace-tabs.js?v=20260721-3";
 import { getNoteName } from "./music/note.js";
@@ -87,6 +88,12 @@ export const checkpointService = createCheckpointService({
   replaceProject: (document, detail) => projectPersistence.replaceActiveProject(document.project, detail),
   repository: checkpointRepository,
 });
+export const starterService = createStarterService({
+  checkpointService,
+  onBeforeProjectChange: stopAllSound,
+  persistence: projectPersistence,
+  projectState,
+});
 const themeFeature = createThemeFeature({ sessionState });
 const workspaceTabs = createWorkspaceTabs({ projectState, sessionState });
 const getSelectedTrackId = () => sessionState.getState().workspace.selectedTrackId;
@@ -99,6 +106,7 @@ const instrumentState = createInstrumentState(undefined, {
   getTrackId: getSelectedTrackId,
   projectState,
   sessionState,
+  starterService,
 });
 const patternState = createPatternState(undefined, {
   getPatternId: getSelectedPatternId,

@@ -6,6 +6,7 @@ import {
   createRemixImport,
   createRemixService,
 } from "../src/firebase/remix-service.js";
+import { importAndOpenRemix } from "../src/features/remixing/remix-import-feature.js";
 import { createProjectDocument } from "../src/persistence/project-document.js";
 import { createMemoryProjectRepository } from "../src/persistence/project-repository.js";
 import { createMemoryRemixProvenanceRepository } from "../src/persistence/remix-provenance-repository.js";
@@ -91,4 +92,58 @@ test("failed provenance storage rolls back the new project without changing curr
 
   await assert.rejects(service.importPublication("publication-public", 3), /Quota unavailable/);
   assert.deepEqual((await projectRepository.list()).map(({ id }) => id), ["project-current"]);
+});
+
+test("a locally saved remix remains discoverable when opening it fails", async () => {
+  const projectRepository = createMemoryProjectRepository();
+  const provenanceRepository = createMemoryRemixProvenanceRepository();
+  const service = createRemixService({
+    createId: () => "project-remix-saved",
+    loadPublication: async () => publication(),
+    projectRepository,
+    provenanceRepository,
+  });
+  const result = await importAndOpenRemix({
+    intent: {
+      publicationId: "publication-public",
+      publicationRevision: 3,
+    },
+    persistence: {
+      async openProject() {
+        throw new Error("Could not activate local project");
+      },
+    },
+    remixService: service,
+  });
+
+  assert.equal(result.status, "saved-not-opened");
+  assert.equal(result.imported.document.id, "project-remix-saved");
+  assert.match(result.error.message, /activate/);
+  assert.deepEqual(
+    (await projectRepository.list()).map(({ id }) => id),
+    ["project-remix-saved"],
+  );
+  assert.deepEqual(
+    await provenanceRepository.get("project-remix-saved"),
+    result.imported.provenance,
+  );
+});
+
+test("a remix creation failure remains distinct from a post-save open failure", async () => {
+  await assert.rejects(importAndOpenRemix({
+    intent: {
+      publicationId: "publication-public",
+      publicationRevision: 3,
+    },
+    persistence: {
+      async openProject() {
+        throw new Error("This should not be reached");
+      },
+    },
+    remixService: {
+      async importPublication() {
+        throw new Error("Local storage quota unavailable");
+      },
+    },
+  }), /quota unavailable/);
 });
