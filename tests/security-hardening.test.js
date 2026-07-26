@@ -53,10 +53,13 @@ test("publication slots expose exactly twenty server-enforceable positions", asy
   const rules = await readFile(new URL("firestore.rules", root), "utf8");
   assert.match(rules, /match \/publicationSlots\/\{slotId\}/);
   assert.match(rules, /slotMatchesAfter/);
-  assert.match(rules, /publicationVersion == 2/);
+  assert.match(rules, /publicationVersion == 3/);
   assert.match(rules, /project\.patterns\.size\(\) <= 64/);
   assert.match(rules, /project\.tracks\.size\(\) <= 8/);
   assert.match(rules, /validText\(project\.metadata\.title, 1, 100\)/);
+  assert.match(rules, /project\.schemaVersion == 6/);
+  assert.match(rules, /project\.scaleGuide\.keys\(\)\.hasOnly/);
+  assert.match(rules, /project\.scaleGuide\.lock is bool/);
 });
 
 test("delivery actions are immutable and Dependabot covers the supply chain", async () => {

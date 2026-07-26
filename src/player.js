@@ -3,6 +3,7 @@ import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
 import { createFirebaseClient } from "./firebase/firebase-client.js";
 import { getTrackColour } from "./shared/track-presentation.js";
 import { publicErrorMessage } from "./shared/public-error.js";
+import { buildRemixStudioUrl } from "./features/remixing/remix-intent.js";
 import { setTextIfChanged } from "./shared/status-announcer.js";
 import { createProjectState, getArrangementEnd } from "./state/project-state.js";
 import { createArrangementScheduler } from "./transport/arrangement-scheduler.js";
@@ -18,6 +19,11 @@ const elements = {
   play: document.querySelector("#player-play"),
   position: document.querySelector("#player-position"),
   restart: document.querySelector("#player-restart"),
+  remix: document.querySelector("#player-remix"),
+  remixCancel: document.querySelector("#player-remix-cancel"),
+  remixConfirm: document.querySelector("#player-remix-confirm"),
+  remixDialog: document.querySelector("#player-remix-dialog"),
+  remixSection: document.querySelector("#player-remix-section"),
   revision: document.querySelector("#player-revision"),
   status: document.querySelector("#player-status"),
   title: document.querySelector("#player-title"),
@@ -30,6 +36,7 @@ let runtimes = null;
 let scheduler = null;
 let visualFrame = 0;
 let visitorVolume = 1;
+let remixUrl = null;
 let context = null;
 try {
   context = elements.canvas.getContext?.("2d") ?? null;
@@ -153,6 +160,10 @@ function createPlayer(record) {
   elements.title.textContent = record.title;
   elements.creator.textContent = record.creatorName;
   elements.revision.textContent = `Revision ${record.publicationRevision}`;
+  if (record.allowRemix === true) {
+    remixUrl = buildRemixStudioUrl(record);
+    elements.remixSection.hidden = false;
+  }
   document.title = `${record.title} - Klinto Studio`;
   document.querySelector('meta[name="description"]').content = `Listen to ${record.title} by ${record.creatorName}.`;
   if (getArrangementEnd(project) === 0) showError("This published snapshot does not contain an arranged pattern yet.");
@@ -181,6 +192,17 @@ elements.volume.addEventListener("input", () => {
   if (audioEngine?.isReady()) {
     audioEngine.setMasterVolume(projectState.getState().transport.masterVolume * visitorVolume);
   }
+});
+elements.remix.addEventListener("click", () => {
+  if (remixUrl) elements.remixDialog.showModal();
+});
+elements.remixCancel.addEventListener("click", () => elements.remixDialog.close());
+elements.remixDialog.addEventListener("cancel", () => elements.remixDialog.close());
+elements.remixConfirm.addEventListener("click", () => {
+  if (!remixUrl) return;
+  elements.remixConfirm.disabled = true;
+  elements.remixConfirm.textContent = "Opening studio…";
+  location.assign(remixUrl);
 });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {

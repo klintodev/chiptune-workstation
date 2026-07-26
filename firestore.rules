@@ -29,12 +29,21 @@ service cloud.firestore {
     function validProject(project) {
       return project is map
         && project.keys().hasOnly([
-          "schemaVersion", "metadata", "visualiser", "transport", "patterns", "tracks"
+          "schemaVersion", "metadata", "scaleGuide", "visualiser", "transport", "patterns", "tracks"
         ])
-        && project.schemaVersion == 5
+        && project.schemaVersion == 6
         && project.metadata is map
         && project.metadata.keys().hasOnly(["title"])
         && validText(project.metadata.title, 1, 100)
+        && project.scaleGuide is map
+        && project.scaleGuide.keys().hasOnly(["tonic", "scale", "lock"])
+        && project.scaleGuide.tonic is int
+        && project.scaleGuide.tonic >= 0
+        && project.scaleGuide.tonic <= 11
+        && project.scaleGuide.scale in [
+          "major", "natural-minor", "major-pentatonic", "minor-pentatonic", "chromatic"
+        ]
+        && project.scaleGuide.lock is bool
         && project.visualiser is map
         && project.transport is map
         && project.transport.keys().hasOnly(["bpm", "masterVolume", "loop"])
@@ -109,10 +118,10 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           "publicationFormat", "publicationVersion", "publicationId", "publicationRevision",
           "ownerSlot", "sourceProjectId", "title", "creatorName", "publishedAt", "updatedAt",
-          "document", "serverUpdatedAt"
+          "allowRemix", "document", "serverUpdatedAt"
         ])
         && request.resource.data.publicationFormat == "chiptune-workstation-publication"
-        && request.resource.data.publicationVersion == 2
+        && request.resource.data.publicationVersion == 3
         && request.resource.data.publicationId == publicationId
         && validText(request.resource.data.publicationId, 1, 100)
         && request.resource.data.publicationRevision is int
@@ -123,6 +132,7 @@ service cloud.firestore {
         && validText(request.resource.data.creatorName, 1, 48)
         && validText(request.resource.data.publishedAt, 1, 64)
         && validText(request.resource.data.updatedAt, 1, 64)
+        && request.resource.data.allowRemix is bool
         && request.resource.data.serverUpdatedAt is timestamp
         && validProjectDocument(request.resource.data.document, request.resource.data.sourceProjectId)
         && request.resource.data.title == request.resource.data.document.project.metadata.title;
@@ -206,7 +216,7 @@ service cloud.firestore {
         && (
           (resource.data.publicationVersion == 1 && resource.data.ownerId == request.auth.uid)
           || (
-            resource.data.publicationVersion == 2
+            resource.data.publicationVersion in [2, 3]
             && slotMatchesBefore(request.auth.uid, resource.data.ownerSlot, publicationId)
             && request.resource.data.ownerSlot == resource.data.ownerSlot
           )
@@ -220,7 +230,7 @@ service cloud.firestore {
         && (
           (resource.data.publicationVersion == 1 && resource.data.ownerId == request.auth.uid)
           || (
-            resource.data.publicationVersion == 2
+            resource.data.publicationVersion in [2, 3]
             && slotMatchesBefore(request.auth.uid, resource.data.ownerSlot, publicationId)
             && !existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/publicationSlots/$(resource.data.ownerSlot))
           )

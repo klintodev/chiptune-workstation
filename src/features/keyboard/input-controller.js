@@ -11,6 +11,7 @@ export function createInputController({
   getVoiceEngine,
   onActiveNotesChange,
   onNoteStart,
+  resolvePatternNote = (note) => note,
   root = document,
   voiceEngine,
 }) {
@@ -22,10 +23,12 @@ export function createInputController({
     onActiveNotesChange?.(new Set(ownersByNote.keys()));
   }
 
-  function createVoice(baseNote) {
+  function createVoice(baseNote, { consumeBypass = true } = {}) {
     const config = getInstrumentConfig();
-    const patternNote = baseNote + getKeyboardNoteOffset() * 12;
-    const playedNote = getEffectiveMidiNote(patternNote, config.octaveOffset);
+    const keyboardNoteOffset = getKeyboardNoteOffset();
+    const proposedNote = baseNote + keyboardNoteOffset * 12;
+    const previewPatternNote = resolvePatternNote(proposedNote, { consumeBypass: false });
+    const playedNote = getEffectiveMidiNote(previewPatternNote, config.octaveOffset);
     const activeVoiceEngine = resolveVoiceEngine();
     const voice = activeVoiceEngine.trigger({
       type: config.voiceType,
@@ -33,7 +36,14 @@ export function createInputController({
       attackSeconds: config.attackSeconds,
       releaseSeconds: config.releaseSeconds,
     });
-    return { patternNote, voice };
+    const patternNote = consumeBypass
+      ? resolvePatternNote(proposedNote, { consumeBypass: true })
+      : previewPatternNote;
+    return {
+      activeNote: patternNote - keyboardNoteOffset * 12,
+      patternNote,
+      voice,
+    };
   }
 
   function start(owner, baseNote) {
@@ -45,10 +55,14 @@ export function createInputController({
       if (error?.code === "not-ready") return false;
       throw error;
     }
-    voicesByOwner.set(owner, { baseNote, voice: started.voice });
-    const owners = ownersByNote.get(baseNote) ?? new Set();
+    voicesByOwner.set(owner, {
+      activeNote: started.activeNote,
+      baseNote,
+      voice: started.voice,
+    });
+    const owners = ownersByNote.get(started.activeNote) ?? new Set();
     owners.add(owner);
-    ownersByNote.set(baseNote, owners);
+    ownersByNote.set(started.activeNote, owners);
     emitActiveNotes();
     onNoteStart?.(started.patternNote);
     return true;
@@ -59,9 +73,9 @@ export function createInputController({
     if (!active) return false;
     active.voice.stop();
     voicesByOwner.delete(owner);
-    const owners = ownersByNote.get(active.baseNote);
+    const owners = ownersByNote.get(active.activeNote);
     owners?.delete(owner);
-    if (owners?.size === 0) ownersByNote.delete(active.baseNote);
+    if (owners?.size === 0) ownersByNote.delete(active.activeNote);
     emitActiveNotes();
     return true;
   }
@@ -71,10 +85,20 @@ export function createInputController({
   }
 
   function refreshActiveVoices() {
+    ownersByNote.clear();
     for (const [owner, active] of voicesByOwner) {
       active.voice.stop();
-      voicesByOwner.set(owner, { baseNote: active.baseNote, voice: createVoice(active.baseNote).voice });
+      const refreshed = createVoice(active.baseNote, { consumeBypass: false });
+      voicesByOwner.set(owner, {
+        activeNote: refreshed.activeNote,
+        baseNote: active.baseNote,
+        voice: refreshed.voice,
+      });
+      const owners = ownersByNote.get(refreshed.activeNote) ?? new Set();
+      owners.add(owner);
+      ownersByNote.set(refreshed.activeNote, owners);
     }
+    emitActiveNotes();
   }
 
   function handleKeyDown(event) {

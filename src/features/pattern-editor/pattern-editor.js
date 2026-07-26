@@ -4,6 +4,7 @@ import {
   MIN_PATTERN_NOTE,
   SUPPORTED_PATTERN_GATES,
 } from "../../state/pattern-state.js";
+import { classifyScaleNote } from "../../music/scale.js";
 
 const GRID_NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp"]);
 const GATE_LABELS = Object.freeze({
@@ -35,6 +36,7 @@ export function createPatternEditor({
   doneButton,
   gateControl,
   getNoteName,
+  getScaleGuide,
   grid,
   noteDownButton,
   noteUpButton,
@@ -46,6 +48,7 @@ export function createPatternEditor({
   pitchSelect,
   previewInput,
   previewNote,
+  resolveNewNote = (note) => note,
   selectedNoteOutput,
   selectionEmpty,
   selectionSummary,
@@ -181,7 +184,7 @@ export function createPatternEditor({
       const step = patternState.getState().steps[index];
       selectStep(index, step !== null);
       if (step === null) {
-        const note = getSelectedNote();
+        const note = resolveNewNote(getSelectedNote());
         patternState.setStep(index, note);
         previewSelectedNote(note, patternState.getState().steps[index].volume);
         render();
@@ -299,7 +302,14 @@ export function createPatternEditor({
       const elements = stepElements[index];
       const hasNote = step !== null;
       const noteLabel = hasNote ? getNoteName(step.note) : "Rest";
+      const scale = hasNote && getScaleGuide ? classifyScaleNote(step.note, getScaleGuide()) : null;
       elements.container.classList.toggle("has-note", hasNote);
+      elements.container.classList.toggle("in-scale", scale?.inScale === true);
+      elements.container.classList.toggle("out-of-scale", scale?.inScale === false);
+      elements.container.classList.toggle("tonic", scale?.tonic === true);
+      elements.container.dataset.scaleRole = !hasNote
+        ? ""
+        : scale?.tonic ? "Tonic" : scale?.inScale ? "In scale" : "Outside scale";
       elements.container.classList.toggle("selected", index === selectedStepIndex);
       const isPlayhead = index === playheadStepIndex;
       elements.container.classList.toggle("playback-step", isPlayhead);
@@ -326,7 +336,7 @@ export function createPatternEditor({
         : "";
       elements.setButton.setAttribute(
         "aria-label",
-        `Step ${index + 1}, ${hasNote ? `${noteLabel}, ${Math.round(step.gate * 100)}% gate, ${Math.round(step.volume * 100)}% volume` : "rest"}.`,
+        `Step ${index + 1}, ${hasNote ? `${noteLabel}, ${elements.container.dataset.scaleRole.toLowerCase()}, ${Math.round(step.gate * 100)}% gate, ${Math.round(step.volume * 100)}% volume` : "rest"}.`,
       );
     });
     renderInspector(pattern);
@@ -359,7 +369,8 @@ export function createPatternEditor({
     onSelectionChange(currentIndex);
     onEditAction?.();
     if (isAssign) {
-      const note = getSelectedNote();
+      const current = patternState.getState().steps[currentIndex];
+      const note = current === null ? resolveNewNote(getSelectedNote()) : getSelectedNote();
       patternState.setStep(currentIndex, note);
       previewSelectedNote(note, patternState.getState().steps[currentIndex].volume);
     } else {
@@ -373,7 +384,13 @@ export function createPatternEditor({
     onEditAction?.();
     event.currentTarget.blur();
     constrainPitchSelection();
-    const note = getSelectedNote();
+    const proposedNote = getSelectedNote();
+    const current = selectedStepIndex === null ? undefined : patternState.getState().steps[selectedStepIndex];
+    const note = current === null ? resolveNewNote(proposedNote) : proposedNote;
+    if (note !== proposedNote) {
+      pitchSelect.value = String(note % 12);
+      octaveSelect.value = String(Math.floor(note / 12) - 1);
+    }
     if (selectedStepIndex !== null) patternState.setStep(selectedStepIndex, note);
     const volume = selectedStepIndex === null
       ? DEFAULT_PATTERN_VOLUME
@@ -413,7 +430,7 @@ export function createPatternEditor({
   }
   addButton.addEventListener("click", () => {
     if (selectedStepIndex === null) return;
-    const note = getSelectedNote();
+    const note = resolveNewNote(getSelectedNote());
     patternState.setStep(selectedStepIndex, note);
     previewSelectedNote(note, patternState.getState().steps[selectedStepIndex].volume);
     render();

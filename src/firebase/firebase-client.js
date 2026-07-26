@@ -339,6 +339,7 @@ export async function createFirebaseClient({
       });
     },
     async savePublication({
+      allowRemix,
       creatorName,
       document,
       expectedRevision = 0,
@@ -371,6 +372,7 @@ export async function createFirebaseClient({
           throw error;
         }
         const record = createPublicationRecord({
+          allowRemix: allowRemix ?? remote?.allowRemix ?? false,
           creatorName,
           document,
           ownerSlot,
@@ -388,6 +390,44 @@ export async function createFirebaseClient({
           sourceProjectId: record.sourceProjectId,
           createdAt: slotSnapshot.exists() ? slotSnapshot.data().createdAt : record.publishedAt,
           updatedAt: record.updatedAt,
+        });
+        return record;
+      });
+    },
+    async setPublicationRemixPermission(ownerId, publicationId, expectedRevision, allowRemix, updatedAt) {
+      if (typeof allowRemix !== "boolean") {
+        throw new TypeError("Publication remix permission must be a boolean.");
+      }
+      const reference = publicationDocument(publicationId);
+      const ownerSlot = await findPublicationSlot(ownerId, publicationId);
+      return sdk.firestore.runTransaction(database, async (transaction) => {
+        const snapshot = await transaction.get(reference);
+        if (!snapshot.exists()) throw new RangeError("That publication no longer exists.");
+        const remote = normalizePublicationRecord(snapshot.data());
+        if (remote.ownerId && remote.ownerId !== ownerId) {
+          throw new Error("That publication belongs to another account.");
+        }
+        if (remote.ownerSlot && remote.ownerSlot !== ownerSlot) {
+          throw new Error("That publication uses another account slot.");
+        }
+        if (remote.publicationRevision !== expectedRevision) {
+          const error = new Error("This publication changed elsewhere. Reload its status before changing remix permission.");
+          error.code = "publication/revision-conflict";
+          throw error;
+        }
+        const record = createPublicationRecord({
+          allowRemix,
+          creatorName: remote.creatorName,
+          document: remote.document,
+          ownerSlot,
+          publicationId,
+          publicationRevision: remote.publicationRevision + 1,
+          publishedAt: remote.publishedAt,
+          updatedAt,
+        });
+        transaction.set(reference, {
+          ...record,
+          serverUpdatedAt: sdk.firestore.serverTimestamp(),
         });
         return record;
       });

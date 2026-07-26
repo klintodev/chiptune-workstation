@@ -16,8 +16,12 @@ import {
   SUPPORTED_PATTERN_GATES,
   SUPPORTED_PATTERN_LENGTHS,
 } from "./pattern-state.js";
+import {
+  DEFAULT_SCALE_GUIDE,
+  normalizeScaleGuide,
+} from "../music/scale.js";
 
-export const PROJECT_SCHEMA_VERSION = 5;
+export const PROJECT_SCHEMA_VERSION = 6;
 export const DEFAULT_PATTERN_ID = "pattern-1";
 export const DEFAULT_TRACK_ID = "track-1";
 export const MAX_PROJECT_HISTORY = 100;
@@ -51,6 +55,7 @@ function cloneTrack(track) {
 
 function freezeProject(project) {
   Object.freeze(project.metadata);
+  Object.freeze(project.scaleGuide);
   for (const layer of project.visualiser.layers) {
     Object.freeze(layer.mapping);
     Object.freeze(layer);
@@ -201,6 +206,7 @@ export function validateProject(candidate) {
     throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
   }
   validateName(candidate.metadata?.title, "Project", MAX_PROJECT_TITLE_LENGTH);
+  normalizeScaleGuide(candidate.scaleGuide);
   validateVisualiser(candidate.visualiser);
   validateTransport(candidate.transport);
   if (
@@ -254,10 +260,18 @@ function isPatternEmpty(pattern) {
 
 export function migrateProject(candidate) {
   if (candidate?.schemaVersion === PROJECT_SCHEMA_VERSION) return candidate;
+  if (candidate?.schemaVersion === 5 && Array.isArray(candidate.patterns)) {
+    return {
+      ...candidate,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      scaleGuide: { ...DEFAULT_SCALE_GUIDE },
+    };
+  }
   if (candidate?.schemaVersion === 4 && Array.isArray(candidate.patterns)) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
+      scaleGuide: { ...DEFAULT_SCALE_GUIDE },
       tracks: candidate.tracks.map((track) => ({
         ...track,
         mixer: { ...track.mixer, pan: track.mixer.pan ?? 0 },
@@ -268,6 +282,7 @@ export function migrateProject(candidate) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
+      scaleGuide: { ...DEFAULT_SCALE_GUIDE },
       visualiser: createDefaultVisualiser(),
       tracks: candidate.tracks.map((track) => ({
         ...track,
@@ -279,6 +294,7 @@ export function migrateProject(candidate) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
+      scaleGuide: { ...DEFAULT_SCALE_GUIDE },
       visualiser: createDefaultVisualiser(),
       tracks: candidate.tracks.map((track) => ({
         ...track,
@@ -313,6 +329,7 @@ export function migrateProject(candidate) {
   return {
     schemaVersion: PROJECT_SCHEMA_VERSION,
     metadata: { ...candidate.metadata },
+    scaleGuide: { ...DEFAULT_SCALE_GUIDE },
     visualiser: createDefaultVisualiser(),
     transport: {
       bpm: candidate.transport.bpm,
@@ -328,6 +345,9 @@ function normalizeProject(candidate) {
   const migrated = migrateProject(candidate);
   const normalized = {
     ...migrated,
+    metadata: { ...migrated.metadata },
+    scaleGuide: normalizeScaleGuide(migrated.scaleGuide),
+    visualiser: normalizeVisualiser(migrated.visualiser),
     transport: {
       ...migrated.transport,
       loop: {
@@ -335,22 +355,18 @@ function normalizeProject(candidate) {
         mode: migrated.transport.loop.mode ?? "custom",
       },
     },
+    patterns: migrated.patterns.map(clonePattern),
+    tracks: migrated.tracks.map(cloneTrack),
   };
   validateProject(normalized);
-  return freezeProject({
-    ...normalized,
-    metadata: { ...normalized.metadata },
-    visualiser: normalizeVisualiser(normalized.visualiser),
-    transport: { ...normalized.transport, loop: { ...normalized.transport.loop } },
-    patterns: normalized.patterns.map(clonePattern),
-    tracks: normalized.tracks.map(cloneTrack),
-  });
+  return freezeProject(normalized);
 }
 
 export function createDefaultProject() {
   return normalizeProject({
     schemaVersion: PROJECT_SCHEMA_VERSION,
     metadata: { title: "Untitled chiptune" },
+    scaleGuide: { ...DEFAULT_SCALE_GUIDE },
     visualiser: createDefaultVisualiser(),
     transport: {
       bpm: 120,
@@ -645,6 +661,56 @@ export function createProjectState(initialProject = createDefaultProject()) {
     return id;
   }
 
+  function applyPatternTransform(patternId, steps, {
+    duplicate = false,
+    name,
+    operation = "pattern-transform",
+  } = {}) {
+    const source = getPattern(patternId);
+    const transformed = { ...source, steps: Array.from(steps, cloneStep) };
+    validatePattern(transformed);
+    if (!duplicate) {
+      return updatePattern(
+        patternId,
+        () => transformed,
+        { field: "pattern.steps", operation },
+      ) ? patternId : false;
+    }
+    if (state.patterns.length >= MAX_PROJECT_PATTERNS) {
+      throw new RangeError(`A project supports at most ${MAX_PROJECT_PATTERNS} patterns.`);
+    }
+    const ids = new Set(state.patterns.map(({ id }) => id));
+    const names = new Set(state.patterns.map((pattern) => pattern.name));
+    const id = nextIdentifier("pattern", ids);
+    const resolvedName = createBoundedUniqueName(
+      name?.trim() || `${source.name} variation`,
+      names,
+      { maximumLength: MAX_PATTERN_NAME_LENGTH },
+    );
+    validateName(resolvedName, "Pattern", MAX_PATTERN_NAME_LENGTH);
+    commit({
+      ...state,
+      patterns: [...state.patterns, {
+        ...transformed,
+        id,
+        name: resolvedName,
+      }],
+    }, {
+      field: "pattern.steps",
+      operation,
+      patternId: id,
+      sourcePatternId: patternId,
+    });
+    return id;
+  }
+
+  function applyProjectTransform(nextProject, detail = {}) {
+    return commit(nextProject, {
+      operation: "project-transform",
+      ...detail,
+    });
+  }
+
   function setPatternRootOctave(patternId, rootOctave) {
     if (
       !Number.isInteger(rootOctave) ||
@@ -840,6 +906,15 @@ export function createProjectState(initialProject = createDefaultProject()) {
     return commit({ ...state, visualiser }, { field: "visualiser", operation: "update-visualiser" });
   }
 
+  function setScaleGuide(values) {
+    const scaleGuide = normalizeScaleGuide({ ...state.scaleGuide, ...values });
+    if (Object.keys(values).every((key) => state.scaleGuide[key] === scaleGuide[key])) return false;
+    return commit(
+      { ...state, scaleGuide },
+      { field: "scaleGuide", operation: "update-scale-guide" },
+    );
+  }
+
   function setBpm(bpm) {
     if (!Number.isFinite(bpm) || bpm < 40 || bpm > 240) {
       throw new RangeError("Tempo must be between 40 and 240 BPM.");
@@ -903,6 +978,8 @@ export function createProjectState(initialProject = createDefaultProject()) {
     addClip,
     addEventListener: events.addEventListener.bind(events),
     addTrack,
+    applyPatternTransform,
+    applyProjectTransform,
     beginHistoryGroup,
     canMoveClip,
     createClipVariation,
@@ -933,6 +1010,7 @@ export function createProjectState(initialProject = createDefaultProject()) {
     setLoop,
     setMasterVolume,
     setPatternRootOctave,
+    setScaleGuide,
     setVisualiser,
     undo,
     updatePattern,

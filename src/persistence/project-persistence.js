@@ -154,12 +154,16 @@ export function createProjectPersistence({
 
   projectState.addEventListener("change", handleProjectChange);
 
-  async function activate(document, { flushCurrent = true } = {}) {
+  async function activate(document, { detail = {}, flushCurrent = true } = {}) {
     const target = normalizeProjectDocument(document);
     if (flushCurrent) await saveNow();
     suppressAutosave = true;
     try {
-      projectState.replace(target.project, { operation: "open-project", projectId: target.id });
+      projectState.replace(target.project, {
+        operation: "open-project",
+        projectId: target.id,
+        ...detail,
+      });
     } finally {
       suppressAutosave = false;
     }
@@ -192,6 +196,19 @@ export function createProjectPersistence({
     const document = createProjectDocument(project, { id: createId(), now: now() });
     const saved = await repository.save(document);
     return activate(saved, { flushCurrent: false });
+  }
+
+  async function createProjectFromTemplate(project) {
+    await saveNow();
+    const summaries = await repository.list();
+    const template = JSON.parse(JSON.stringify(project));
+    template.metadata.title = uniqueTitle(template.metadata.title, summaries);
+    const document = createProjectDocument(template, { id: createId(), now: now() });
+    const saved = await repository.save(document);
+    return activate(saved, {
+      detail: { operation: "create-project-from-template" },
+      flushCurrent: false,
+    });
   }
 
   async function duplicateProject() {
@@ -240,6 +257,13 @@ export function createProjectPersistence({
     return serializeProjectDocument(activeDocument);
   }
 
+  async function replaceActiveProject(project, detail = {}) {
+    await saveNow();
+    const candidate = reviseProjectDocument(activeDocument, project, { now: now() });
+    const saved = await repository.save(candidate);
+    return activate(saved, { detail, flushCurrent: false });
+  }
+
   function getExportText() {
     const document = dirty
       ? reviseProjectDocument(activeDocument, projectState.getState(), { now: now() })
@@ -254,6 +278,7 @@ export function createProjectPersistence({
   return Object.freeze({
     addEventListener: events.addEventListener.bind(events),
     createProject,
+    createProjectFromTemplate,
     deleteProject,
     dispose() {
       disposed = true;
@@ -269,6 +294,7 @@ export function createProjectPersistence({
     importProject,
     listProjects,
     openProject,
+    replaceActiveProject,
     removeEventListener: events.removeEventListener.bind(events),
     saveNow,
   });

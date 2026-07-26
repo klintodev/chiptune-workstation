@@ -2,6 +2,8 @@ import { createAudioExportFeature } from "./features/audio-export/audio-export.j
 import { createAccountFeature } from "./features/account/account.js";
 import { createVisualiserFeature } from "./features/visualiser/visualiser.js";
 import { createPublishingFeature } from "./features/publishing/publishing.js";
+import { createRemixImportFeature } from "./features/remixing/remix-import-feature.js";
+import { createRemixService } from "./firebase/remix-service.js";
 import {
   createAccountService,
   createAccountSessionPreference,
@@ -27,8 +29,10 @@ import {
   projectPreferences,
   projectRepository,
   projectState,
+  remixProvenanceRepository,
   scheduler,
   sessionState,
+  stopAllSound,
 } from "./workstation-app.js";
 
 const audioExportFeature = createAudioExportFeature({
@@ -94,6 +98,22 @@ const publishingFeature = createPublishingFeature({
   accountService,
   persistence: projectPersistence,
   publicationService,
+  provenanceRepository: remixProvenanceRepository,
+});
+let publicClientPromise;
+const remixService = createRemixService({
+  loadPublication: async (publicationId) => {
+    publicClientPromise ??= import("./firebase/firebase-client.js")
+      .then(({ createFirebaseClient }) => createFirebaseClient());
+    return (await publicClientPromise).getPublication(publicationId);
+  },
+  projectRepository,
+  provenanceRepository: remixProvenanceRepository,
+});
+const remixImportFeature = createRemixImportFeature({
+  onBeforeProjectChange: stopAllSound,
+  persistence: projectPersistence,
+  remixService,
 });
 
 cloudProjectService.start();
@@ -101,6 +121,7 @@ if (accountSessionPreference.isEnabled()) void accountService.start({ remember: 
 
 window.addEventListener("unload", () => {
   publishingFeature.dispose();
+  remixImportFeature.dispose();
   visualiserFeature.dispose();
   audioExportFeature.dispose();
   accountFeature.dispose();
