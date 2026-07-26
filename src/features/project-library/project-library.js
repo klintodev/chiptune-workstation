@@ -1,4 +1,5 @@
 import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js?v=20260722-1";
+import { downloadProjectFile } from "../../persistence/project-download.js";
 import { queryRequired } from "../../shared/query-required.js";
 
 const STATUS_LABELS = Object.freeze({
@@ -17,6 +18,7 @@ function formatUpdatedAt(value) {
 }
 
 export function createProjectLibraryFeature({
+  downloadProject = downloadProjectFile,
   onBeforeProjectChange = () => {},
   persistence,
   projectState,
@@ -33,6 +35,7 @@ export function createProjectLibraryFeature({
     dialog: queryRequired(root, "#project-library-dialog"),
     duplicate: queryRequired(root, "#project-duplicate"),
     error: queryRequired(root, "#project-library-error"),
+    export: queryRequired(root, "#project-export"),
     import: queryRequired(root, "#project-import"),
     importFile: queryRequired(root, "#project-import-file"),
     librarySaveStatus: queryRequired(root, "#project-library-save-status"),
@@ -41,6 +44,8 @@ export function createProjectLibraryFeature({
     create: queryRequired(root, "#project-new"),
     open: queryRequired(root, "#project-library-open"),
     saveStatus: queryRequired(root, "#project-save-status"),
+    storageRecovery: queryRequired(root, "#project-storage-recovery"),
+    recoveryDownload: queryRequired(root, "#project-recovery-download"),
     storageMessage: queryRequired(root, "#project-storage-message"),
     title: queryRequired(root, "#project-title"),
   };
@@ -64,9 +69,15 @@ export function createProjectLibraryFeature({
     elements.open.dataset.saveState = state.status;
     elements.open.title = `${project.metadata.title} · ${STATUS_LABELS[state.status] ?? state.status}`;
     if (root.activeElement !== elements.name) elements.name.value = project.metadata.title;
-    elements.storageMessage.textContent = state.persistent
-      ? "Projects are saved automatically in this browser."
-      : `Browser storage is unavailable. This session will not survive a reload.${state.error?.message ? ` ${state.error.message}` : ""}`;
+    const needsRecovery = !state.persistent || state.status === "error";
+    elements.storageRecovery.hidden = !needsRecovery;
+    if (!state.persistent) {
+      elements.storageMessage.textContent = `Browser storage is unavailable. This session will not survive a reload.${state.error?.message ? ` ${state.error.message}` : ""}`;
+    } else if (state.status === "error") {
+      elements.storageMessage.textContent = `Automatic saving failed. Your current edits are still available in this tab.${state.error?.message ? ` ${state.error.message}` : ""}`;
+    } else {
+      elements.storageMessage.textContent = "Projects are saved automatically in this browser.";
+    }
   }
 
   function createProjectRow(summary, activeId) {
@@ -118,8 +129,10 @@ export function createProjectLibraryFeature({
       elements.close,
       elements.create,
       elements.duplicate,
+      elements.export,
       elements.import,
       elements.name,
+      elements.recoveryDownload,
     ]) {
       if ("disabled" in element) element.disabled = value;
       element.setAttribute("aria-disabled", String(value));
@@ -149,6 +162,19 @@ export function createProjectLibraryFeature({
   function openLibrary() {
     void renderLibrary();
     if (!elements.dialog.open) elements.dialog.showModal();
+  }
+
+  function downloadActiveProject() {
+    if (busy) return false;
+    try {
+      const project = projectState.getState();
+      downloadProject(persistence.getExportText(), project.metadata.title);
+      showError("");
+      return true;
+    } catch (error) {
+      showError(error.message || "The recovery copy could not be downloaded.");
+      return false;
+    }
   }
 
   function closeDeleteDialog({ reopenLibrary = true } = {}) {
@@ -198,6 +224,8 @@ export function createProjectLibraryFeature({
     await persistence.duplicateProject();
   }, { closeAfter: true }), { signal: lifecycle.signal });
   elements.import.addEventListener("click", () => elements.importFile.click(), { signal: lifecycle.signal });
+  elements.export.addEventListener("click", downloadActiveProject, { signal: lifecycle.signal });
+  elements.recoveryDownload.addEventListener("click", downloadActiveProject, { signal: lifecycle.signal });
   elements.importFile.addEventListener("change", () => void run(async () => {
     const [file] = elements.importFile.files;
     elements.importFile.value = "";
@@ -267,6 +295,7 @@ export function createProjectLibraryFeature({
 
   renderHeader();
   return Object.freeze({
+    downloadActiveProject,
     dispose: () => lifecycle.abort(),
     render: renderHeader,
   });

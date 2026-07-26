@@ -1,13 +1,17 @@
+import {
+  MAX_PLAYABLE_FREQUENCY,
+  MIN_PLAYABLE_FREQUENCY,
+  midiNoteToFrequency,
+  validateAudioSampleRate,
+  validatePlayableFrequency,
+} from "./pitch-policy.js";
+
 const VOICE_TYPES = new Set(["pulse12", "pulse25", "square", "triangle", "sawtooth", "noise"]);
-const MIN_FREQUENCY = 20;
-const MAX_FREQUENCY = 20_000;
 const NOISE_REFERENCE_FREQUENCY = 440;
 const SILENCE = 0.0001;
 const VOLUME_RAMP_SECONDS = 0.015;
 
-export function midiNoteToFrequency(note) {
-  return 440 * 2 ** ((note - 69) / 12);
-}
+export { midiNoteToFrequency };
 
 export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Infinity }) {
   if (!(maxVoices === Infinity || (Number.isInteger(maxVoices) && maxVoices > 0))) {
@@ -28,10 +32,17 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
   function getInstrumentOutput() {
     if (instrumentOutput) return instrumentOutput;
     const masterOutput = getOutputNode();
-    instrumentOutput = masterOutput.context.createGain();
-    instrumentOutput.gain.setValueAtTime(volume, masterOutput.context.currentTime);
-    instrumentOutput.connect(masterOutput);
-    return instrumentOutput;
+    validateAudioSampleRate(masterOutput.context.sampleRate);
+    const candidate = masterOutput.context.createGain();
+    try {
+      candidate.gain.setValueAtTime(volume, masterOutput.context.currentTime);
+      candidate.connect(masterOutput);
+      instrumentOutput = candidate;
+      return instrumentOutput;
+    } catch (error) {
+      try { candidate.disconnect(); } catch {}
+      throw error;
+    }
   }
 
   function setVolume(nextVolume) {
@@ -134,19 +145,19 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
   function trigger({
     type = "square",
     frequency = midiNoteToFrequency(60),
-    startTime = getAudioTime(),
+    startTime,
     duration,
     intensity = 1,
     attackSeconds = 0.008,
     releaseSeconds = 0.03,
   } = {}) {
+    const now = getAudioTime();
+    const resolvedStartTime = startTime === undefined ? now : Math.max(startTime, now);
     if (!VOICE_TYPES.has(type)) throw new RangeError(`Unsupported voice type: ${type}`);
-    if (!Number.isFinite(startTime) || startTime < getAudioTime()) {
-      throw new RangeError("Start time must use the current or future audio clock.");
+    if (!Number.isFinite(resolvedStartTime)) {
+      throw new RangeError("Start time must use a finite audio-clock value.");
     }
-    if (!Number.isFinite(frequency) || frequency < MIN_FREQUENCY || frequency > MAX_FREQUENCY) {
-      throw new RangeError(`Frequency must be between ${MIN_FREQUENCY} and ${MAX_FREQUENCY} Hz.`);
-    }
+    validatePlayableFrequency(frequency);
     if (duration !== undefined && (!Number.isFinite(duration) || duration <= 0)) {
       throw new RangeError("Duration must be greater than zero.");
     }
@@ -160,36 +171,46 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
       throw new RangeError("Release must be between 0.01 and 3 seconds.");
     }
 
-    enforceVoiceLimit(startTime);
+    enforceVoiceLimit(resolvedStartTime);
     const output = getInstrumentOutput();
     const context = output.context;
-    const source = createSource(context, type, frequency);
-    const gain = context.createGain();
+    let source = null;
+    let gain = null;
     const id = nextId++;
-
-    gain.gain.setValueAtTime(SILENCE, startTime);
-    gain.gain.exponentialRampToValueAtTime(intensity, startTime + attackSeconds);
-    source.connect(gain);
-    gain.connect(output);
-    const record = {
-      source,
-      gain,
-      startTime,
-      attackSeconds,
-      releaseSeconds,
-      peakGain: intensity,
-      stopTime: null,
-    };
-    activeVoices.set(id, record);
-    source.addEventListener("ended", () => {
-      if (activeVoices.get(id) === record) activeVoices.delete(id);
-      disconnectVoice(record);
+    let record = null;
+    try {
+      source = createSource(context, type, frequency);
+      gain = context.createGain();
+      gain.gain.setValueAtTime(SILENCE, resolvedStartTime);
+      gain.gain.exponentialRampToValueAtTime(intensity, resolvedStartTime + attackSeconds);
+      source.connect(gain);
+      gain.connect(output);
+      record = {
+        source,
+        gain,
+        startTime: resolvedStartTime,
+        attackSeconds,
+        releaseSeconds,
+        peakGain: intensity,
+        stopTime: null,
+      };
+      activeVoices.set(id, record);
+      source.addEventListener("ended", () => {
+        if (activeVoices.get(id) === record) activeVoices.delete(id);
+        disconnectVoice(record);
+        emitChange();
+      }, { once: true });
+      source.start(resolvedStartTime);
+      if (duration !== undefined) stop(id, resolvedStartTime + duration);
       emitChange();
-    }, { once: true });
-    source.start(startTime);
-    if (duration !== undefined) stop(id, startTime + duration);
-    emitChange();
-    return Object.freeze({ id, stop: (time) => stop(id, time) });
+      return Object.freeze({ id, stop: (time) => stop(id, time) });
+    } catch (error) {
+      activeVoices.delete(id);
+      try { source?.stop(Math.max(now, resolvedStartTime)); } catch {}
+      try { source?.disconnect(); } catch {}
+      try { gain?.disconnect(); } catch {}
+      throw error;
+    }
   }
 
   function stopAll(time) {
@@ -219,3 +240,5 @@ export function createVoiceEngine({ getAudioTime, getOutputNode, maxVoices = Inf
     trigger,
   });
 }
+
+export { MAX_PLAYABLE_FREQUENCY, MIN_PLAYABLE_FREQUENCY };

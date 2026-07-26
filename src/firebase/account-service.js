@@ -3,6 +3,42 @@ const INITIAL_STATE = Object.freeze({
   error: null,
   status: "idle",
 });
+export const ACCOUNT_SESSION_OPT_IN_KEY = "chiptune-workstation:account-session-opt-in";
+
+export function createAccountSessionPreference(storage = null) {
+  if (storage === null) {
+    try {
+      storage = globalThis.localStorage;
+    } catch {
+      storage = null;
+    }
+  }
+  return Object.freeze({
+    clear() {
+      try {
+        storage?.removeItem(ACCOUNT_SESSION_OPT_IN_KEY);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    enable() {
+      try {
+        storage?.setItem(ACCOUNT_SESSION_OPT_IN_KEY, "1");
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    isEnabled() {
+      try {
+        return storage?.getItem(ACCOUNT_SESSION_OPT_IN_KEY) === "1";
+      } catch {
+        return false;
+      }
+    },
+  });
+}
 
 function friendlyError(error) {
   const code = error?.code || "";
@@ -21,7 +57,10 @@ function friendlyError(error) {
   return "The account action could not be completed. Local projects remain available.";
 }
 
-export function createAccountService({ loadClient } = {}) {
+export function createAccountService({
+  loadClient,
+  sessionPreference = createAccountSessionPreference(),
+} = {}) {
   if (typeof loadClient !== "function") throw new TypeError("Account service requires a Firebase client loader.");
   const events = new EventTarget();
   let client = null;
@@ -51,8 +90,9 @@ export function createAccountService({ loadClient } = {}) {
     }
   }
 
-  async function start() {
+  async function start({ remember = true } = {}) {
     if (disposed || unsubscribe || state.status === "checking") return;
+    if (remember) sessionPreference.enable();
     setState({ error: null, status: "checking" });
     try {
       const firebase = await getClient();
@@ -105,6 +145,9 @@ export function createAccountService({ loadClient } = {}) {
       try {
         const firebase = await getClient();
         await firebase.deleteAccount(password);
+        sessionPreference.clear();
+        unsubscribe?.();
+        unsubscribe = null;
         if (!disposed) setState({ account: null, error: null, status: "anonymous" });
       } catch (error) {
         if (!disposed) setState({
@@ -134,6 +177,9 @@ export function createAccountService({ loadClient } = {}) {
       try {
         const firebase = await getClient();
         await firebase.signOut();
+        sessionPreference.clear();
+        unsubscribe?.();
+        unsubscribe = null;
         if (!disposed) setState({ account: null, error: null, status: "anonymous" });
       } catch (error) {
         if (!disposed) setState({ error: friendlyError(error), status: "authenticated" });

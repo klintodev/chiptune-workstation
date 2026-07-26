@@ -50,6 +50,7 @@ try {
     repository: projectRepository,
   });
 }
+export { projectPreferences, projectRepository };
 
 export const audioEngine = createAudioEngine();
 export const projectState = createProjectState(initialProjectDocument.project);
