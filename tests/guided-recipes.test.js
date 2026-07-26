@@ -133,6 +133,28 @@ test("seeded variations are reproducible and never alter fields outside their sc
   }
 });
 
+test("variation scopes do not create notes when rhythm is not selected", () => {
+  const pattern = patternWithSteps([
+    null,
+    { note: 60, gate: 0.75, volume: 0.7 },
+    null,
+    { note: 64, gate: 0.75, volume: 0.7 },
+  ]);
+  const preview = createVariationPreview({
+    options: {
+      scopes: ["velocity"],
+      minimumVelocity: 0.4,
+      maximumVelocity: 0.8,
+    },
+    pattern,
+    seed: 42,
+  });
+  assert.equal(preview.steps[0], null);
+  assert.equal(preview.steps[2], null);
+  assert.equal(preview.steps[1].note, 60);
+  assert.equal(preview.steps[3].note, 64);
+});
+
 test("recipe and variation validation fails before changing authoritative state", () => {
   const pattern = patternWithSteps(Array(4).fill(null));
   assert.throws(() => createRecipePreview({

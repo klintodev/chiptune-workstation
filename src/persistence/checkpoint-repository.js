@@ -202,10 +202,12 @@ export function createIndexedDbCheckpointRepository({
   let database = null;
   let databasePromise = null;
   let disposed = false;
+  let connectionGeneration = 0;
 
   function getDatabase() {
     if (disposed) throw new Error("Checkpoint storage has been disposed.");
     if (databasePromise) return databasePromise;
+    const generation = ++connectionGeneration;
     databasePromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(databaseName, DATABASE_VERSION);
       request.addEventListener("upgradeneeded", () => {
@@ -216,13 +218,21 @@ export function createIndexedDbCheckpointRepository({
         }
       });
       request.addEventListener("success", () => {
-        database = request.result;
-        database.addEventListener("versionchange", () => {
-          database?.close();
+        const openedDatabase = request.result;
+        if (disposed || generation !== connectionGeneration) {
+          openedDatabase.close();
+          reject(new Error("Checkpoint storage was closed while opening."));
+          return;
+        }
+        database = openedDatabase;
+        openedDatabase.addEventListener("versionchange", () => {
+          openedDatabase.close();
+          if (database !== openedDatabase) return;
           database = null;
           databasePromise = null;
+          connectionGeneration += 1;
         });
-        resolve(request.result);
+        resolve(openedDatabase);
       }, { once: true });
       request.addEventListener("error", () => {
         databasePromise = null;
@@ -255,6 +265,7 @@ export function createIndexedDbCheckpointRepository({
   }
 
   function close() {
+    connectionGeneration += 1;
     database?.close();
     database = null;
     databasePromise = null;

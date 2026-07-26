@@ -80,6 +80,7 @@ export function createVariationPreview({
   let previousNote = null;
   for (let index = startStep; index < resolvedEnd; index += 1) {
     const current = steps[index];
+    if (current === null && !scopes.has("rhythm")) continue;
     if (scopes.has("rhythm") && random() > density) {
       steps[index] = null;
       continue;
