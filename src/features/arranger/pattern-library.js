@@ -61,9 +61,15 @@ export function createPatternLibrary({
     elements.name.value = pattern.name;
     elements.rootOctave.value = String(pattern.rootOctave);
     const usage = projectState.getPatternUsageCount(pattern.id);
+    const hasNotes = pattern.steps.some((step) => step !== null);
     elements.usage.value = `${usage} clip${usage === 1 ? "" : "s"}`;
     elements.delete.disabled = project.patterns.length === 1;
-    elements.place.disabled = project.tracks.length === 0;
+    elements.place.disabled = project.tracks.length === 0 || !hasNotes;
+    elements.place.title = hasNotes
+      ? `Add ${pattern.name} to ${track.name} at song step ${workspace.arrangementStartStep + 1}`
+      : "Add at least one note before adding this loop to the song.";
+    if (hasNotes) elements.place.removeAttribute("aria-describedby");
+    else elements.place.setAttribute("aria-describedby", "pattern-selection-empty");
     elements.placeTrack.textContent = track.name;
     elements.placeStart.value = String(workspace.arrangementStartStep + 1);
   }

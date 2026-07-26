@@ -1,5 +1,6 @@
 import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js?v=20260722-1";
 import { queryRequired } from "../../shared/query-required.js";
+import { announceStatus, setTextIfChanged } from "../../shared/status-announcer.js";
 
 const STATUS_LABELS = Object.freeze({
   error: "Save failed",
@@ -45,6 +46,7 @@ export function createProjectLibraryFeature({
     title: queryRequired(root, "#project-title"),
   };
   let busy = false;
+  let previousPersistenceStatus = persistence.getState().status;
   let pendingDelete = null;
   let renderGeneration = 0;
 
@@ -63,10 +65,17 @@ export function createProjectLibraryFeature({
     elements.librarySaveStatus.dataset.state = state.status;
     elements.open.dataset.saveState = state.status;
     elements.open.title = `${project.metadata.title} · ${STATUS_LABELS[state.status] ?? state.status}`;
+    if (state.status !== previousPersistenceStatus) {
+      previousPersistenceStatus = state.status;
+      if (state.status === "saved") announceStatus(root, "Saved");
+      if (state.status === "error" || state.status === "unavailable") {
+        announceStatus(root, `Error: ${state.error?.message ?? "Project could not be saved."}`);
+      }
+    }
     if (root.activeElement !== elements.name) elements.name.value = project.metadata.title;
-    elements.storageMessage.textContent = state.persistent
+    setTextIfChanged(elements.storageMessage, state.persistent
       ? "Projects are saved automatically in this browser."
-      : `Browser storage is unavailable. This session will not survive a reload.${state.error?.message ? ` ${state.error.message}` : ""}`;
+      : `Browser storage is unavailable. This session will not survive a reload.${state.error?.message ? ` ${state.error.message}` : ""}`);
   }
 
   function createProjectRow(summary, activeId) {
@@ -149,6 +158,7 @@ export function createProjectLibraryFeature({
   function openLibrary() {
     void renderLibrary();
     if (!elements.dialog.open) elements.dialog.showModal();
+    elements.close.focus();
   }
 
   function closeDeleteDialog({ reopenLibrary = true } = {}) {
@@ -167,7 +177,10 @@ export function createProjectLibraryFeature({
 
   elements.open.addEventListener("click", openLibrary, { signal: lifecycle.signal });
   elements.close.addEventListener("click", () => elements.dialog.close(), { signal: lifecycle.signal });
-  elements.dialog.addEventListener("cancel", () => elements.dialog.close(), { signal: lifecycle.signal });
+  elements.dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    elements.dialog.close();
+  }, { signal: lifecycle.signal });
   elements.name.addEventListener("focus", projectState.beginHistoryGroup, { signal: lifecycle.signal });
   elements.name.addEventListener("input", () => {
     if (elements.name.value.trim() === "") return;

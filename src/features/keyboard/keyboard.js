@@ -7,6 +7,35 @@ function isWhiteKey(note) {
   return WHITE_SEMITONES.has(note % 12);
 }
 
+export function createOneShotPreview({
+  clearTimer = globalThis.clearTimeout,
+  durationMs = 250,
+  scheduleTimer = globalThis.setTimeout,
+  start,
+  stop,
+}) {
+  let timer = null;
+
+  function cancel() {
+    if (timer === null) return false;
+    clearTimer(timer);
+    timer = null;
+    stop();
+    return true;
+  }
+
+  function preview() {
+    if (timer !== null || !start()) return false;
+    timer = scheduleTimer(() => {
+      timer = null;
+      stop();
+    }, durationMs);
+    return true;
+  }
+
+  return Object.freeze({ cancel, preview });
+}
+
 export function createKeyboardFeature({
   audioEngine,
   getNoteName,
@@ -18,6 +47,7 @@ export function createKeyboardFeature({
   sessionState,
 }) {
   const keyButtons = new Map();
+  const keyboardPreviews = new Set();
   const lifecycle = new AbortController();
   const keybed = queryRequired(root, "#keyboard-keybed");
   const stopSound = queryRequired(root, "#stop-sound");
@@ -34,6 +64,12 @@ export function createKeyboardFeature({
     button.append(computerKey, noteName);
 
     const owner = (pointerId) => `pointer:${pointerId}:${key.note}`;
+    const keyboardOwner = `keybed:${key.note}`;
+    const keyboardPreview = createOneShotPreview({
+      start: () => inputController.start(keyboardOwner, key.note),
+      stop: () => inputController.stop(keyboardOwner),
+    });
+    keyboardPreviews.add(keyboardPreview);
     button.addEventListener("pointerdown", (event) => {
       button.setPointerCapture(event.pointerId);
       inputController.start(owner(event.pointerId), key.note);
@@ -44,6 +80,24 @@ export function createKeyboardFeature({
     button.addEventListener("pointercancel", (event) => {
       inputController.stop(owner(event.pointerId));
     }, { signal: lifecycle.signal });
+    button.addEventListener("lostpointercapture", (event) => {
+      inputController.stop(owner(event.pointerId));
+    }, { signal: lifecycle.signal });
+    button.addEventListener("keydown", (event) => {
+      if (event.repeat || !["Enter", " ", "Spacebar"].includes(event.key)) return;
+      event.preventDefault();
+      keyboardPreview.preview();
+    }, { signal: lifecycle.signal });
+    button.addEventListener("keyup", (event) => {
+      if (!["Enter", " ", "Spacebar"].includes(event.key)) return;
+      event.preventDefault();
+    }, { signal: lifecycle.signal });
+    button.addEventListener("click", (event) => {
+      if (event.detail === 0) keyboardPreview.preview();
+    }, { signal: lifecycle.signal });
+    button.addEventListener("blur", keyboardPreview.cancel, {
+      signal: lifecycle.signal,
+    });
 
     keyButtons.set(key.note, { button, key, noteName });
     return button;
@@ -85,17 +139,35 @@ export function createKeyboardFeature({
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
       button.setAttribute("aria-label", `${displayedName}, computer key ${key.label}`);
+      button.setAttribute("aria-keyshortcuts", key.label);
+      button.title = `${displayedName} · computer key ${key.label} · press Enter or Space for a short preview`;
       noteName.textContent = displayedName;
     }
   }
 
-  stopSound.addEventListener("click", onStopAllSound, { signal: lifecycle.signal });
+  function cancelKeyboardPreviews() {
+    for (const preview of keyboardPreviews) preview.cancel();
+  }
+
+  stopSound.addEventListener("click", () => {
+    cancelKeyboardPreviews();
+    onStopAllSound();
+  }, { signal: lifecycle.signal });
+  root.addEventListener("visibilitychange", () => {
+    if (root.hidden) cancelKeyboardPreviews();
+  }, { signal: lifecycle.signal });
+  root.defaultView?.addEventListener("pagehide", cancelKeyboardPreviews, {
+    signal: lifecycle.signal,
+  });
 
   renderKeybed();
   render();
 
   return Object.freeze({
-    dispose: () => lifecycle.abort(),
+    dispose() {
+      lifecycle.abort();
+      cancelKeyboardPreviews();
+    },
     render,
   });
 }

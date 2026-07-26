@@ -314,6 +314,7 @@ export function createAccountFeature({
   function openAccount() {
     render();
     if (!elements.dialog.open) elements.dialog.showModal();
+    elements.close.focus();
     if (accountService.getState().account?.emailVerified === true) {
       void Promise.all([loadCurrentCloudStatus(), loadCloudProjects()]);
     }
@@ -358,7 +359,10 @@ export function createAccountFeature({
 
   elements.open.addEventListener("click", openAccount, { signal: lifecycle.signal });
   elements.close.addEventListener("click", () => elements.dialog.close(), { signal: lifecycle.signal });
-  elements.dialog.addEventListener("cancel", () => elements.dialog.close(), { signal: lifecycle.signal });
+  elements.dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    elements.dialog.close();
+  }, { signal: lifecycle.signal });
   elements.emailForm.addEventListener("submit", (event) => {
     event.preventDefault();
     void run(() => accountService.signInWithEmail(elements.email.value, elements.password.value));

@@ -1,5 +1,6 @@
 import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js?v=20260722-1";
 import { encodePcm16Wave } from "../../audio/wav-encoder.js";
+import { setTextIfChanged } from "../../shared/status-announcer.js";
 
 function safeFilename(title) {
   const base = title.trim().toLowerCase()
@@ -37,7 +38,7 @@ export function createAudioExportFeature({
   panel.append(status);
 
   function setStatus(message = "", { error = false } = {}) {
-    status.textContent = message;
+    setTextIfChanged(status, message);
     status.classList.toggle("error", error);
     status.hidden = !message;
   }
