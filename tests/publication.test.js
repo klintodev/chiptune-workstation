@@ -31,12 +31,16 @@ test("publication records contain a validated immutable playback snapshot", () =
   assert.equal(record.title, "Untitled chiptune");
   assert.equal(record.sourceProjectId, "project-song");
   assert.equal(record.ownerSlot, "01");
+  assert.equal(record.allowRemix, false);
   assert.equal("ownerId" in record, false);
   assert.equal(normalizePublicationRecord(record).publicationId, "publication-1");
   const { ownerSlot, ...legacyBase } = record;
   const legacy = { ...legacyBase, publicationVersion: 1, ownerId: "user-1" };
   assert.equal(normalizePublicationRecord(legacy, { ownerId: "user-1" }).ownerId, "user-1");
   assert.throws(() => normalizePublicationRecord(legacy, { ownerId: "another-user" }), /owner/);
+  const versionTwo = { ...record, publicationVersion: 2 };
+  delete versionTwo.allowRemix;
+  assert.equal(normalizePublicationRecord(versionTwo).allowRemix, false);
 });
 
 test("republishing preserves one stable URL and advances snapshot revision", async () => {
@@ -113,6 +117,66 @@ test("publishing remains optional and requires a signed-in owner", async () => {
   await assert.rejects(() => service.publish("Artist"), /Sign in/);
 });
 
+test("verified owners can enable and disable future remix imports", async () => {
+  const document = createDocument();
+  let expectedRevision = null;
+  let remote = createPublicationRecord({
+    creatorName: "Chip Artist",
+    document,
+    ownerSlot: "01",
+    publicationId: "publication-remix",
+    publicationRevision: 1,
+    publishedAt: "2026-07-20T12:00:00.000Z",
+    updatedAt: "2026-07-20T12:00:00.000Z",
+  });
+  const accountService = {
+    async getClient() {
+      return {
+        async setPublicationRemixPermission(ownerId, publicationId, revision, allowRemix, updatedAt) {
+          assert.equal(ownerId, "user-1");
+          assert.equal(publicationId, "publication-remix");
+          expectedRevision = revision;
+          remote = createPublicationRecord({
+            ...remote,
+            allowRemix,
+            publicationRevision: revision + 1,
+            updatedAt,
+          });
+          return remote;
+        },
+      };
+    },
+    getState() {
+      return { account: { uid: "user-1", emailVerified: true } };
+    },
+  };
+  const linkRepository = createMemoryPublicationLinkRepository([{
+    uid: "user-1",
+    projectId: document.id,
+    publicationId: remote.publicationId,
+    publicationRevision: remote.publicationRevision,
+    allowRemix: false,
+    creatorName: remote.creatorName,
+    publishedAt: remote.publishedAt,
+    updatedAt: remote.updatedAt,
+  }]);
+  const service = createPublicationService({
+    accountService,
+    linkRepository,
+    now: () => "2026-07-20T12:01:00.000Z",
+    persistence: {
+      getActiveDocument: () => document,
+      saveNow: async () => document,
+    },
+  });
+
+  const enabled = await service.setRemixPermission(true);
+  assert.equal(expectedRevision, 1);
+  assert.equal(enabled.allowRemix, true);
+  assert.equal(enabled.publicationRevision, 2);
+  await assert.rejects(service.setRemixPermission("yes"), /enabled or disabled/);
+});
+
 test("Firestore rules allow public reads while restricting legacy ownership discovery", async () => {
   const rules = await readFile(new URL("../firestore.rules", import.meta.url), "utf8");
   assert.match(rules, /match \/publications\/\{publicationId\}/);
@@ -123,4 +187,6 @@ test("Firestore rules allow public reads while restricting legacy ownership disc
   assert.match(rules, /match \/publicationSlots\/\{slotId\}/);
   assert.match(rules, /validSlotId\(request\.resource\.data\.ownerSlot\)/);
   assert.match(rules, /publicationRevision == resource\.data\.publicationRevision \+ 1/);
+  assert.match(rules, /publicationVersion == 3/);
+  assert.match(rules, /allowRemix is bool/);
 });

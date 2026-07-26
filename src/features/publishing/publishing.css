@@ -11,6 +11,10 @@
 .publishing-actions { display: flex; justify-content: flex-end; }
 .publishing-link { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--accent); background: var(--bg-1); }
 .publishing-link > div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px; }
+.publishing-remix { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 9px; padding: 9px; border: 1px solid var(--line-strong); background: var(--surface); }
+.publishing-remix input { width: 20px; height: 20px; margin: 1px 0 0; }
+.publishing-remix span { display: grid; gap: 3px; }
+.publishing-remix small { color: var(--muted); }
 .publishing-link a { display: grid; min-height: 34px; place-items: center; padding: 4px 11px; border: 1px solid var(--line-strong); color: var(--ink); text-decoration: none; }
 .publishing-link .neutral-action { justify-self: start; }
 .publishing-message { min-height: 1.2em; }

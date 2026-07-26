@@ -53,11 +53,38 @@ export function createPublicationService({
       projectId: document.id,
       publicationId,
       publicationRevision: record.publicationRevision,
+      allowRemix: record.allowRemix,
       creatorName: record.creatorName,
       publishedAt: record.publishedAt,
       updatedAt: record.updatedAt,
     });
     return Object.freeze({ ...link, url: buildPublicationUrl(publicationId, shareBaseUrl) });
+  }
+
+  async function setRemixPermission(allowRemix) {
+    if (typeof allowRemix !== "boolean") {
+      throw new TypeError("Remix permission must be enabled or disabled.");
+    }
+    const account = requireAccount();
+    const projectId = persistence.getActiveDocument().id;
+    const existing = await linkRepository.get(account.uid, projectId);
+    if (!existing) throw new RangeError("Publish this project before enabling remixing.");
+    const timestamp = now();
+    const client = await accountService.getClient();
+    const record = await client.setPublicationRemixPermission(
+      account.uid,
+      existing.publicationId,
+      existing.publicationRevision,
+      allowRemix,
+      timestamp,
+    );
+    const link = await linkRepository.save({
+      ...existing,
+      allowRemix: record.allowRemix,
+      publicationRevision: record.publicationRevision,
+      updatedAt: record.updatedAt,
+    });
+    return Object.freeze({ ...link, url: buildPublicationUrl(link.publicationId, shareBaseUrl) });
   }
 
   async function unpublish() {
@@ -77,6 +104,7 @@ export function createPublicationService({
       return link ? Object.freeze({ ...link, url: buildPublicationUrl(link.publicationId, shareBaseUrl) }) : null;
     },
     publish,
+    setRemixPermission,
     unpublish,
   });
 }

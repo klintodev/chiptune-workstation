@@ -2,7 +2,8 @@ import { normalizeProjectDocument } from "../persistence/project-document.js?v=2
 
 export const PUBLICATION_FORMAT = "chiptune-workstation-publication";
 export const LEGACY_PUBLICATION_VERSION = 1;
-export const PUBLICATION_VERSION = 2;
+export const SLOT_PUBLICATION_VERSION = 2;
+export const PUBLICATION_VERSION = 3;
 export const MAX_PUBLICATION_BYTES = 900_000;
 export const MAX_PUBLICATIONS_PER_ACCOUNT = 20;
 export const PUBLICATION_SLOTS = Object.freeze(Array.from(
@@ -65,6 +66,7 @@ function normalizeCommonRecord(candidate) {
 }
 
 export function createPublicationRecord({
+  allowRemix = false,
   creatorName,
   document,
   ownerSlot,
@@ -87,8 +89,12 @@ export function createPublicationRecord({
       updatedAt: requireTimestamp(updatedAt, "update time"),
       document: normalizedDocument,
     }),
+    allowRemix,
     ownerSlot: requirePublicationSlot(ownerSlot),
   });
+  if (typeof record.allowRemix !== "boolean") {
+    throw new TypeError("Publication remix permission must be a boolean.");
+  }
   if (encodedSize(record) > MAX_PUBLICATION_BYTES) {
     throw new RangeError("This project is too large to publish.");
   }
@@ -101,14 +107,31 @@ export function normalizePublicationRecord(candidate, { ownerId } = {}) {
   }
   if (
     candidate.publicationFormat !== PUBLICATION_FORMAT
-    || ![LEGACY_PUBLICATION_VERSION, PUBLICATION_VERSION].includes(candidate.publicationVersion)
+    || ![
+      LEGACY_PUBLICATION_VERSION,
+      SLOT_PUBLICATION_VERSION,
+      PUBLICATION_VERSION,
+    ].includes(candidate.publicationVersion)
   ) {
     throw new RangeError("This publication format is not supported.");
   }
   const common = normalizeCommonRecord(candidate);
   const record = candidate.publicationVersion === LEGACY_PUBLICATION_VERSION
-    ? { ...common, ownerId: requireText(candidate.ownerId, "owner", 128) }
-    : { ...common, ownerSlot: requirePublicationSlot(candidate.ownerSlot) };
+    ? {
+      ...common,
+      allowRemix: false,
+      ownerId: requireText(candidate.ownerId, "owner", 128),
+    }
+    : {
+      ...common,
+      allowRemix: candidate.publicationVersion === PUBLICATION_VERSION
+        ? candidate.allowRemix
+        : false,
+      ownerSlot: requirePublicationSlot(candidate.ownerSlot),
+    };
+  if ("allowRemix" in record && typeof record.allowRemix !== "boolean") {
+    throw new TypeError("Publication remix permission must be a boolean.");
+  }
   if (ownerId && record.ownerId && record.ownerId !== ownerId) {
     throw new Error("Publication owner does not match the signed-in account.");
   }

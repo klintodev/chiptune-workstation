@@ -40,6 +40,7 @@ export function createPublishingFeature({
           <span class="panel-context">Public link</span>
           <div><input data-url type="url" readonly /><button type="button" data-copy>Copy</button><a data-open target="_blank" rel="noopener">Open</a></div>
           <p>Republishing updates this same URL. Visitors do not need an account.</p>
+          <label class="publishing-remix"><input data-remix type="checkbox" /><span><strong>Allow remixing</strong><small>Visitors can import this exact public snapshot as a new local project. Your private project and account stay private.</small></span></label>
           <button class="neutral-action" type="button" data-unpublish>Unpublish</button>
         </section>
         <p class="publishing-message" data-message role="status"></p>
@@ -67,6 +68,7 @@ export function createPublishingFeature({
     message: dialog.querySelector("[data-message]"),
     openLink: dialog.querySelector("[data-open]"),
     publish: dialog.querySelector("[data-publish]"),
+    remix: dialog.querySelector("[data-remix]"),
     title: dialog.querySelector("[data-title]"),
     unpublish: dialog.querySelector("[data-unpublish]"),
     url: dialog.querySelector("[data-url]"),
@@ -101,6 +103,7 @@ export function createPublishingFeature({
       elements.url.value = currentPublication.url;
       elements.openLink.href = currentPublication.url;
       elements.creator.value = currentPublication.creatorName;
+      elements.remix.checked = currentPublication.allowRemix === true;
     } else if (verified && !elements.creator.value) {
       elements.creator.value = account.displayName || "";
     }
@@ -170,6 +173,14 @@ export function createPublishingFeature({
       () => globalThis.navigator.clipboard.writeText(currentPublication.url),
       "Share link copied.",
     );
+  }, { signal: lifecycle.signal });
+  elements.remix.addEventListener("change", () => {
+    const allowRemix = elements.remix.checked;
+    void run(async () => {
+      currentPublication = await publicationService.setRemixPermission(allowRemix);
+    }, allowRemix
+      ? "Visitors may now create local remixes from this snapshot."
+      : "Future in-product remix imports are disabled.");
   }, { signal: lifecycle.signal });
   elements.unpublish.addEventListener("click", () => {
     dialog.close();

@@ -14,12 +14,15 @@ export function normalizePublicationLink(candidate) {
   if (!Number.isInteger(candidate.publicationRevision) || candidate.publicationRevision < 1) {
     throw new RangeError("Publication link revision is invalid.");
   }
+  const allowRemix = candidate.allowRemix ?? false;
+  if (typeof allowRemix !== "boolean") throw new TypeError("Publication remix permission is invalid.");
   return Object.freeze({
     key: key(candidate.uid, candidate.projectId),
     uid: candidate.uid,
     projectId: candidate.projectId,
     publicationId: candidate.publicationId,
     publicationRevision: candidate.publicationRevision,
+    allowRemix,
     creatorName: candidate.creatorName,
     publishedAt: candidate.publishedAt,
     updatedAt: candidate.updatedAt,
