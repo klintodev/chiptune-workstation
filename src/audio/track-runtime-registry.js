@@ -1,6 +1,6 @@
 import { isTrackAudible, MAX_TRACK_VOICES } from "../state/project-state.js";
-import { createTrackChannel } from "./track-channel.js?v=20260722-1";
-import { createVoiceEngine } from "./voice-engine.js?v=20260721-1";
+import { createTrackChannel } from "./track-channel.js";
+import { createVoiceEngine } from "./voice-engine.js";
 
 export function createTrackRuntimeRegistry({ audioEngine, projectState }) {
   const runtimes = new Map();

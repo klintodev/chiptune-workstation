@@ -1,4 +1,7 @@
-import { midiNoteToFrequency } from "../../audio/voice-engine.js?v=20260721-1";
+import {
+  getEffectiveMidiNote,
+  midiNoteToFrequency,
+} from "../../audio/pitch-policy.js";
 import { isGlobalShortcutEligible } from "../../shared/keyboard-policy.js";
 import { KEY_BY_CODE } from "./keyboard-layout.js";
 
@@ -22,7 +25,7 @@ export function createInputController({
   function createVoice(baseNote) {
     const config = getInstrumentConfig();
     const patternNote = baseNote + getKeyboardNoteOffset() * 12;
-    const playedNote = patternNote + config.octaveOffset * 12;
+    const playedNote = getEffectiveMidiNote(patternNote, config.octaveOffset);
     const activeVoiceEngine = resolveVoiceEngine();
     const voice = activeVoiceEngine.trigger({
       type: config.voiceType,

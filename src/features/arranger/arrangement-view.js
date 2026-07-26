@@ -363,7 +363,7 @@ export function createArrangementView({
     elements.canvas.replaceChildren(...rows);
     elements.addTrack.disabled = project.tracks.length >= MAX_PROJECT_TRACKS;
     elements.empty.hidden = project.tracks.some((track) => track.clips.some((clip) => (
-      patterns.get(clip.patternId)?.steps.some((step) => step !== null)
+      patterns.get(clip.patternId)?.steps.some((step) => step !== null && step.volume > 0)
     )));
     renderTrackMenu(project, workspace);
     renderClipInspector(project, workspace);
@@ -559,7 +559,7 @@ export function createArrangementView({
       const workspace = getWorkspace();
       try {
         const pattern = projectState.getPattern(workspace.selectedPatternId);
-        if (!pattern.steps.some((step) => step !== null)) {
+        if (!pattern.steps.some((step) => step !== null && step.volume > 0)) {
           throw new RangeError("Add at least one note to this loop before adding it to the song.");
         }
         const clipId = projectState.addClip(lane.dataset.trackId, workspace.selectedPatternId, startStep);

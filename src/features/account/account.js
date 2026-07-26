@@ -312,6 +312,7 @@ export function createAccountFeature({
   }
 
   function openAccount() {
+    void accountService.start();
     render();
     if (!elements.dialog.open) elements.dialog.showModal();
     elements.close.focus();

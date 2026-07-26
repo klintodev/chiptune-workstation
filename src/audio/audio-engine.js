@@ -1,3 +1,8 @@
+import {
+  MIN_SUPPORTED_AUDIO_SAMPLE_RATE,
+  validateAudioSampleRate,
+} from "./pitch-policy.js";
+
 export const DEFAULT_MASTER_GAIN = 0.35;
 const MASTER_RAMP_SECONDS = 0.015;
 
@@ -56,7 +61,18 @@ export function createAudioEngine() {
 
     try {
       if (!context) {
-        context = new Context();
+        const candidate = new Context();
+        try {
+          validateAudioSampleRate(candidate.sampleRate);
+        } catch (error) {
+          void candidate.close?.().catch?.(() => {});
+          throw createAudioEngineError(
+            "unsupported",
+            `This audio device uses a sample rate below ${MIN_SUPPORTED_AUDIO_SAMPLE_RATE} Hz and cannot safely play the full note range.`,
+            error,
+          );
+        }
+        context = candidate;
         context.addEventListener("statechange", emitState);
         masterGain = context.createGain();
         analyser = context.createAnalyser();

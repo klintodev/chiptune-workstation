@@ -109,6 +109,14 @@ test("song playback requires a placed loop that contains a note", () => {
   project.updatePattern(DEFAULT_PATTERN_ID, (pattern) => ({
     ...pattern,
     steps: pattern.steps.map((step, index) => index === 0
+      ? { note: 60, gate: 0.75, volume: 0 }
+      : step),
+  }));
+  assert.equal(hasPlayableArrangement(project.getState()), false);
+
+  project.updatePattern(DEFAULT_PATTERN_ID, (pattern) => ({
+    ...pattern,
+    steps: pattern.steps.map((step, index) => index === 0
       ? { note: 60, gate: 0.75, volume: 0.7 }
       : step),
   }));

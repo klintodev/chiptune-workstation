@@ -5,7 +5,7 @@ import { announceStatus, setTextIfChanged } from "../../shared/status-announcer.
 export function hasPlayableArrangement(project) {
   const patterns = new Map(project.patterns.map((pattern) => [pattern.id, pattern]));
   return project.tracks.some((track) => track.clips.some((clip) => (
-    patterns.get(clip.patternId)?.steps.some((step) => step !== null)
+    patterns.get(clip.patternId)?.steps.some((step) => step !== null && step.volume > 0)
   )));
 }
 
@@ -106,7 +106,9 @@ export function createTransportControls({
     const selectedPattern = project.patterns.find(({ id }) => (
       id === sessionState.getState().workspace.selectedPatternId
     )) ?? project.patterns[0];
-    const selectedPatternHasNotes = selectedPattern.steps.some((step) => step !== null);
+    const selectedPatternHasNotes = selectedPattern.steps.some(
+      (step) => step !== null && step.volume > 0,
+    );
     elements.songHelp.hidden = transport.mode !== "arrangement" || hasArrangement;
     elements.songMessage.textContent = selectedPatternHasNotes
       ? "Song needs this loop to be added."
@@ -165,7 +167,12 @@ export function createTransportControls({
     const project = projectState.getState();
     const enabled = !project.transport.loop.enabled;
     const endStep = Math.max(1, projectState.getArrangementEnd());
-    projectState.setLoop({ enabled, startStep: 0, endStep });
+    projectState.setLoop({
+      enabled,
+      endStep,
+      mode: "arrangement",
+      startStep: 0,
+    });
     onError("");
   }
 
@@ -256,7 +263,7 @@ export function createTransportControls({
     const pattern = projectState.getState().patterns.find(({ id }) => (
       id === workspace.selectedPatternId
     ));
-    const hasNotes = pattern?.steps.some((step) => step !== null);
+    const hasNotes = pattern?.steps.some((step) => step !== null && step.volume > 0);
     sessionState.setWorkspace({
       activeDockPanel: "sequencer",
       detailPanelCollapsed: false,

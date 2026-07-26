@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {
+  MAX_PLAYABLE_FREQUENCY,
+  MIN_PLAYABLE_FREQUENCY,
+} from "../src/audio/pitch-policy.js";
 import { createVoiceEngine } from "../src/audio/voice-engine.js";
 
-function createAudioHarness({ maxVoices = Infinity } = {}) {
+function createAudioHarness({ advanceOnRead = false, maxVoices = Infinity } = {}) {
   let now = 0;
   const gainNodes = [];
   const periodicWaves = [];
@@ -71,7 +75,11 @@ function createAudioHarness({ maxVoices = Infinity } = {}) {
   };
   const output = { context };
   const voiceEngine = createVoiceEngine({
-    getAudioTime: () => now,
+    getAudioTime: () => {
+      const captured = now;
+      if (advanceOnRead) now += 0.001;
+      return captured;
+    },
     getOutputNode: () => output,
     maxVoices,
   });
@@ -138,4 +146,31 @@ test("noise voices use note frequency to tune their sample-and-hold clock", () =
   assert.equal(harness.sources[0].playbackRate.value, 0.5);
   assert.equal(harness.sources[1].playbackRate.value, 2);
   assert.equal(harness.sources[0].buffer, harness.sources[1].buffer);
+});
+
+test("an omitted start time is resolved from one advancing audio-clock read", () => {
+  const harness = createAudioHarness({ advanceOnRead: true });
+
+  assert.doesNotThrow(() => harness.voiceEngine.trigger());
+  assert.equal(harness.voiceEngine.getActiveVoiceCount(), 1);
+});
+
+test("an explicitly late finite start clamps to the captured audio clock", () => {
+  const harness = createAudioHarness();
+  harness.setTime(2);
+
+  assert.doesNotThrow(() => harness.voiceEngine.trigger({ startTime: 1 }));
+  assert.deepEqual(harness.gainNodes[1].events[0], ["set", 0.0001, 2]);
+  assert.throws(() => harness.voiceEngine.trigger({ startTime: Number.NaN }));
+});
+
+test("inclusive frequency boundaries pass before nodes are created", () => {
+  const harness = createAudioHarness();
+
+  harness.voiceEngine.trigger({ frequency: MIN_PLAYABLE_FREQUENCY });
+  harness.voiceEngine.trigger({ frequency: MAX_PLAYABLE_FREQUENCY });
+  const sourceCount = harness.sources.length;
+  assert.throws(() => harness.voiceEngine.trigger({ frequency: MIN_PLAYABLE_FREQUENCY - 0.001 }));
+  assert.throws(() => harness.voiceEngine.trigger({ frequency: MAX_PLAYABLE_FREQUENCY + 0.001 }));
+  assert.equal(harness.sources.length, sourceCount);
 });

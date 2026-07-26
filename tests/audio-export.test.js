@@ -6,6 +6,10 @@ import {
   EXPORT_CHANNELS,
   EXPORT_SAMPLE_RATE,
 } from "../src/audio/offline-arrangement-renderer.js";
+import {
+  MAX_PLAYABLE_FREQUENCY,
+  MIN_PLAYABLE_FREQUENCY,
+} from "../src/audio/pitch-policy.js";
 import { encodePcm16Wave } from "../src/audio/wav-encoder.js";
 import { createDefaultProject } from "../src/state/project-state.js";
 
@@ -65,6 +69,19 @@ test("render plan preserves distinct pitches for noise voices", () => {
 
   assert.ok(plan.tracks[0].notes[1].frequency > plan.tracks[0].notes[0].frequency);
   assert.equal(plan.tracks[0].notes[0].type, "noise");
+});
+
+test("render plans accept both effective pitch boundaries", () => {
+  const low = createSong();
+  low.patterns[0].steps[0].note = 36;
+  low.tracks[0].instrument.octaveOffset = -2;
+  const high = createSong();
+  high.patterns[0].steps[0].note = 112;
+  high.tracks[0].instrument.octaveOffset = 2;
+
+  assert.equal(createArrangementRenderPlan(low).tracks[0].notes[0].frequency, MIN_PLAYABLE_FREQUENCY);
+  assert.equal(createArrangementRenderPlan(high).tracks[0].notes[0].frequency, MAX_PLAYABLE_FREQUENCY);
+  assert.throws(() => createArrangementRenderPlan(low, { sampleRate: 44_099 }), /sample rate/);
 });
 
 test("render plan rejects empty and excessively long exports before rendering", () => {

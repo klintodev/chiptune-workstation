@@ -216,4 +216,8 @@ test("track pan is validated, persisted, and undoable", () => {
   const invalid = structuredClone(project.getState());
   invalid.tracks[0].mixer.pan = 1.1;
   assert.throws(() => createProjectState(invalid), /invalid mixer/);
+
+  const fractionalOctave = structuredClone(project.getState());
+  fractionalOctave.tracks[0].instrument.octaveOffset = 0.5;
+  assert.throws(() => createProjectState(fractionalOctave), /instrument octaveOffset/);
 });

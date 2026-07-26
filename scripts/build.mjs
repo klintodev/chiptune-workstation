@@ -36,6 +36,22 @@ function replaceRequired(source, pattern, replacement, label) {
   return source.replace(pattern, replacement);
 }
 
+function assertCanonicalModuleIdentities(metafile) {
+  const identities = new Map();
+  for (const input of Object.keys(metafile.inputs)) {
+    if (!input.endsWith(".js")) continue;
+    if (input.includes("?")) {
+      throw new Error(`Build input must use a canonical module specifier: ${input}`);
+    }
+    const identity = path.resolve(root, input).toLowerCase();
+    const previous = identities.get(identity);
+    if (previous && previous !== input) {
+      throw new Error(`Build resolved one module through multiple identities: ${previous}, ${input}`);
+    }
+    identities.set(identity, input);
+  }
+}
+
 async function writeHtml({ appAsset, cssAsset, filename, sourceFile }) {
   let html = await readFile(path.join(root, sourceFile), "utf8");
   html = replaceRequired(
@@ -60,6 +76,7 @@ const result = await build({
   absWorkingDir: root,
   assetNames: "fonts/[name]-[hash]",
   bundle: true,
+  chunkNames: "chunks/[name]-[hash]",
   entryNames: "[name]-[hash]",
   entryPoints: absoluteEntries,
   format: "esm",
@@ -71,10 +88,20 @@ const result = await build({
   outdir: outputDirectory,
   platform: "browser",
   sourcemap: false,
+  splitting: true,
   target: ["es2022"],
 });
 
-await cp(path.join(root, "assets"), outputDirectory, { recursive: true });
+assertCanonicalModuleIdentities(result.metafile);
+
+const staticAssets = path.join(root, "assets");
+await cp(staticAssets, outputDirectory, {
+  filter(source) {
+    const relative = path.relative(staticAssets, source);
+    return relative !== "fonts" && !relative.startsWith(`fonts${path.sep}`);
+  },
+  recursive: true,
+});
 await Promise.all([
   cp(path.join(root, "robots.txt"), path.join(dist, "robots.txt")),
   cp(path.join(root, "sitemap.xml"), path.join(dist, "sitemap.xml")),

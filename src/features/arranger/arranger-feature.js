@@ -1,8 +1,8 @@
 import { queryRequired } from "../../shared/query-required.js";
 import { setTextIfChanged } from "../../shared/status-announcer.js";
-import { createArrangementView } from "./arrangement-view.js?v=20260722-1";
+import { createArrangementView } from "./arrangement-view.js";
 import { createPatternLibrary } from "./pattern-library.js";
-import { createTransportControls } from "./transport-controls.js?v=20260720-1";
+import { createTransportControls } from "./transport-controls.js";
 
 export function createArrangerFeature({
   audioEngine,

@@ -33,7 +33,7 @@
     <link rel="icon" href="/assets/brand/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png" />
     <link rel="manifest" href="/assets/brand/site.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=20260722-1" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="shell">
@@ -214,6 +214,7 @@
           <button id="project-new" type="button">New</button>
           <button id="project-duplicate" type="button">Duplicate</button>
           <button id="project-import" type="button">Import</button>
+          <button id="project-export" type="button">Download</button>
           <input id="project-import-file" type="file" accept=".chipwork.json,.json,application/json" hidden />
         </div>
         <div class="project-library-heading"><span>Saved in this browser</span><output id="project-library-count">0 projects</output></div>
@@ -223,6 +224,10 @@
           <div id="project-share-render-actions"></div>
         </div>
         <p id="project-storage-message" class="project-storage-message" role="status"></p>
+        <div id="project-storage-recovery" class="project-storage-recovery" hidden>
+          <p><strong>Keep a recovery copy.</strong> Download this project now, then use Import to restore it later.</p>
+          <button id="project-recovery-download" type="button">Download recovery copy</button>
+        </div>
         <p id="project-library-error" class="project-library-error" role="alert" hidden></p>
       </div>
     </dialog>
@@ -246,6 +251,6 @@
       </div>
     </dialog>
 
-    <script type="module" src="./src/app.js?v=20260722-1"></script>
+    <script type="module" src="./src/app.js"></script>
   </body>
 </html>

@@ -1,23 +1,34 @@
-import { createAudioExportFeature } from "./features/audio-export/audio-export.js?v=20260721-3";
-import { createAccountFeature } from "./features/account/account.js?v=20260721-5";
-import { createVisualiserFeature } from "./features/visualiser/visualiser.js?v=20260722-1";
-import { createPublishingFeature } from "./features/publishing/publishing.js?v=20260721-4";
-import { createAccountService } from "./firebase/account-service.js?v=20260721-3";
-import { createIndexedDbCloudLinkRepository } from "./firebase/cloud-link-repository.js?v=20260722-1";
-import { createCloudProjectService } from "./firebase/cloud-project-service.js?v=20260722-1";
-import { createFirebaseClient } from "./firebase/firebase-client.js?v=20260722-1";
-import { createLocalPublicationLinkRepository } from "./firebase/publication-link-repository.js";
-import { createPublicationService } from "./firebase/publication-service.js?v=20260722-1";
+import { createAudioExportFeature } from "./features/audio-export/audio-export.js";
+import { createAccountFeature } from "./features/account/account.js";
+import { createVisualiserFeature } from "./features/visualiser/visualiser.js";
+import { createPublishingFeature } from "./features/publishing/publishing.js";
 import {
-  createIndexedDbProjectRepository,
-  createProjectPreferences,
-} from "./persistence/project-repository.js?v=20260722-1";
+  createAccountService,
+  createAccountSessionPreference,
+} from "./firebase/account-service.js";
+import {
+  createFallbackCloudLinkRepository,
+  createIndexedDbCloudLinkRepository,
+  createMemoryCloudLinkRepository,
+} from "./firebase/cloud-link-repository.js";
+import { createCloudProjectService } from "./firebase/cloud-project-service.js";
+import {
+  createLazyCloudProjectService,
+  createLazyPublicationService,
+} from "./firebase/lazy-optional-services.js";
+import {
+  createLocalPublicationLinkRepository,
+  createMemoryPublicationLinkRepository,
+} from "./firebase/publication-link-repository.js";
+import { createPublicationService } from "./firebase/publication-service.js";
 import {
   projectPersistence,
+  projectPreferences,
+  projectRepository,
   projectState,
   scheduler,
   sessionState,
-} from "./workstation-app.js?v=20260722-1";
+} from "./workstation-app.js";
 
 const audioExportFeature = createAudioExportFeature({
   persistence: projectPersistence,
@@ -28,24 +39,54 @@ const visualiserFeature = createVisualiserFeature({
   scheduler,
   sessionState,
 });
+const accountSessionPreference = createAccountSessionPreference();
 const accountService = createAccountService({
-  loadClient: createFirebaseClient,
+  async loadClient() {
+    const { createFirebaseClient } = await import("./firebase/firebase-client.js");
+    return createFirebaseClient();
+  },
+  sessionPreference: accountSessionPreference,
 });
-const cloudProjectService = createCloudProjectService({
+const cloudProjectService = createLazyCloudProjectService({
   accountService,
-  linkRepository: createIndexedDbCloudLinkRepository(),
-  localRepository: createIndexedDbProjectRepository(),
-  persistence: projectPersistence,
-  preferences: createProjectPreferences(),
+  createService() {
+    let linkRepository;
+    try {
+      linkRepository = createFallbackCloudLinkRepository({
+        fallback: createMemoryCloudLinkRepository(),
+        primary: createIndexedDbCloudLinkRepository(),
+      });
+    } catch {
+      linkRepository = createMemoryCloudLinkRepository();
+    }
+    return createCloudProjectService({
+      accountService,
+      linkRepository,
+      localRepository: projectRepository,
+      persistence: projectPersistence,
+      preferences: projectPreferences,
+    });
+  },
 });
 const accountFeature = createAccountFeature({
   accountService,
   cloudProjectService,
 });
-const publicationService = createPublicationService({
+const publicationService = createLazyPublicationService({
   accountService,
-  linkRepository: createLocalPublicationLinkRepository(),
-  persistence: projectPersistence,
+  createService() {
+    let linkRepository;
+    try {
+      linkRepository = createLocalPublicationLinkRepository();
+    } catch {
+      linkRepository = createMemoryPublicationLinkRepository();
+    }
+    return createPublicationService({
+      accountService,
+      linkRepository,
+      persistence: projectPersistence,
+    });
+  },
 });
 const publishingFeature = createPublishingFeature({
   accountService,
@@ -54,7 +95,7 @@ const publishingFeature = createPublishingFeature({
 });
 
 cloudProjectService.start();
-void accountService.start();
+if (accountSessionPreference.isEnabled()) void accountService.start({ remember: false });
 
 window.addEventListener("unload", () => {
   publishingFeature.dispose();

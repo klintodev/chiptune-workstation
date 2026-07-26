@@ -1,4 +1,4 @@
-import { normalizeProjectDocument } from "../persistence/project-document.js?v=20260722-1";
+import { normalizeProjectDocument } from "../persistence/project-document.js";
 
 const DATABASE_NAME = "chiptune-workstation-cloud";
 const DATABASE_VERSION = 1;
@@ -65,6 +65,56 @@ export function createMemoryCloudLinkRepository(initialLinks = []) {
       links.set(normalized.key, normalized);
       return normalizeCloudLink(clone(normalized));
     },
+  });
+}
+
+export function createFallbackCloudLinkRepository({
+  fallback = createMemoryCloudLinkRepository(),
+  primary,
+} = {}) {
+  const methods = ["delete", "get", "list", "save"];
+  if (
+    !primary
+    || methods.some((method) => typeof primary[method] !== "function")
+    || methods.some((method) => typeof fallback?.[method] !== "function")
+  ) {
+    throw new TypeError("Cloud-link fallback requires complete primary and fallback repositories.");
+  }
+  let usingFallback = false;
+
+  async function mirror(method, args, result) {
+    try {
+      if (method === "delete") {
+        await fallback.delete(...args);
+      } else if (method === "get" && result) {
+        await fallback.save(result);
+      } else if (method === "list") {
+        for (const link of result) await fallback.save(link);
+      } else if (method === "save") {
+        await fallback.save(result);
+      }
+    } catch {
+      // A healthy primary repository remains authoritative if mirroring is unavailable.
+    }
+  }
+
+  async function run(method, args) {
+    if (usingFallback) return fallback[method](...args);
+    try {
+      const result = await primary[method](...args);
+      await mirror(method, args, result);
+      return result;
+    } catch {
+      usingFallback = true;
+      return fallback[method](...args);
+    }
+  }
+
+  return Object.freeze({
+    delete: (...args) => run("delete", args),
+    get: (...args) => run("get", args),
+    list: (...args) => run("list", args),
+    save: (...args) => run("save", args),
   });
 }
 
