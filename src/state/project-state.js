@@ -16,10 +16,6 @@ import {
   SUPPORTED_PATTERN_GATES,
   SUPPORTED_PATTERN_LENGTHS,
 } from "./pattern-state.js";
-import {
-  DEFAULT_SCALE_GUIDE,
-  normalizeScaleGuide,
-} from "../music/scale.js";
 
 export const PROJECT_SCHEMA_VERSION = 6;
 export const DEFAULT_PATTERN_ID = "pattern-1";
@@ -55,7 +51,6 @@ function cloneTrack(track) {
 
 function freezeProject(project) {
   Object.freeze(project.metadata);
-  Object.freeze(project.scaleGuide);
   for (const layer of project.visualiser.layers) {
     Object.freeze(layer.mapping);
     Object.freeze(layer);
@@ -206,7 +201,6 @@ export function validateProject(candidate) {
     throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
   }
   validateName(candidate.metadata?.title, "Project", MAX_PROJECT_TITLE_LENGTH);
-  normalizeScaleGuide(candidate.scaleGuide);
   validateVisualiser(candidate.visualiser);
   validateTransport(candidate.transport);
   if (
@@ -259,19 +253,20 @@ function isPatternEmpty(pattern) {
 }
 
 export function migrateProject(candidate) {
-  if (candidate?.schemaVersion === PROJECT_SCHEMA_VERSION) return candidate;
+  if (candidate?.schemaVersion === PROJECT_SCHEMA_VERSION) {
+    const { scaleGuide: _legacyScaleGuide, ...project } = candidate;
+    return project;
+  }
   if (candidate?.schemaVersion === 5 && Array.isArray(candidate.patterns)) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
-      scaleGuide: { ...DEFAULT_SCALE_GUIDE },
     };
   }
   if (candidate?.schemaVersion === 4 && Array.isArray(candidate.patterns)) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
-      scaleGuide: { ...DEFAULT_SCALE_GUIDE },
       tracks: candidate.tracks.map((track) => ({
         ...track,
         mixer: { ...track.mixer, pan: track.mixer.pan ?? 0 },
@@ -282,7 +277,6 @@ export function migrateProject(candidate) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
-      scaleGuide: { ...DEFAULT_SCALE_GUIDE },
       visualiser: createDefaultVisualiser(),
       tracks: candidate.tracks.map((track) => ({
         ...track,
@@ -294,7 +288,6 @@ export function migrateProject(candidate) {
     return {
       ...candidate,
       schemaVersion: PROJECT_SCHEMA_VERSION,
-      scaleGuide: { ...DEFAULT_SCALE_GUIDE },
       visualiser: createDefaultVisualiser(),
       tracks: candidate.tracks.map((track) => ({
         ...track,
@@ -329,7 +322,6 @@ export function migrateProject(candidate) {
   return {
     schemaVersion: PROJECT_SCHEMA_VERSION,
     metadata: { ...candidate.metadata },
-    scaleGuide: { ...DEFAULT_SCALE_GUIDE },
     visualiser: createDefaultVisualiser(),
     transport: {
       bpm: candidate.transport.bpm,
@@ -342,11 +334,10 @@ export function migrateProject(candidate) {
 }
 
 function normalizeProject(candidate) {
-  const migrated = migrateProject(candidate);
+  const { scaleGuide: _legacyScaleGuide, ...migrated } = migrateProject(candidate);
   const normalized = {
     ...migrated,
     metadata: { ...migrated.metadata },
-    scaleGuide: normalizeScaleGuide(migrated.scaleGuide),
     visualiser: normalizeVisualiser(migrated.visualiser),
     transport: {
       ...migrated.transport,
@@ -366,7 +357,6 @@ export function createDefaultProject() {
   return normalizeProject({
     schemaVersion: PROJECT_SCHEMA_VERSION,
     metadata: { title: "Untitled chiptune" },
-    scaleGuide: { ...DEFAULT_SCALE_GUIDE },
     visualiser: createDefaultVisualiser(),
     transport: {
       bpm: 120,
@@ -906,15 +896,6 @@ export function createProjectState(initialProject = createDefaultProject()) {
     return commit({ ...state, visualiser }, { field: "visualiser", operation: "update-visualiser" });
   }
 
-  function setScaleGuide(values) {
-    const scaleGuide = normalizeScaleGuide({ ...state.scaleGuide, ...values });
-    if (Object.keys(values).every((key) => state.scaleGuide[key] === scaleGuide[key])) return false;
-    return commit(
-      { ...state, scaleGuide },
-      { field: "scaleGuide", operation: "update-scale-guide" },
-    );
-  }
-
   function setBpm(bpm) {
     if (!Number.isFinite(bpm) || bpm < 40 || bpm > 240) {
       throw new RangeError("Tempo must be between 40 and 240 BPM.");
@@ -1010,7 +991,6 @@ export function createProjectState(initialProject = createDefaultProject()) {
     setLoop,
     setMasterVolume,
     setPatternRootOctave,
-    setScaleGuide,
     setVisualiser,
     undo,
     updatePattern,

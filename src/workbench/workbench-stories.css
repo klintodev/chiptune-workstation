@@ -297,20 +297,13 @@
 
 .story-frame > .account-dialog,
 .story-frame > .publishing-dialog,
-.story-frame > .guided-dialog,
 .story-frame > .help-dialog,
 .story-frame > .remix-import-dialog {
   width: min(980px, 100%);
   margin-inline: auto;
 }
 
-.story-frame > .account-dialog .account-dialog-panel,
-.story-frame > .publishing-dialog .publishing-panel,
-.story-frame > .guided-dialog .guided-panel,
-.story-frame > .help-dialog .help-panel {
-  width: 100%;
-  max-width: none;
-}
+
 
 @media (max-width: 700px) {
   .story-theme-palette {
@@ -355,27 +348,15 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) :is(.guided-scale-controls, .guided-idea-controls) {
-  grid-template-columns: 1fr 1fr;
-}
 
-.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .guided-preview {
-  align-items: stretch;
-  flex-direction: column;
-}
 
-.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .guided-preview > div:last-child {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
 
-.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) :is(.guided-variation-bounds, .guided-recipe-controls) > div {
-  grid-template-columns: 1fr 1fr;
-}
 
-.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .guided-starter-controls {
-  grid-template-columns: 1fr;
-}
+
+
+
+
+
 
 .story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell {
   grid-template-rows: 84px auto;
@@ -430,37 +411,19 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.story-viewport[data-viewport="mobile"] :is(.guided-scale-controls, .guided-idea-controls, .guided-checkpoint-create) {
-  grid-template-columns: 1fr;
-}
 
-.story-viewport[data-viewport="mobile"] .guided-section-heading {
-  align-items: stretch;
-  flex-direction: column;
-}
 
-.story-viewport[data-viewport="mobile"] .guided-section-heading output {
-  text-align: left;
-}
 
-.story-viewport[data-viewport="mobile"] :is(.guided-variation-bounds, .guided-recipe-controls) > div {
-  grid-template-columns: 1fr;
-}
 
-.story-viewport[data-viewport="mobile"] .guided-starter-controls fieldset {
-  align-items: stretch;
-  flex-direction: column;
-}
 
-.story-viewport[data-viewport="mobile"] .guided-starter-preview dl {
-  grid-template-columns: 1fr;
-  gap: 3px;
-}
 
-.story-viewport[data-viewport="mobile"] .guided-starter-actions {
-  display: grid;
-  grid-template-columns: 1fr;
-}
+
+
+
+
+
+
+
 
 .story-viewport[data-viewport="mobile"] .story-workspace-shell {
   gap: 10px;

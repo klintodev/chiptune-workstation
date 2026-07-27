@@ -196,7 +196,7 @@ export function createProjectLibraryFeature({
 
   function requestDelete(summary) {
     pendingDelete = summary;
-    elements.deleteMessage.textContent = `Delete “${summary.title}” and its device-local checkpoints from this browser? This cannot be undone.`;
+    elements.deleteMessage.textContent = `Delete “${summary.title}” from this browser? This cannot be undone.`;
     if (elements.dialog.open) elements.dialog.close();
     elements.deleteDialog.showModal();
     elements.cancelDelete.focus();

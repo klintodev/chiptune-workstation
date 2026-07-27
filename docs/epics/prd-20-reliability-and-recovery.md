@@ -125,7 +125,7 @@ As a returning user, I want that downloaded file to restore the same musical pro
 - Sanitize the download filename independently from the document's preserved project title.
 - Validate the serialized document before initiating the browser download and report browser download failures without mutating state.
 - Keep import compatible with the exact downloaded representation.
-- Export only the active versioned project document; do not embed PRD 24 checkpoint records or a recursive recovery archive.
+- Export only the active versioned project document; do not embed a recursive recovery archive.
 
 ### Acceptance and automated coverage
 
@@ -133,7 +133,7 @@ As a returning user, I want that downloaded file to restore the same musical pro
 - Conflict-copy creation succeeds when the original title is exactly 100 characters.
 - A guest using the in-memory repository can download the active project without any repository or cloud call.
 - Importing the download in a fresh store preserves project ID, notes, instruments, mixer state, clips, visualiser settings, and supported metadata.
-- The file contains no local checkpoint history, cloud-link record, or account metadata.
+- The file contains no cloud-link record or account metadata.
 - Unit tests cover suffix growth into double digits, all-whitespace input, Unicode, duplicate sibling names, and filename-reserved characters.
 - A browser test disables IndexedDB, edits a note, downloads the project, and verifies the captured file can be imported.
 

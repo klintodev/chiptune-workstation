@@ -85,7 +85,7 @@ Requirements:
 
 - Resolve the palette from saved project state in the dock and performance viewer.
 - Resolve the same palette from the immutable published snapshot in public playback.
-- Preserve the palette through existing persistence, checkpoint, download, cloud, publication, and remix document paths.
+- Preserve the palette through existing persistence, download, cloud, publication, and remix document paths.
 - Never let palette application alter scheduler, audio, projection geometry, or musical data.
 
 ### Acceptance and test coverage
@@ -117,7 +117,7 @@ As a publisher, I want my custom palette to remain intact on shared and remixed 
 
 Requirements:
 
-- Carry custom data through validation, migration, persistence, checkpoints, publication, and remixing.
+- Carry custom data through validation, migration, persistence, publication, and remixing.
 - Accept no CSS strings, remote assets, URLs, shaders, or executable transforms.
 - Fall back predictably when custom data is invalid or unsupported.
 

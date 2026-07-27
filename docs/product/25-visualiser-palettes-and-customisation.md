@@ -47,7 +47,7 @@ This release also establishes the bounded colour-role model needed for later cus
 
 - The compact guide and performance view must resolve scene and track colours from the same saved palette identifier.
 - Public playback must render the palette stored in the immutable published project snapshot.
-- Checkpoints, local persistence, downloads, cloud projects, publication, and remix import inherit palette data through the existing validated project document.
+- Local persistence, downloads, cloud projects, publication, and remix import inherit palette data through the existing validated project document.
 - Palette changes must not restart playback, reschedule notes, recreate audio graphs, or alter scheduler state.
 - Canvas-unavailable textual alternatives must retain the same musical meaning without requiring palette information.
 

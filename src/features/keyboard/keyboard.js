@@ -1,6 +1,5 @@
 import { queryRequired } from "../../shared/query-required.js";
 import { KEYBOARD_KEYS } from "./keyboard-layout.js";
-import { classifyScaleNote } from "../../music/scale.js";
 
 const WHITE_SEMITONES = new Set([0, 2, 4, 5, 7, 9, 11]);
 
@@ -41,7 +40,6 @@ export function createKeyboardFeature({
   audioEngine,
   getNoteName,
   getKeyboardNoteOffset = () => 0,
-  getScaleGuide,
   inputController,
   instrumentState,
   onStopAllSound,
@@ -136,24 +134,13 @@ export function createKeyboardFeature({
     stopSound.disabled = !ready;
     for (const [baseNote, { button, key, noteName }] of keyButtons) {
       const displayedName = getNoteName(baseNote + (getKeyboardNoteOffset() + octaveOffset) * 12);
-      const patternNote = baseNote + getKeyboardNoteOffset() * 12;
-      const scale = getScaleGuide ? classifyScaleNote(patternNote, getScaleGuide()) : null;
       const active = activeNotes.has(baseNote);
       button.disabled = !ready;
       button.classList.toggle("active", active);
-      button.classList.toggle("in-scale", scale?.inScale === true);
-      button.classList.toggle("out-of-scale", scale?.inScale === false);
-      button.classList.toggle("tonic", scale?.tonic === true);
-      button.dataset.scaleRole = !scale
-        ? "Note"
-        : scale.tonic ? "Tonic" : scale.inScale ? "In scale" : "Outside scale";
       button.setAttribute("aria-pressed", String(active));
-      button.setAttribute(
-        "aria-label",
-        `${displayedName}, ${button.dataset.scaleRole.toLowerCase()}, computer key ${key.label}`,
-      );
+      button.setAttribute("aria-label", `${displayedName}, computer key ${key.label}`);
       button.setAttribute("aria-keyshortcuts", key.label);
-      button.title = `${displayedName} · ${button.dataset.scaleRole.toLowerCase()} · computer key ${key.label} · press Enter or Space for a short preview`;
+      button.title = `${displayedName} · computer key ${key.label} · press Enter or Space for a short preview`;
       noteName.textContent = displayedName;
     }
   }

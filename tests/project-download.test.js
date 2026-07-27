@@ -90,7 +90,6 @@ test("in-memory unsaved edits round-trip through the emergency document", async 
   assert.equal(restoredDocument.project.patterns[0].steps[0].note, 112);
   assert.equal("account" in restoredDocument, false);
   assert.equal("cloudLink" in restoredDocument, false);
-  assert.equal("checkpoints" in restoredDocument, false);
 
   const fresh = createProjectDocument(createDefaultProject(), { id: "fresh", now: NOW });
   const freshState = createProjectState(fresh.project);

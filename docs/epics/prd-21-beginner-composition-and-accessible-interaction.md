@@ -286,7 +286,7 @@ Requirements:
 - Existing local or cloud projects bypass it.
 - Every option works without an account.
 - Demo and template choices create an editable local copy and never overwrite another project.
-- Demo and template choices use fixed, versioned teaching documents; reusable transformations and genre recipes belong to PRD 24.
+- Demo and template choices use fixed, versioned teaching documents.
 - Blank project opens the complete Epic 74 workflow.
 - The chooser can be skipped and reopened from Help.
 
@@ -345,10 +345,10 @@ Resolved for this release:
 - Clip movement uses one step and one four-step beat.
 - Focused on-screen piano buttons use a 250-millisecond one-shot keyboard preview.
 - The timing check includes at least eight first-time users with the documented touch and desktop mix, and retains unsuccessful attempts.
-- Epic 78 starter content is fixed teaching material; PRD 24 owns reusable musical transformations.
+- Epic 78 starter content is fixed teaching material.
 
 Deferred:
 
 - Should mobile banks use four or eight steps at the minimum supported width?
 - Should the Mix sheet be a modal dialog, bottom sheet or expandable transport row?
-- Which demo and starter templates should be included in optional Epic 78?
+- Which demo projects should be included in optional Epic 78?
