@@ -1,0 +1,555 @@
+.story-frame:has(dialog[open]) {
+  align-content: start;
+}
+
+.story-frame dialog[open] {
+  position: static;
+  transform: none;
+  inset: auto;
+  display: block;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  color: inherit;
+  background: transparent;
+}
+
+.story-frame dialog[open]::backdrop {
+  display: none;
+}
+
+.story-frame .audio-setup[open] {
+  height: auto;
+  place-items: initial;
+  backdrop-filter: none;
+}
+
+.story-audio-status .status-cluster {
+  min-width: 150px;
+}
+
+.story-audio-status .status-cluster strong {
+  max-width: none;
+}
+
+.story-feature-panel,
+.story-feature-toolbar,
+.story-project-header,
+.story-theme-swatch {
+  width: min(980px, 100%);
+  margin-inline: auto;
+}
+
+.story-feature-toolbar,
+.story-project-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-raised);
+}
+
+.story-feature-toolbar p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.story-help-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(720px, 100%);
+  margin: 0 auto 14px;
+}
+
+.story-help-term {
+  min-height: 32px;
+  padding: 5px 10px;
+  border-color: var(--line-strong);
+  color: var(--label);
+  background: var(--surface);
+}
+
+.story-theme-swatch {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--panel-raised);
+}
+
+.story-theme-swatch h2,
+.story-theme-swatch p {
+  margin: 0;
+}
+
+.story-theme-swatch p {
+  color: var(--muted);
+}
+
+.story-theme-swatch .theme-toggle {
+  justify-self: start;
+}
+
+.story-theme-palette {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.story-theme-palette span {
+  min-height: 88px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--label);
+  background: var(--bg-0);
+}
+
+.story-theme-palette span:nth-child(2) {
+  background: var(--panel);
+}
+
+.story-theme-palette span:nth-child(3) {
+  color: var(--bg-0);
+  background: var(--accent);
+}
+
+.story-theme-palette span:nth-child(4) {
+  color: white;
+  background: var(--danger);
+}
+
+.story-project-library {
+  width: min(920px, 100%);
+  margin-inline: auto;
+}
+
+.story-project-library .story-project-header {
+  margin-bottom: 10px;
+}
+
+.story-project-library .project-dialog-panel {
+  width: 100%;
+  max-width: none;
+}
+
+.story-export .project-dialog-panel > :not(.project-share-render, header) {
+  display: none;
+}
+
+.story-export .project-share-render {
+  margin: 0;
+}
+
+.story-workspace-shell {
+  min-height: 420px;
+  grid-template-rows: 84px minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px;
+}
+
+.story-workspace-shell.detail-collapsed {
+  grid-template-rows: 84px var(--detail-tabs-height);
+}
+
+.story-arrangement-source {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.story-arrangement-source .arrangement-track-row {
+  display: grid;
+  height: 82px;
+  grid-template-columns: 180px minmax(0, 1fr);
+  border: 0;
+}
+
+.story-arrangement-source .track-header {
+  position: relative;
+  left: auto;
+  height: 82px;
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 5px;
+  padding: 10px 14px;
+}
+
+.story-arrangement-source .track-header .panel-context {
+  color: var(--muted);
+  font-size: 0.48rem;
+}
+
+.story-arrangement-source .track-header strong {
+  color: var(--accent);
+  font-size: 1.1rem;
+  font-weight: 400;
+}
+
+.story-arrangement-source .track-lane {
+  height: 82px;
+  cursor: default;
+}
+
+.story-arrangement-source .story-source-clip {
+  left: 12px;
+  width: 168px;
+  --track-color: var(--accent);
+  pointer-events: none;
+}
+
+.story-workspace-shell .dock-panel {
+  min-height: 230px;
+  padding: 28px;
+}
+
+.story-workspace-shell .dock-panel h2,
+.story-workspace-shell .dock-panel p {
+  margin: 0;
+}
+
+.story-arranger {
+  min-width: 900px;
+  min-height: 720px;
+  background: var(--bg-0);
+}
+
+.story-arranger .story-transport {
+  position: static;
+  display: grid;
+  grid-template-columns: auto auto auto auto auto auto;
+  gap: 8px;
+  padding: 10px;
+}
+
+.story-arranger .story-transport > * {
+  min-width: 0;
+}
+
+.story-arranger .arrangement-stage {
+  position: relative;
+  inset: auto;
+  min-height: 390px;
+}
+
+.story-arranger .arrangement-scroll {
+  min-height: 300px;
+}
+
+.story-arranger-controls {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.story-arranger-controls .pattern-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.story-arranger-controls .pattern-toolbar label {
+  display: grid;
+  gap: 3px;
+}
+
+.story-visualiser-workspace {
+  display: block;
+  min-height: 0;
+  padding: 0 18px 18px;
+}
+
+.story-visualiser-workspace .visualiser-dock {
+  width: 100%;
+  height: 360px;
+  border: 1px solid var(--line-strong);
+}
+
+.story-visualiser-workspace .visualiser-dock[data-size="expanded"] {
+  height: 460px;
+}
+
+.story-visualiser-workspace .visualiser-dock[data-size="collapsed"] {
+  height: 32px;
+}
+
+.story-visualiser-workspace #pattern-grid {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.story-frame > .account-dialog,
+.story-frame > .publishing-dialog,
+.story-frame > .guided-dialog,
+.story-frame > .help-dialog,
+.story-frame > .remix-import-dialog {
+  width: min(980px, 100%);
+  margin-inline: auto;
+}
+
+.story-frame > .account-dialog .account-dialog-panel,
+.story-frame > .publishing-dialog .publishing-panel,
+.story-frame > .guided-dialog .guided-panel,
+.story-frame > .help-dialog .help-panel {
+  width: 100%;
+  max-width: none;
+}
+
+@media (max-width: 700px) {
+  .story-theme-palette {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .story-feature-toolbar,
+  .story-project-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+/*
+ * Viewport presets resize the preview canvas without resizing the browser
+ * window, so production media queries cannot observe them. Mirror the
+ * feature breakpoints here to keep the narrow workbench previews honest.
+ */
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .voice-lab {
+  overflow: visible;
+  padding: 10px;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .device-rack {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  grid-template-columns: 1fr;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) :is(.device, .device-oscillator, .device-envelope, .device-output) {
+  width: 100%;
+  min-height: 0;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .device :is(button, select) {
+  min-height: 44px;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .voice-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) :is(.guided-scale-controls, .guided-idea-controls) {
+  grid-template-columns: 1fr 1fr;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .guided-preview {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .guided-preview > div:last-child {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) :is(.guided-variation-bounds, .guided-recipe-controls) > div {
+  grid-template-columns: 1fr 1fr;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .guided-starter-controls {
+  grid-template-columns: 1fr;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell {
+  grid-template-rows: 84px auto;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell .editor-dock {
+  min-height: 404px;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell .editor-dock.collapsed {
+  min-height: 88px;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell .editor-tabbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "context actions"
+    "tabs tabs";
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell .dock-context {
+  grid-area: context;
+  min-height: 44px;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell .dock-actions {
+  grid-area: actions;
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell .workspace-tabs {
+  grid-area: tabs;
+  border-top: 1px solid var(--line);
+}
+
+.story-viewport:is([data-viewport="tablet"], [data-viewport="mobile"]) .story-workspace-shell .workspace-tabs [role="tab"] {
+  min-width: 0;
+  min-height: 44px;
+  flex: 1;
+}
+
+.story-viewport[data-viewport="mobile"] .story-frame:not([data-layout="fill"]) {
+  padding: 12px;
+}
+
+.story-viewport[data-viewport="mobile"] :is(.story-feature-toolbar, .story-project-header) {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.story-viewport[data-viewport="mobile"] .story-theme-palette {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.story-viewport[data-viewport="mobile"] :is(.guided-scale-controls, .guided-idea-controls, .guided-checkpoint-create) {
+  grid-template-columns: 1fr;
+}
+
+.story-viewport[data-viewport="mobile"] .guided-section-heading {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.story-viewport[data-viewport="mobile"] .guided-section-heading output {
+  text-align: left;
+}
+
+.story-viewport[data-viewport="mobile"] :is(.guided-variation-bounds, .guided-recipe-controls) > div {
+  grid-template-columns: 1fr;
+}
+
+.story-viewport[data-viewport="mobile"] .guided-starter-controls fieldset {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.story-viewport[data-viewport="mobile"] .guided-starter-preview dl {
+  grid-template-columns: 1fr;
+  gap: 3px;
+}
+
+.story-viewport[data-viewport="mobile"] .guided-starter-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.story-viewport[data-viewport="mobile"] .story-workspace-shell {
+  gap: 10px;
+  padding: 12px;
+}
+
+.story-viewport[data-viewport="mobile"] .story-arrangement-source .arrangement-track-row {
+  grid-template-columns: 118px minmax(0, 1fr);
+}
+
+.story-viewport[data-viewport="mobile"] .story-arrangement-source .track-header {
+  padding-inline: 9px;
+}
+
+.story-viewport[data-viewport="mobile"] .story-arrangement-source .story-source-clip {
+  width: 118px;
+}
+
+.story-viewport[data-viewport="mobile"] .story-workspace-shell .dock-context {
+  gap: 6px;
+  padding-inline: 9px;
+}
+
+.story-viewport[data-viewport="mobile"] .story-workspace-shell :is(#dock-context-kicker, .dock-locate-icon) {
+  display: none;
+}
+
+.story-viewport[data-viewport="mobile"] .story-workspace-shell #dock-context-title {
+  max-width: 120px;
+}
+
+.story-viewport[data-viewport="mobile"] .story-workspace-shell #workspace-collapse {
+  min-width: 82px;
+  padding-inline: 7px;
+}
+
+.story-viewport[data-viewport="mobile"] .story-workspace-shell .workspace-tabs [role="tab"] {
+  padding-inline: 6px;
+  font-size: 0.5rem;
+}
+
+.story-viewport[data-viewport="mobile"] .story-visualiser-workspace .visualiser-dock {
+  height: 480px;
+}
+
+.story-viewport[data-viewport="mobile"] .story-visualiser-workspace .visualiser-dock[data-size="expanded"] {
+  height: 560px;
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-dock-header output,
+.story-viewport[data-viewport="mobile"] .visualiser-dock-actions label,
+.story-viewport[data-viewport="mobile"] .visualiser-dock-actions [data-resize] {
+  display: none;
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-dock-header > button {
+  padding-inline: 7px;
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-dock-actions button {
+  padding-inline: 5px;
+  font-size: 0.46rem;
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-dock-actions [data-palette-open] small {
+  display: none;
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-dock-body {
+  display: block;
+  overflow: auto;
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-dock-body > .visualiser-legend {
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-surface {
+  min-height: 410px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-stage {
+  min-height: 240px;
+}
+
+.story-viewport[data-viewport="mobile"] .visualiser-explanation {
+  min-height: 170px;
+  border-top: 1px solid var(--line);
+  border-left: 0;
+}
