@@ -135,6 +135,8 @@
 }
 
 .story-workspace-shell > .arrangement-stage {
+  position: relative;
+  inset: auto;
   min-height: 90px;
   margin-bottom: 14px;
 }

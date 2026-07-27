@@ -13,19 +13,21 @@ function mountWorkspaceTabs({ canvas, scenario }) {
         <div class="arrangement-track-row"><button class="track-header" data-track-id="track-1">Pulse lead</button></div>
       </section>
       <section id="editor-dock" class="editor-dock" aria-label="Editing workspace">
-        <div class="editor-dock-header">
+        <div class="editor-tabbar">
           <button id="dock-context-locate" class="dock-context" type="button">
             <span id="dock-context-dot" aria-hidden="true"></span>
             <span id="dock-context-kicker">Pattern</span>
             <strong id="dock-context-title">Lead pulse</strong>
             <span aria-hidden="true">◎</span>
           </button>
-          <div class="workspace-tabs" role="tablist" aria-label="Editing views">
-            <button type="button" role="tab" data-panel="sequencer">Pattern</button>
-            <button type="button" role="tab" data-panel="instrument">Instrument</button>
-            <button type="button" role="tab" data-panel="keyboard">Keyboard</button>
+          <div class="workspace-tabs" role="tablist" aria-label="Editing tools">
+            <button id="workspace-tab-pattern" type="button" role="tab" aria-controls="dock-panel-sequencer" data-panel="sequencer">Pattern</button>
+            <button id="workspace-tab-instrument" type="button" role="tab" aria-controls="dock-panel-instrument" data-panel="instrument">Instrument</button>
+            <button id="workspace-tab-keyboard" type="button" role="tab" aria-controls="dock-panel-keyboard" data-panel="keyboard">Keyboard</button>
           </div>
-          <button id="workspace-collapse" type="button" aria-expanded="true">Collapse</button>
+          <div class="dock-actions">
+            <button id="workspace-collapse" type="button" aria-expanded="true" aria-controls="dock-panels">Collapse</button>
+          </div>
         </div>
         <div id="dock-panels" class="dock-panels">
           <section id="dock-panel-sequencer" class="dock-panel"><h2>Pattern editor</h2><p>16 steps · Lead pulse</p></section>

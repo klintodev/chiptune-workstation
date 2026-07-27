@@ -30,11 +30,23 @@ test("workbench catalog has unique addressable stories and scenarios", () => {
   }
 });
 
-test("arranger story contains its absolute production stage", async () => {
+test("workbench stories contain their absolute production stages", async () => {
   const storyStyles = await readFile(
     new URL("../src/workbench/workbench-stories.css", import.meta.url),
     "utf8",
   );
 
   assert.match(storyStyles, /\.story-arranger \.arrangement-stage\s*\{[^}]*position:\s*relative;[^}]*inset:\s*auto;/);
+  assert.match(storyStyles, /\.story-workspace-shell > \.arrangement-stage\s*\{[^}]*position:\s*relative;[^}]*inset:\s*auto;/);
+});
+
+test("workspace tabs story uses the production tab-bar structure", async () => {
+  const workspaceStory = await readFile(
+    new URL("../src/workbench/stories/workspace-tabs.story.js", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceStory, /class="editor-tabbar"/);
+  assert.match(workspaceStory, /class="dock-actions"/);
+  assert.doesNotMatch(workspaceStory, /editor-dock-header/);
 });
