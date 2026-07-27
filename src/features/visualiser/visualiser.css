@@ -509,7 +509,7 @@
   .visualiser-explanation { min-height: 130px; border-top: 1px solid var(--line); border-left: 0; }
   .visualiser-dialog { width: calc(100vw - 10px); height: calc(100dvh - 10px); }
   .visualiser-header { min-height: 48px; padding: 5px; }
-  .visualiser-heading, .visualiser-status, .visualiser-actions label, .visualiser-actions [data-announce] { display: none; }
+  .visualiser-heading, .visualiser-status, .visualiser-actions label { display: none; }
   .visualiser-actions { width: 100%; justify-content: space-between; margin: 0; }
   .visualiser-actions button { min-height: 42px; }
   .visualiser-performance-body { display: block; overflow: auto; }

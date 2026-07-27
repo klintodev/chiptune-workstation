@@ -300,6 +300,7 @@ test("high-frequency displays are visual-only and use event announcements", asyn
   assert.match(transport, /setTextIfChanged\(elements\.status/);
   assert.match(visualiser, /<output class="visualiser-status" data-status><\/output>/);
   assert.match(visualiser, /data-announcer role="status" aria-live="polite"/);
+  assert.doesNotMatch(visualiser, /Announce current view/);
   assert.match(player, /setTextIfChanged\(elements\.position/);
 });
 
