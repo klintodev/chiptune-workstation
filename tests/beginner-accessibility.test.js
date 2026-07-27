@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { hasPlayableArrangement } from "../src/features/arranger/transport-controls.js";
+import {
+  handlePlaybackShortcut,
+  hasPlayableArrangement,
+} from "../src/features/arranger/transport-controls.js";
 import { createOneShotPreview } from "../src/features/keyboard/keyboard.js";
 import { getPatternBankRange } from "../src/features/pattern-editor/pattern-editor.js";
 import { getAdjacentWorkspacePanel } from "../src/features/workspace-tabs/workspace-tabs.js";
@@ -77,6 +80,58 @@ test("global shortcuts leave focused controls and open dialogs alone", () => {
     repeat: true,
     target: plainTarget,
   }, closedRoot), false);
+});
+
+test("Space starts playback, then stops and returns the playhead to step 1", () => {
+  const root = { querySelector: () => null };
+  const target = { closest: () => null };
+  let status = "stopped";
+  let playheadStep = 12;
+  let startStep = 12;
+  let playCount = 0;
+  let stopCount = 0;
+  const scheduler = {
+    getState: () => ({ status }),
+  };
+  const createEvent = () => {
+    let prevented = false;
+    return {
+      code: "Space",
+      defaultPrevented: false,
+      get prevented() { return prevented; },
+      preventDefault() { prevented = true; },
+      repeat: false,
+      target,
+    };
+  };
+  const options = {
+    root,
+    scheduler,
+    startPlayback() {
+      playCount += 1;
+      status = "playing";
+    },
+    stopPlayback() {
+      stopCount += 1;
+      status = "stopped";
+      playheadStep = 0;
+      startStep = 0;
+    },
+  };
+
+  const startEvent = createEvent();
+  assert.equal(handlePlaybackShortcut(startEvent, options), true);
+  assert.equal(startEvent.prevented, true);
+  assert.equal(playCount, 1);
+  assert.equal(status, "playing");
+
+  const stopEvent = createEvent();
+  assert.equal(handlePlaybackShortcut(stopEvent, options), true);
+  assert.equal(stopEvent.prevented, true);
+  assert.equal(stopCount, 1);
+  assert.equal(status, "stopped");
+  assert.equal(playheadStep, 0);
+  assert.equal(startStep, 0);
 });
 
 test("hidden disclosure content does not disable musical keyboard input", () => {

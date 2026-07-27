@@ -41,7 +41,7 @@ export function createHelpFeature({ root = document } = {}) {
             <div id="help-release" tabindex="-1"><dt>Release</dt><dd>How long the note's tail takes to fade out.</dd></div>
           </dl>
         </section>
-        <p class="help-shortcuts"><strong>Keyboard:</strong> Arrow keys move around steps. Enter adds a note. Delete or Backspace clears it. A focused clip moves with Arrow keys; hold Shift for four steps. Space controls playback only when no control is focused.</p>
+        <p class="help-shortcuts"><strong>Keyboard:</strong> Arrow keys move around steps. Enter adds a note. Delete or Backspace clears it. A focused clip moves with Arrow keys; hold Shift for four steps. When no control is focused, Space starts playback or stops it and returns to step 1.</p>
         <button class="safe-action" type="button" data-done>Back to my music</button>
       </div>
     </dialog>`;

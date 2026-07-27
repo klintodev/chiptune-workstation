@@ -9,6 +9,22 @@ export function hasPlayableArrangement(project) {
   )));
 }
 
+export function handlePlaybackShortcut(event, {
+  root,
+  scheduler,
+  startPlayback,
+  stopPlayback,
+}) {
+  if (
+    (event.code !== "Space" && event.key !== " " && event.key !== "Spacebar") ||
+    !isGlobalShortcutEligible(event, root)
+  ) return false;
+  event.preventDefault();
+  if (scheduler.getState().status === "playing") stopPlayback();
+  else startPlayback();
+  return true;
+}
+
 export function createTransportControls({
   audioEngine,
   onError = () => {},
@@ -102,7 +118,7 @@ export function createTransportControls({
     elements.play.setAttribute("aria-label", playLabel);
     elements.play.title = transport.mode === "arrangement" && !hasArrangement
       ? "Add a non-empty loop to the song before playing Song mode."
-      : `${playLabel} (Space from the workspace)`;
+      : `${playLabel} (Space ${playing ? "stops and returns to step 1" : "starts playback"} from the workspace)`;
     const selectedPattern = project.patterns.find(({ id }) => (
       id === sessionState.getState().workspace.selectedPatternId
     )) ?? project.patterns[0];
@@ -194,15 +210,12 @@ export function createTransportControls({
   elements.play.addEventListener("click", togglePlayback, { signal: lifecycle.signal });
   elements.stop.addEventListener("click", scheduler.stop, { signal: lifecycle.signal });
   elements.loop.addEventListener("click", toggleLoop, { signal: lifecycle.signal });
-  root.addEventListener("keydown", (event) => {
-    if (
-      (event.code !== "Space" && event.key !== " " && event.key !== "Spacebar") ||
-      event.repeat ||
-      !isGlobalShortcutEligible(event, root)
-    ) return;
-    event.preventDefault();
-    togglePlayback();
-  }, { signal: lifecycle.signal });
+  root.addEventListener("keydown", (event) => handlePlaybackShortcut(event, {
+    root,
+    scheduler,
+    startPlayback,
+    stopPlayback: jumpToStart,
+  }), { signal: lifecycle.signal });
 
   function applyTempo(source = elements.tempo, { reportInvalid = false } = {}) {
     const invalidMessage = "Tempo must be a whole number between 40 and 240 BPM.";
