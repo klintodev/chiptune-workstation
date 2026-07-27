@@ -58,7 +58,7 @@ test("publication slots expose exactly twenty server-enforceable positions", asy
   assert.match(rules, /project\.tracks\.size\(\) <= 8/);
   assert.match(rules, /validText\(project\.metadata\.title, 1, 100\)/);
   assert.match(rules, /project\.schemaVersion == 6/);
-  assert.match(rules, /project\.scaleGuide\.keys\(\)\.hasOnly/);
+  assert.match(rules, /!\("scaleGuide" in project\)/);
   assert.match(rules, /project\.scaleGuide\.lock is bool/);
 });
 

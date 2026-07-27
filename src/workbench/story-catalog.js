@@ -2,7 +2,6 @@ import { accountStory } from "./stories/account.story.js";
 import { arrangerStory } from "./stories/arranger.story.js";
 import { audioExportStory } from "./stories/audio-export.story.js";
 import { audioStatusStory } from "./stories/audio-status.story.js";
-import { guidedCreationStory } from "./stories/guided-creation.story.js";
 import { helpStory } from "./stories/help.story.js";
 import { instrumentStory } from "./stories/instrument.story.js";
 import { keyboardStory } from "./stories/keyboard.story.js";
@@ -16,7 +15,6 @@ import { workspaceTabsStory } from "./stories/workspace-tabs.story.js";
 
 export const stories = Object.freeze([
   arrangerStory,
-  guidedCreationStory,
   patternEditorStory,
   workspaceTabsStory,
   instrumentStory,

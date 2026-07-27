@@ -21,14 +21,12 @@ These documents define independently demonstrable roadmap releases for a browser
 | [PRD 21](./21-beginner-composition-and-accessible-interaction.md) | Beginner composition and accessible interaction | UX enabler | [PRD21/E74-E78](../epics/prd-21-beginner-composition-and-accessible-interaction.md) | Planned: next |
 | [PRD 22](./22-visual-learning-workspace.md) | Visual learning workspace | Extended | [PRD22/E79-E82](../epics/prd-22-visual-learning-workspace.md) | Planned: after PRD 21 |
 | [PRD 23](./23-maintainable-application-foundation.md) | Maintainable application foundation | Technical enabler | [PRD23/E83-E86](../epics/prd-23-maintainable-application-foundation.md) | Planned: cross-cutting |
-| [PRD 24](./24-guided-creation-and-remixing.md) | Guided creation and remixing | Extended | [PRD24/E87-E90](../epics/prd-24-guided-creation-and-remixing.md) | Planned: later |
 | [PRD 25](./25-visualiser-palettes-and-customisation.md) | Visualiser palettes and customisation | Extended | [PRD25/E91-E94](../epics/prd-25-visualiser-palettes-and-customisation.md) | In progress: palette presets |
 
 PRD 4 is the implementation prerequisite for PRD 5. PRD 6 makes the delivered multi-track workflow usable before persistence is added in PRD 7. The local-first release boundary is PRDs 1-7. PRD 8 adds the optional identity and cloud foundation needed for eventual publishing without gating the workstation. PRD 9 adds a portable audio artifact, while PRDs 10-12 add the audiovisual and sharing experiences. PRD 13 hardens optional accounts by requiring verified email ownership before any private cloud access or publication mutation.
 
 PRDs 14-19 were delivered as implementation-led epic documents without parallel product files. Numbering resumes at PRD 20 so new product requirements and implementation epics remain aligned.
 
-PRD 20 is the next release boundary because it fixes data-loss and audio-failure paths before the product grows. PRD 21 makes the first composition workflow understandable and operable across pointer, keyboard, assistive technology, and narrow screens. PRD 22 builds a visual learning layer on the deterministic projection introduced by PRD 16. PRD 23 is a cross-cutting workstream that supplies clearer module boundaries and browser-level quality gates alongside those releases. PRD 24 follows the beginner and visual foundations with guided musical creation, remixing, and lightweight checkpoint history.
 
 PRD 25 extends the visual-learning workspace with project-owned visual identity. Its first three epics add curated palettes and consistent public playback; its custom-colour editor remains a separate later iteration.
 
@@ -38,5 +36,4 @@ Recommended delivery order:
 2. Begin PRD23/E83 and the baseline parts of E86, then deliver required beginner work PRD21/E74-E77 against those seams where practical; PRD21/E78 remains optional.
 3. Deliver PRD22/E79-E82 after PRD 21 establishes the visible workspace navigation, input rules, reduced-motion policy, and responsive baseline it reuses.
 4. Complete PRD23/E84-E85 and promote the full suite through E86 before increasing project complexity.
-5. Treat PRD 24's epics as independently reviewable later releases in the order E87, E90, E88, then E89 so scale and checkpoint foundations precede their consumers.
-6. Deliver PRD25/E91-E93 as one palette-preset slice, observe how people use the curated roles, then design E94's bounded custom editor from that evidence.
+5. Deliver PRD25/E91-E93 as one palette-preset slice, observe how people use the curated roles, then design E94's bounded custom editor from that evidence.

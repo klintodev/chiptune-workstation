@@ -35,15 +35,17 @@ service cloud.firestore {
         && project.metadata is map
         && project.metadata.keys().hasOnly(["title"])
         && validText(project.metadata.title, 1, 100)
-        && project.scaleGuide is map
-        && project.scaleGuide.keys().hasOnly(["tonic", "scale", "lock"])
-        && project.scaleGuide.tonic is int
-        && project.scaleGuide.tonic >= 0
-        && project.scaleGuide.tonic <= 11
-        && project.scaleGuide.scale in [
-          "major", "natural-minor", "major-pentatonic", "minor-pentatonic", "chromatic"
-        ]
-        && project.scaleGuide.lock is bool
+        && (!("scaleGuide" in project) || (
+          project.scaleGuide is map
+          && project.scaleGuide.keys().hasOnly(["tonic", "scale", "lock"])
+          && project.scaleGuide.tonic is int
+          && project.scaleGuide.tonic >= 0
+          && project.scaleGuide.tonic <= 11
+          && project.scaleGuide.scale in [
+            "major", "natural-minor", "major-pentatonic", "minor-pentatonic", "chromatic"
+          ]
+          && project.scaleGuide.lock is bool
+        ))
         && project.visualiser is map
         && project.transport is map
         && project.transport.keys().hasOnly(["bpm", "masterVolume", "loop"])

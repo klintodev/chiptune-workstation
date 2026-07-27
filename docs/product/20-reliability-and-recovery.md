@@ -68,7 +68,7 @@ This release fixes reliability invariants rather than redesigning the editor. Th
 - The download must serialize the current in-memory state into the existing versioned, validated project-document format and use a safe filename.
 - Downloading must not wait for a cloud write and must remain available when the application is using its in-memory persistence fallback.
 - A downloaded project must import into a fresh session without changing its musical content, identifiers, or supported metadata.
-- The emergency file contains only the active versioned project document. It does not recursively include the checkpoint history introduced by PRD 24.
+- The emergency file contains only the active versioned project document.
 - When durable local storage is unavailable or a save fails, the interface must identify that work is at risk and place the download action beside the warning.
 - A failed download must leave project state unchanged and provide an actionable error instead of reporting success.
 - Focused tests must cover maximum-length and repeated duplicate names, conflict-copy naming, invalid filename characters, storage-unavailable download, and export/import round trips.
@@ -109,6 +109,5 @@ Resolved for this release:
 Deferred:
 
 - Should emergency downloads later include optional WAV renders or preview images in an archive?
-- Should a successful local save retain recoverable named checkpoints in addition to bounded undo history?
 - Should cloud conflicts later provide a read-only musical comparison before the user chooses a version?
 - Should a service worker provide offline application-shell loading once update and cache invalidation behaviour is designed?

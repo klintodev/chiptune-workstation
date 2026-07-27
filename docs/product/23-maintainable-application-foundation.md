@@ -4,7 +4,7 @@
 
 Refactor the delivered workstation into smaller ownership boundaries with explicit application lifecycle, efficient immutable state updates, one canonical module graph, and browser-level quality gates.
 
-The product remains a dependency-light native JavaScript application. This release does not replace working features or introduce a frontend framework. It reduces the cost and risk of the beginner, accessibility, visualisation, and guided-creation work by separating responsibilities that have accumulated in the project store, arrangement view, Firebase client, and page entry points.
+The product remains a dependency-light native JavaScript application. This release does not replace working features or introduce a frontend framework. It reduces the cost and risk of the beginner, accessibility, and visualisation work by separating responsibilities that have accumulated in the project store, arrangement view, Firebase client, and page entry points.
 
 The refactor must be incremental and behaviour-preserving. Each slice must keep local composing available, preserve the versioned project document, and leave a compatibility path for existing callers until they move to the smaller contracts.
 
@@ -13,7 +13,7 @@ The refactor must be incremental and behaviour-preserving. Each slice must keep 
 - PRD 20 defines the playable-pitch, local recovery, serialized cloud, and network-silent guest invariants this refactor must preserve behind smaller boundaries.
 - PRD 21 extends the initial browser harness with beginner and accessibility journeys; this PRD consolidates those journeys into shared blocking quality gates.
 - PRD 22's composition projection, compact dock, performance surface, DOM note list, inspector, and textual alternative are live product paths and must survive reachability cleanup.
-- The work is cross-cutting and may be delivered in slices alongside PRDs 21 and 22, but its full quality and state-performance gates must be complete before PRD 24 expands project complexity.
+- The work is cross-cutting and may be delivered in slices alongside PRDs 21 and 22, but its full quality and state-performance gates must be complete.
 
 ## Implementation epics
 

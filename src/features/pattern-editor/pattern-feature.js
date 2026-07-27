@@ -4,13 +4,11 @@ import { createPatternHistoryShortcut } from "./pattern-shortcuts.js";
 
 export function createPatternFeature({
   getNoteName,
-  getScaleGuide,
   notePreview,
   onError = () => {},
   onStructuralEdit = () => {},
   patternState,
   projectState,
-  resolveNewNote,
   root = document,
   sessionState,
 }) {
@@ -103,8 +101,7 @@ export function createPatternFeature({
     doneButton: elements.stepDone,
     gateControl: elements.stepGate,
     getNoteName,
-    getScaleGuide,
-    grid: elements.grid,
+      grid: elements.grid,
     noteDownButton: elements.noteDown,
     noteUpButton: elements.noteUp,
     octaveSelect: elements.octave,
@@ -115,8 +112,7 @@ export function createPatternFeature({
     pitchSelect: elements.pitch,
     previewInput: elements.preview,
     previewNote: notePreview.play,
-    resolveNewNote,
-    selectedNoteOutput: elements.selectedNote,
+      selectedNoteOutput: elements.selectedNote,
     selectionEmpty: elements.selectionEmpty,
     selectionSummary: elements.selectionSummary,
     stepNumberOutput: elements.stepNumber,

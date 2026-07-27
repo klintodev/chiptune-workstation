@@ -114,6 +114,15 @@ test("a project survives JSON serialization and validates on restoration", () =>
   assert.throws(() => createProjectState({ ...original.getState(), schemaVersion: 99 }), RangeError);
 });
 
+test("legacy scale guidance is ignored when restoring a project", () => {
+  const legacy = structuredClone(createProjectState().getState());
+  legacy.scaleGuide = { tonic: 9, scale: "natural-minor", lock: true };
+
+  const restored = createProjectState(legacy).getState();
+
+  assert.equal("scaleGuide" in restored, false);
+});
+
 test("schema two projects gain a default pattern root octave", () => {
   const current = createProjectState().getState();
   const legacy = JSON.parse(JSON.stringify({

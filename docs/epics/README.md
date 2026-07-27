@@ -28,5 +28,4 @@ PRD 4 was delivered as an architectural prerequisite without a standalone epic f
 - [PRD 21 - Beginner Composition and Accessible Interaction](./prd-21-beginner-composition-and-accessible-interaction.md) — E74-E77 required; E78 optional
 - [PRD 22 - Visual Learning Workspace](./prd-22-visual-learning-workspace.md) — E79-E82
 - [PRD 23 - Maintainable Application Foundation](./prd-23-maintainable-application-foundation.md) — E83-E86
-- [PRD 24 - Guided Creation and Remixing](./prd-24-guided-creation-and-remixing.md) — E87-E90
 - [PRD 25 - Visualiser Palettes and Customisation](./prd-25-visualiser-palettes-and-customisation.md) — E91-E94

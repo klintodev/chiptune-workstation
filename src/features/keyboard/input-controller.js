@@ -11,7 +11,6 @@ export function createInputController({
   getVoiceEngine,
   onActiveNotesChange,
   onNoteStart,
-  resolvePatternNote = (note) => note,
   root = document,
   voiceEngine,
 }) {
@@ -23,12 +22,11 @@ export function createInputController({
     onActiveNotesChange?.(new Set(ownersByNote.keys()));
   }
 
-  function createVoice(baseNote, { consumeBypass = true } = {}) {
+  function createVoice(baseNote) {
     const config = getInstrumentConfig();
     const keyboardNoteOffset = getKeyboardNoteOffset();
-    const proposedNote = baseNote + keyboardNoteOffset * 12;
-    const previewPatternNote = resolvePatternNote(proposedNote, { consumeBypass: false });
-    const playedNote = getEffectiveMidiNote(previewPatternNote, config.octaveOffset);
+    const patternNote = baseNote + keyboardNoteOffset * 12;
+    const playedNote = getEffectiveMidiNote(patternNote, config.octaveOffset);
     const activeVoiceEngine = resolveVoiceEngine();
     const voice = activeVoiceEngine.trigger({
       type: config.voiceType,
@@ -36,9 +34,6 @@ export function createInputController({
       attackSeconds: config.attackSeconds,
       releaseSeconds: config.releaseSeconds,
     });
-    const patternNote = consumeBypass
-      ? resolvePatternNote(proposedNote, { consumeBypass: true })
-      : previewPatternNote;
     return {
       activeNote: patternNote - keyboardNoteOffset * 12,
       patternNote,
@@ -88,7 +83,7 @@ export function createInputController({
     ownersByNote.clear();
     for (const [owner, active] of voicesByOwner) {
       active.voice.stop();
-      const refreshed = createVoice(active.baseNote, { consumeBypass: false });
+      const refreshed = createVoice(active.baseNote);
       voicesByOwner.set(owner, {
         activeNote: refreshed.activeNote,
         baseNote: active.baseNote,

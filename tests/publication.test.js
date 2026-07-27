@@ -34,11 +34,7 @@ test("publication records contain a validated immutable playback snapshot", () =
   assert.equal(record.sourceProjectId, "project-song");
   assert.equal(record.ownerSlot, "01");
   assert.equal(record.allowRemix, false);
-  assert.deepEqual(record.document.project.scaleGuide, {
-    tonic: 0,
-    scale: "major",
-    lock: false,
-  });
+  assert.equal("scaleGuide" in record.document.project, false);
   assert.equal(record.document.project.visualiser.palette, "ocean");
   assert.equal("ownerId" in record, false);
   assert.equal(normalizePublicationRecord(record).publicationId, "publication-1");
