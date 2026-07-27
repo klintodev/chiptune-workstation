@@ -2,6 +2,7 @@ import { createAudioStatusFeature } from "../../features/audio-status/audio-stat
 import { createSessionState } from "../../state/session-state.js";
 import { defineStory } from "../story-registry.js";
 import { createStoryRoot, disposeAll } from "../story-helpers.js";
+import { displayStoryDialog } from "../story-utilities.js";
 
 function createAudioEngine(initialState) {
   const events = new EventTarget();
@@ -68,6 +69,7 @@ function mountAudioStatus({ canvas, scenario }) {
     sessionState,
   });
   feature.render();
+  displayStoryDialog(root, root.querySelector("#audio-setup"));
   return disposeAll(feature);
 }
 

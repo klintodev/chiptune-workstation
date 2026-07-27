@@ -9,8 +9,13 @@ function mountWorkspaceTabs({ canvas, scenario }) {
   root.innerHTML = `
     <p class="story-note">The production tablist, context projection, keyboard navigation, and collapse state.</p>
     <div class="daw-workspace story-workspace-shell">
-      <section class="arrangement-stage" aria-label="Arrangement source">
-        <div class="arrangement-track-row"><button class="track-header" data-track-id="track-1">Pulse lead</button></div>
+      <section class="story-arrangement-source" aria-label="Arrangement source">
+        <div class="arrangement-track-row">
+          <button class="track-header" data-track-id="track-1"><span class="panel-context">Arrangement source</span><strong>Pulse lead</strong></button>
+          <div class="track-lane" aria-hidden="true">
+            <span class="arrangement-clip story-source-clip" data-clip-id="clip-1" data-pattern-id="pattern-1"><strong>Lead pulse</strong><small>1-16</small></span>
+          </div>
+        </div>
       </section>
       <section id="editor-dock" class="editor-dock" aria-label="Editing workspace">
         <div class="editor-tabbar">

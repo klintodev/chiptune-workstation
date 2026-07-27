@@ -11,9 +11,9 @@ function mountHelp({ canvas, scenario }) {
       <p>Help terms remain linked to the production glossary.</p>
     </div>
     <div class="story-help-terms">
-      <button class="term-help" type="button" data-help-term="pattern">Explain pattern</button>
-      <button class="term-help" type="button" data-help-term="gate">Explain gate</button>
-      <button class="term-help" type="button" data-help-term="velocity">Explain velocity</button>
+      <button class="story-help-term" type="button" data-help-term="pattern" aria-label="Explain pattern">Pattern</button>
+      <button class="story-help-term" type="button" data-help-term="gate" aria-label="Explain gate">Gate</button>
+      <button class="story-help-term" type="button" data-help-term="velocity" aria-label="Explain velocity">Velocity</button>
     </div>
   `;
   const feature = createHelpFeature({ root: root.ownerDocument });
