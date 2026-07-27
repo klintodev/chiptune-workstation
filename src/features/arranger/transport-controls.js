@@ -116,9 +116,10 @@ export function createTransportControls({
     elements.play.textContent = playing ? "❙❙" : "▶";
     elements.play.classList.toggle("playing", playing);
     elements.play.setAttribute("aria-label", playLabel);
+    const spaceAction = playing ? "stops and returns to step 1" : transport.status === "paused" ? "resumes playback" : "starts playback";
     elements.play.title = transport.mode === "arrangement" && !hasArrangement
       ? "Add a non-empty loop to the song before playing Song mode."
-      : `${playLabel} (Space ${playing ? "stops and returns to step 1" : transport.status === "paused" ? "resumes playback" : "starts playback"} from the workspace)`;
+      : `${playLabel} (Space ${spaceAction} from the workspace)`;
     const selectedPattern = project.patterns.find(({ id }) => (
       id === sessionState.getState().workspace.selectedPatternId
     )) ?? project.patterns[0];
