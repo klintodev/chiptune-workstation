@@ -14,6 +14,12 @@ python -m http.server 4173
 
 Then open <http://localhost:4173>.
 
+## Feature workbench
+
+Open <http://localhost:4173/workbench.html> to inspect production UI modules against small, disposable scenarios. The prototype includes the pattern editor, playable keyboard, and audio lifecycle status without starting the full application or connecting persistence and accounts.
+
+Each story owns a `mount({ canvas, scenario })` lifecycle and returns a disposer. Add stories under `src/workbench/stories/`, then register them in `src/workbench.js`. Story and scenario selections are encoded in the URL, so a specific state can be shared directly.
+
 ## Test
 
 Node 22 or later is required.

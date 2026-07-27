@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Klinto Workbench</title>
+    <link rel="icon" href="/assets/brand/klinto-mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./workbench.css" />
+  </head>
+  <body>
+    <main class="workbench-shell">
+      <aside class="workbench-sidebar">
+        <header class="workbench-brand">
+          <a href="./index.html" aria-label="Open Klinto Studio">
+            <img src="./assets/brand/klinto-mark.svg" alt="" />
+            <span><strong>Klinto</strong><small>Feature workbench</small></span>
+          </a>
+        </header>
+
+        <label class="workbench-search">
+          <span class="visually-hidden">Filter features</span>
+          <input id="story-search" type="search" placeholder="Filter features…" />
+        </label>
+
+        <nav id="story-navigation" class="story-navigation" aria-label="Feature stories"></nav>
+
+        <footer class="workbench-sidebar-footer">
+          <span>Prototype · local scenarios</span>
+          <a href="./index.html">Open full studio ↗</a>
+        </footer>
+      </aside>
+
+      <section class="workbench-main">
+        <header class="workbench-toolbar">
+          <div>
+            <p id="story-group" class="eyebrow">Feature</p>
+            <h1 id="story-title">Loading workbench…</h1>
+          </div>
+          <div class="workbench-toolbar-actions">
+            <label>
+              <span>Viewport</span>
+              <select id="viewport-select">
+                <option value="responsive">Responsive</option>
+                <option value="desktop">Desktop · 1280</option>
+                <option value="tablet">Tablet · 768</option>
+                <option value="mobile">Mobile · 390</option>
+              </select>
+            </label>
+            <button id="theme-toggle" type="button" aria-pressed="false">Light theme</button>
+          </div>
+        </header>
+
+        <div class="workbench-context">
+          <p id="story-description"></p>
+          <div>
+            <label>
+              <span>Scenario</span>
+              <select id="scenario-select"></select>
+            </label>
+            <code id="story-source"></code>
+          </div>
+        </div>
+
+        <div class="workbench-stage">
+          <div id="story-viewport" class="story-viewport" data-viewport="responsive">
+            <div id="story-canvas" class="story-canvas"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/workbench.js"></script>
+  </body>
+</html>

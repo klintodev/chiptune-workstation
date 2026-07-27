@@ -12,6 +12,8 @@ const entries = Object.freeze({
   player: "src/player.js",
   "player-styles": "player.css",
   styles: "styles.css",
+  workbench: "src/workbench.js",
+  "workbench-styles": "workbench.css",
 });
 const absoluteEntries = Object.freeze(Object.fromEntries(
   Object.entries(entries).map(([name, entryPoint]) => [name, path.join(root, entryPoint)]),
@@ -56,13 +58,13 @@ async function writeHtml({ appAsset, cssAsset, filename, sourceFile }) {
   let html = await readFile(path.join(root, sourceFile), "utf8");
   html = replaceRequired(
     html,
-    /<link rel="stylesheet" href="\.\/(?:styles|player)\.css[^"\n]*" \/>/,
+    /<link rel="stylesheet" href="\.\/(?:styles|player|workbench)\.css[^"\n]*" \/>/,
     `<link rel="stylesheet" href="${cssAsset}" />`,
     "stylesheet",
   );
   html = replaceRequired(
     html,
-    /<script type="module" src="\.\/src\/(?:app|player)\.js[^"\n]*"><\/script>/,
+    /<script type="module" src="\.\/src\/(?:app|player|workbench)\.js[^"\n]*"><\/script>/,
     `<script type="module" src="${appAsset}"></script>`,
     "module script",
   );
@@ -119,5 +121,11 @@ await Promise.all([
     cssAsset: emittedAsset(result.metafile, entries["player-styles"]),
     filename: "player.html",
     sourceFile: "player.html",
+  }),
+  writeHtml({
+    appAsset: emittedAsset(result.metafile, entries.workbench),
+    cssAsset: emittedAsset(result.metafile, entries["workbench-styles"]),
+    filename: "workbench.html",
+    sourceFile: "workbench.html",
   }),
 ]);
