@@ -1,7 +1,15 @@
 import { queryRequired } from "../../shared/query-required.js";
+import { announceStatus } from "../../shared/status-announcer.js";
+
+export function getPatternDeleteCopy(name, usage) {
+  const clipLabel = `${usage} arrangement clip${usage === 1 ? "" : "s"}`;
+  return Object.freeze({
+    action: `Delete pattern and ${usage} clip${usage === 1 ? "" : "s"}`,
+    message: `Delete “${name}”? ${clipLabel} will also be removed. This cannot be undone.`,
+  });
+}
 
 export function createPatternLibrary({
-  confirmAction = (message) => globalThis.confirm(message),
   onBeforeSelectionChange = () => {},
   onError = () => {},
   projectState,
@@ -12,6 +20,10 @@ export function createPatternLibrary({
   const elements = {
     create: queryRequired(root, "#pattern-new"),
     delete: queryRequired(root, "#pattern-delete"),
+    deleteCancel: queryRequired(root, "#pattern-delete-cancel"),
+    deleteConfirm: queryRequired(root, "#pattern-delete-confirm"),
+    deleteDialog: queryRequired(root, "#pattern-delete-dialog"),
+    deleteMessage: queryRequired(root, "#pattern-delete-message"),
     name: queryRequired(root, "#pattern-name"),
     place: queryRequired(root, "#place-pattern"),
     placeStart: queryRequired(root, "#place-start"),
@@ -21,6 +33,26 @@ export function createPatternLibrary({
     usage: queryRequired(root, "#pattern-usage"),
     variation: queryRequired(root, "#pattern-variation"),
   };
+  let pendingDelete = null;
+
+  function closeDeleteDialog(restoreFocus = true) {
+    if (elements.deleteDialog.open) elements.deleteDialog.close();
+    pendingDelete = null;
+    if (restoreFocus && elements.delete.isConnected) elements.delete.focus();
+  }
+
+  function requestDelete() {
+    const { selectedPatternId } = getWorkspace();
+    const pattern = projectState.getState().patterns.find(({ id }) => id === selectedPatternId);
+    if (!pattern) return;
+    const usage = projectState.getPatternUsageCount(selectedPatternId);
+    pendingDelete = { id: selectedPatternId, name: pattern.name, usage };
+    const copy = getPatternDeleteCopy(pattern.name, usage);
+    elements.deleteMessage.textContent = copy.message;
+    elements.deleteConfirm.textContent = copy.action;
+    elements.deleteDialog.showModal();
+    elements.deleteCancel.focus();
+  }
 
   function getWorkspace() {
     return sessionState.getState().workspace;
@@ -111,19 +143,28 @@ export function createPatternLibrary({
     selectPattern(patternId);
     onError("");
   }, { signal: lifecycle.signal });
-  elements.delete.addEventListener("click", () => {
-    const { selectedPatternId } = getWorkspace();
-    const usage = projectState.getPatternUsageCount(selectedPatternId);
-    if (usage > 0 && !confirmAction(
-      `Delete this pattern and its ${usage} arrangement clip${usage === 1 ? "" : "s"}?`,
-    )) return;
+  elements.delete.addEventListener("click", requestDelete, { signal: lifecycle.signal });
+  elements.deleteCancel.addEventListener("click", () => closeDeleteDialog(), { signal: lifecycle.signal });
+  elements.deleteDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeDeleteDialog();
+  }, { signal: lifecycle.signal });
+  elements.deleteDialog.addEventListener("click", (event) => {
+    if (event.target === elements.deleteDialog) closeDeleteDialog();
+  }, { signal: lifecycle.signal });
+  elements.deleteConfirm.addEventListener("click", () => {
+    if (!pendingDelete) return;
+    const { id: selectedPatternId, name, usage } = pendingDelete;
     const patterns = projectState.getState().patterns;
     const nextPattern = patterns.find((pattern) => pattern.id !== selectedPatternId);
     try {
-      projectState.deletePattern(selectedPatternId, { removeReferences: usage > 0 });
+      projectState.deletePattern(selectedPatternId, { removeReferences: true });
       onBeforeSelectionChange();
       sessionState.setWorkspace({ selectedClipId: null, selectedPatternId: nextPattern.id });
       onError("");
+      closeDeleteDialog(false);
+      elements.select.focus();
+      announceStatus(root, `Deleted pattern ${name} and ${usage} arrangement clip${usage === 1 ? "" : "s"}.`);
     } catch (error) {
       onError(error.message);
     }
