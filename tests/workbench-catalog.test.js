@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import { stories } from "../src/workbench/story-catalog.js";
 import { createStoryRegistry } from "../src/workbench/story-registry.js";
@@ -28,4 +28,13 @@ test("workbench catalog has unique addressable stories and scenarios", () => {
       assert.deepEqual(registry.resolve(story.id, scenario.id), { story, scenario });
     }
   }
+});
+
+test("arranger story contains its absolute production stage", async () => {
+  const storyStyles = await readFile(
+    new URL("../src/workbench/workbench-stories.css", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(storyStyles, /\.story-arranger \.arrangement-stage\s*\{[^}]*position:\s*relative;[^}]*inset:\s*auto;/);
 });

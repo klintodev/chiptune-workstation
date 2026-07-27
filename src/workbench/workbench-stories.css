@@ -168,6 +168,8 @@
 }
 
 .story-arranger .arrangement-stage {
+  position: relative;
+  inset: auto;
   min-height: 390px;
 }
 
