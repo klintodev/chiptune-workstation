@@ -184,7 +184,6 @@ export function createVisualiserFeature({
             <label><input type="checkbox" data-reduced-motion /> Reduced motion</label>
             <label><input type="checkbox" data-high-contrast /> High contrast</label>
             <button type="button" data-palette-open><span>Colours</span><small data-palette-label>Studio</small></button>
-            <button type="button" data-announce>Announce current view</button>
             <button type="button" data-play>Play</button>
             <button type="button" data-stop>Stop</button>
             <button type="button" data-close>Close</button>
@@ -195,14 +194,12 @@ export function createVisualiserFeature({
     + surfaceMarkup("performance")
     + `</div>
       </section>
-    </dialog>
-    <p class="visually-hidden" data-visual-announcement role="status" aria-live="polite"></p>`;
+    </dialog>`;
   const fragment = template.content;
   const dock = fragment.querySelector(".visualiser-dock");
   const dialog = fragment.querySelector(".visualiser-dialog");
-  const announcement = fragment.querySelector("[data-visual-announcement]");
   (root.querySelector(".daw-workspace") ?? root.querySelector("main"))?.append(dock);
-  root.body.append(dialog, announcement);
+  root.body.append(dialog);
 
   const surfaces = [
     createSurface(root, dock.querySelector('[data-surface="compact"]')),
@@ -475,9 +472,6 @@ export function createVisualiserFeature({
   }, { signal: lifecycle.signal });
   play.addEventListener("click", () => root.getElementById("transport-play")?.click(), { signal: lifecycle.signal });
   stop.addEventListener("click", () => root.getElementById("transport-stop")?.click(), { signal: lifecycle.signal });
-  dialog.querySelector("[data-announce]").addEventListener("click", () => {
-    announcement.textContent = buildProjectionSummary(getProjection());
-  }, { signal: lifecycle.signal });
   dialog.querySelector("[data-reduced-motion]").addEventListener("change", (event) => {
     setPreferences({ motion: event.currentTarget.checked ? "reduced" : "full" });
   }, { signal: lifecycle.signal });
@@ -531,7 +525,6 @@ export function createVisualiserFeature({
       dialog.remove();
       palettePicker.dispose();
       dock.remove();
-      announcement.remove();
       open.remove();
     },
     open: () => open.click(),
