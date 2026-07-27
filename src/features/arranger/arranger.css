@@ -112,6 +112,14 @@
 .track-delete-dialog-actions .safe-action { border-color: var(--accent); color: var(--black); background: var(--accent); }
 .track-delete-dialog-actions .neutral-action { border-color: var(--line-strong); color: var(--muted); background: var(--surface-strong); }
 
+.pattern-delete-dialog { position: fixed; z-index: 350; inset: 50% auto auto 50%; width: min(430px, calc(100vw - 32px)); max-width: none; margin: 0; padding: 0; border: 0; color: var(--ink); background: transparent; transform: translate(-50%, -50%); }
+.pattern-delete-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(5px); }
+.pattern-delete-panel { display: grid; gap: 13px; padding: 18px; border: 1px solid var(--line-bright); border-radius: 6px; background: var(--panel-raised); box-shadow: 0 20px 70px var(--shadow); }
+.pattern-delete-panel h2 { margin: 3px 0 0; font-size: 1.18rem; }
+.pattern-delete-panel p { margin: 0; font-size: 0.92rem; line-height: 1.3; }
+.pattern-delete-actions { display: flex; justify-content: space-between; gap: 8px; }
+.pattern-delete-actions .safe-action { border-color: var(--accent); color: var(--black); background: var(--accent); }
+
 @media (max-width: 900px) {
   .arrangement-section { min-height: 420px; }
   .arrangement-ruler-row, .arrangement-track-row, .arrangement-add-track-row { grid-template-columns: 190px 3584px; }
