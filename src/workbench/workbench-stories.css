@@ -1,0 +1,237 @@
+.story-frame:has(dialog[open]) {
+  align-content: start;
+}
+
+.story-frame dialog[open] {
+  position: static;
+  transform: none;
+  inset: auto;
+  display: block;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  color: inherit;
+  background: transparent;
+}
+
+.story-frame dialog[open]::backdrop {
+  display: none;
+}
+
+.story-feature-panel,
+.story-feature-toolbar,
+.story-project-header,
+.story-theme-swatch {
+  width: min(980px, 100%);
+  margin-inline: auto;
+}
+
+.story-feature-toolbar,
+.story-project-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-raised);
+}
+
+.story-feature-toolbar p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.story-help-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(720px, 100%);
+  margin: 0 auto 14px;
+}
+
+.story-theme-swatch {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--panel-raised);
+}
+
+.story-theme-swatch h2,
+.story-theme-swatch p {
+  margin: 0;
+}
+
+.story-theme-swatch p {
+  color: var(--muted);
+}
+
+.story-theme-swatch .theme-toggle {
+  justify-self: start;
+}
+
+.story-theme-palette {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.story-theme-palette span {
+  min-height: 88px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--label);
+  background: var(--bg-0);
+}
+
+.story-theme-palette span:nth-child(2) {
+  background: var(--panel);
+}
+
+.story-theme-palette span:nth-child(3) {
+  color: var(--bg-0);
+  background: var(--accent);
+}
+
+.story-theme-palette span:nth-child(4) {
+  color: white;
+  background: var(--danger);
+}
+
+.story-project-library {
+  width: min(920px, 100%);
+  margin-inline: auto;
+}
+
+.story-project-library .story-project-header {
+  margin-bottom: 10px;
+}
+
+.story-project-library .project-dialog-panel {
+  width: 100%;
+  max-width: none;
+}
+
+.story-export .project-dialog-panel > :not(.project-share-render, header) {
+  display: none;
+}
+
+.story-export .project-share-render {
+  margin: 0;
+}
+
+.story-workspace-shell {
+  min-height: 470px;
+  padding: 18px;
+}
+
+.story-workspace-shell > .arrangement-stage {
+  min-height: 90px;
+  margin-bottom: 14px;
+}
+
+.story-workspace-shell .dock-panel {
+  min-height: 230px;
+  padding: 28px;
+}
+
+.story-workspace-shell .dock-panel h2,
+.story-workspace-shell .dock-panel p {
+  margin: 0;
+}
+
+.story-arranger {
+  min-width: 900px;
+  min-height: 720px;
+  background: var(--bg-0);
+}
+
+.story-arranger .story-transport {
+  position: static;
+  display: grid;
+  grid-template-columns: auto auto auto auto auto auto;
+  gap: 8px;
+  padding: 10px;
+}
+
+.story-arranger .story-transport > * {
+  min-width: 0;
+}
+
+.story-arranger .arrangement-stage {
+  min-height: 390px;
+}
+
+.story-arranger .arrangement-scroll {
+  min-height: 300px;
+}
+
+.story-arranger-controls {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.story-arranger-controls .pattern-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.story-arranger-controls .pattern-toolbar label {
+  display: grid;
+  gap: 3px;
+}
+
+.story-visualiser-workspace {
+  min-height: 540px;
+  padding: 0 18px 18px;
+}
+
+.story-visualiser-workspace #pattern-grid {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.story-frame > .account-dialog,
+.story-frame > .publishing-dialog,
+.story-frame > .guided-dialog,
+.story-frame > .help-dialog,
+.story-frame > .remix-import-dialog {
+  width: min(980px, 100%);
+  margin-inline: auto;
+}
+
+.story-frame > .account-dialog .account-dialog-panel,
+.story-frame > .publishing-dialog .publishing-panel,
+.story-frame > .guided-dialog .guided-panel,
+.story-frame > .help-dialog .help-panel {
+  width: 100%;
+  max-width: none;
+}
+
+@media (max-width: 700px) {
+  .story-theme-palette {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .story-feature-toolbar,
+  .story-project-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

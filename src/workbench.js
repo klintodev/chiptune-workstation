@@ -1,9 +1,6 @@
 import { createStoryRegistry } from "./workbench/story-registry.js";
-import { audioStatusStory } from "./workbench/stories/audio-status.story.js";
-import { keyboardStory } from "./workbench/stories/keyboard.story.js";
-import { patternEditorStory } from "./workbench/stories/pattern-editor.story.js";
+import { stories } from "./workbench/story-catalog.js";
 
-const stories = Object.freeze([patternEditorStory, keyboardStory, audioStatusStory]);
 const registry = createStoryRegistry(stories);
 const elements = {
   canvas: document.querySelector("#story-canvas"),

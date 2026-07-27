@@ -16,9 +16,9 @@ Then open <http://localhost:4173>.
 
 ## Feature workbench
 
-Open <http://localhost:4173/workbench.html> to inspect production UI modules against small, disposable scenarios. The prototype includes the pattern editor, playable keyboard, and audio lifecycle status without starting the full application or connecting persistence and accounts.
+Open <http://localhost:4173/workbench.html> to inspect every user-facing feature family against small, disposable scenarios. The catalogue covers arrangement, composition guidance, editing, instruments, local projects, cloud and sharing flows, visual learning, help, theme, and audio lifecycle states without starting the full application or connecting real persistence, accounts, audio, or network services.
 
-Each story owns a `mount({ canvas, scenario })` lifecycle and returns a disposer. Add stories under `src/workbench/stories/`, then register them in `src/workbench.js`. Story and scenario selections are encoded in the URL, so a specific state can be shared directly.
+Each story owns a `mount({ canvas, scenario })` lifecycle and returns a disposer. Add stories under `src/workbench/stories/`, then register them in `src/workbench/story-catalog.js`. Story and scenario selections are encoded in the URL, so a specific state can be shared directly.
 
 ## Test
 
