@@ -1,6 +1,5 @@
 import { createAudioExportFeature } from "./features/audio-export/audio-export.js";
 import { createAccountFeature } from "./features/account/account.js";
-import { createVisualiserFeature } from "./features/visualiser/visualiser.js";
 import { createPublishingFeature } from "./features/publishing/publishing.js";
 import { createRemixImportFeature } from "./features/remixing/remix-import-feature.js";
 import { createRemixService } from "./firebase/remix-service.js";
@@ -24,26 +23,17 @@ import {
 } from "./firebase/publication-link-repository.js";
 import { createPublicationService } from "./firebase/publication-service.js";
 import {
-  editProjectedNote,
   projectPersistence,
   projectPreferences,
   projectRepository,
   projectState,
   remixProvenanceRepository,
-  scheduler,
-  sessionState,
   stopAllSound,
 } from "./workstation-app.js";
 
 const audioExportFeature = createAudioExportFeature({
   persistence: projectPersistence,
   projectState,
-});
-const visualiserFeature = createVisualiserFeature({
-  onEditNote: editProjectedNote,
-  projectState,
-  scheduler,
-  sessionState,
 });
 const accountSessionPreference = createAccountSessionPreference();
 const accountService = createAccountService({
@@ -122,7 +112,6 @@ if (accountSessionPreference.isEnabled()) void accountService.start({ remember: 
 window.addEventListener("unload", () => {
   publishingFeature.dispose();
   remixImportFeature.dispose();
-  visualiserFeature.dispose();
   audioExportFeature.dispose();
   accountFeature.dispose();
   cloudProjectService.dispose();
