@@ -192,11 +192,6 @@ export function createArrangementView({
     return projectState.getState().tracks.some((track) => track.clips.length > 0);
   }
 
-  function focusPatternControl() {
-    sessionState.setWorkspace({ activeDockPanel: "sequencer", detailPanelCollapsed: false });
-    root.querySelector("#pattern-select")?.focus();
-  }
-
   function selectTrack(trackId, values = {}) {
     const workspace = getWorkspace();
     if (trackId !== workspace.selectedTrackId || values.selectedPatternId) onBeforeSelectionChange();
@@ -690,7 +685,6 @@ export function createArrangementView({
       sessionState.setWorkspace({ selectedClipId: null, selectedTrackId: fallbackTrack.id });
     }
     projectState.removeTrack(trackId, { allowClips: track.clips.length > 0 });
-    if (!hasArrangementClips()) focusPatternControl();
   }
 
   function moveClip(clipId, trackId, startStep, { focusClip = false } = {}) {
@@ -1004,7 +998,6 @@ export function createArrangementView({
     projectState.removeClip(clipId);
     sessionState.setWorkspace({ selectedClipId: null });
     if (hasArrangementClips()) elements.scroll.focus();
-    else focusPatternControl();
     onError("");
   }, { signal: lifecycle.signal });
 

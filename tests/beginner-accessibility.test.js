@@ -272,7 +272,7 @@ test("beginner-facing markup exposes explicit tools and a guided first loop", as
   assert.match(html, /<dialog id="selected-step-inspector"/);
   assert.match(html, /id="selected-clip-inspector"/);
   assert.match(html, /id="mobile-mix-dialog"/);
-  assert.match(html, /id="song-play-next"/);
+  assert.doesNotMatch(html, /id="song-play-(?:help|message|next)"/);
   assert.match(html, /id="audio-setup-close"[^>]*>Continue without sound/);
   assert.match(html, /tap an empty step to add C4/);
   assert.ok((html.match(/aria-details="help-/g) ?? []).length >= 7);

@@ -43,6 +43,7 @@ export function createWorkspaceTabs({
   ]));
   const patternFocusTarget = root.querySelector("#pattern-select") ?? tabs.get("sequencer");
   let locateTimeout = 0;
+  let previousArrangementVisible = hasArrangementClips(projectState.getState());
 
   function select(panelId, { focus = false } = {}) {
     if (!panels.has(panelId)) throw new RangeError(`Unknown workspace panel: ${panelId}`);
@@ -91,16 +92,8 @@ export function createWorkspaceTabs({
     const project = projectState.getState();
     const workspace = sessionState.getState().workspace;
     const arrangementVisible = hasArrangementClips(project);
-    const activeElement = root.activeElement ?? root.ownerDocument?.activeElement;
-    const restorePatternFocus = !arrangementVisible && (
-      arrangement.contains(activeElement)
-      || clipInspector?.contains(activeElement)
-    );
     const activePanel = panels.has(workspace.activeDockPanel) ? workspace.activeDockPanel : "sequencer";
     const collapsed = arrangementVisible && workspace.detailPanelCollapsed === true;
-    if (!arrangementVisible && workspace.detailPanelCollapsed) {
-      sessionState.setWorkspace({ detailPanelCollapsed: false });
-    }
     arrangement.hidden = !arrangementVisible;
     locate.hidden = !arrangementVisible;
     locate.disabled = !arrangementVisible;
@@ -124,12 +117,40 @@ export function createWorkspaceTabs({
     contextKicker.textContent = context.kicker;
     contextTitle.textContent = context.title;
     locate.setAttribute("aria-label", `${context.kicker}: ${context.title}. Locate in arrangement`);
-    if (restorePatternFocus) {
-      if (activePanel !== "sequencer") {
-        sessionState.setWorkspace({ activeDockPanel: "sequencer", detailPanelCollapsed: false });
-      }
-      patternFocusTarget.focus();
+  }
+
+  function normalizeEditorOnlyWorkspace({ forcePattern = false } = {}) {
+    const workspace = sessionState.getState().workspace;
+    const values = {};
+    if (workspace.detailPanelCollapsed) values.detailPanelCollapsed = false;
+    if (forcePattern && workspace.activeDockPanel !== "sequencer") {
+      values.activeDockPanel = "sequencer";
     }
+    if (Object.keys(values).length === 0) return false;
+    sessionState.setWorkspace(values);
+    return true;
+  }
+
+  function handleProjectChange(event) {
+    const arrangementVisible = hasArrangementClips(projectState.getState());
+    const becameEmpty = previousArrangementVisible && !arrangementVisible;
+    const projectReplaced = ["open-project", "replace"].includes(event.detail.operation);
+    const forcePattern = !arrangementVisible && (becameEmpty || projectReplaced);
+    const activeElement = root.activeElement ?? root.ownerDocument?.activeElement;
+    const focusOwnerWillHide = !arrangementVisible && (
+      arrangement.contains(activeElement)
+      || clipInspector?.contains(activeElement)
+      || locate.contains(activeElement)
+      || collapse.contains(activeElement)
+      || (forcePattern && (
+        panels.get("instrument").contains(activeElement)
+        || panels.get("keyboard").contains(activeElement)
+      ))
+    );
+    previousArrangementVisible = arrangementVisible;
+    const normalized = !arrangementVisible && normalizeEditorOnlyWorkspace({ forcePattern });
+    if (!normalized) render();
+    if (becameEmpty || focusOwnerWillHide) patternFocusTarget.focus();
   }
 
   function findSource() {
@@ -180,8 +201,10 @@ export function createWorkspaceTabs({
   sessionState.addEventListener("change", (event) => {
     if (event.detail.slice === "workspace") render();
   }, { signal: lifecycle.signal });
-  projectState.addEventListener("change", render, { signal: lifecycle.signal });
-  render();
+  projectState.addEventListener("change", handleProjectChange, { signal: lifecycle.signal });
+  const normalizedInitialWorkspace = !previousArrangementVisible
+    && normalizeEditorOnlyWorkspace({ forcePattern: true });
+  if (!normalizedInitialWorkspace) render();
 
   return Object.freeze({
     dispose() {

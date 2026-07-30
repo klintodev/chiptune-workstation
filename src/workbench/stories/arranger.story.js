@@ -21,7 +21,6 @@ function arrangerMarkup() {
         <label class="master-control"><span>Master</span><input id="master-volume" type="range" min="0" max="100" /><output id="master-volume-value">35%</output></label>
         <button id="mobile-mix-open" type="button">Mix</button>
         <output id="transport-status">Song · Stopped · step 001</output>
-        <div id="song-play-help"><span id="song-play-message"></span><button id="song-play-next" type="button">Go to pattern</button></div>
       </header>
       <section class="arrangement-stage" aria-labelledby="arrangement-title">
         <div class="arrangement-heading">

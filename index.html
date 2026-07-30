@@ -39,7 +39,7 @@
     <main class="shell">
       <header class="global-bar">
         <div class="project-cluster">
-          <div class="studio-badge"><span aria-hidden="true"></span><h1>Klinto Studio</h1></div>
+          <div class="studio-badge"><span class="studio-mark" aria-hidden="true"></span><h1>Klinto Studio</h1><span class="studio-beta">Beta</span></div>
           <button id="project-library-open" class="project-summary" type="button" aria-haspopup="dialog">
             <span class="project-summary-icon" aria-hidden="true">&#9656;</span>
             <span class="project-summary-copy"><span>Project</span><output id="project-title">Untitled chiptune</output></span>
@@ -50,7 +50,7 @@
         <div class="global-transport" aria-label="Transport and mix controls">
           <div class="arrangement-transport" aria-label="Transport controls">
             <button id="transport-start" type="button" title="Return to start" aria-label="Return to start">&#9198;</button>
-            <button id="transport-play" class="transport-play" type="button" disabled aria-label="Play" aria-describedby="song-play-help">&#9654;</button>
+            <button id="transport-play" class="transport-play" type="button" disabled aria-label="Play">&#9654;</button>
             <button id="transport-stop" type="button" disabled aria-label="Stop">&#9632;</button>
             <button id="transport-loop" type="button" disabled aria-label="Loop arrangement" aria-pressed="false">&#8635;</button>
           </div>
@@ -58,7 +58,6 @@
           <label class="tempo-control"><span>Tempo</span><span><input id="tempo" type="number" min="40" max="240" step="1" value="120" inputmode="numeric" aria-label="Tempo in BPM" /><output id="tempo-value" for="tempo">120</output><small>BPM</small></span></label>
           <label class="master-control"><span>Master <output id="master-volume-value" for="master-volume">35%</output></span><input id="master-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Master output volume" /></label>
           <button id="mobile-mix-open" class="mobile-mix-open" type="button" aria-haspopup="dialog">Mix</button>
-          <div id="song-play-help" class="song-play-help"><span id="song-play-message">Song needs a loop with at least one note.</span><button id="song-play-next" type="button">Go to pattern</button></div>
         </div>
 
         <div class="global-status">

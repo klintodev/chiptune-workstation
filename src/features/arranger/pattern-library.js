@@ -97,6 +97,10 @@ export function createPatternLibrary({
     elements.usage.value = `${usage} clip${usage === 1 ? "" : "s"}`;
     elements.delete.disabled = project.patterns.length === 1;
     elements.place.disabled = project.tracks.length === 0 || !hasNotes;
+    elements.place.classList.toggle(
+      "place-pattern-primary",
+      hasNotes && project.tracks.every((candidate) => candidate.clips.length === 0),
+    );
     elements.place.title = hasNotes
       ? `Add ${pattern.name} to ${track.name} at song step ${workspace.arrangementStartStep + 1}`
       : "Add at least one note before adding this loop to the song.";
