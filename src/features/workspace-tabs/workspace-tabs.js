@@ -12,13 +12,24 @@ export function getAdjacentWorkspacePanel(panelId, key) {
   return PANEL_IDS[(index + delta + PANEL_IDS.length) % PANEL_IDS.length];
 }
 
-export function createWorkspaceTabs({ projectState, root = document, sessionState }) {
+function hasArrangementClips(project) {
+  return project.tracks.some((track) => track.clips.length > 0);
+}
+
+export function createWorkspaceTabs({
+  arrangementSection = null,
+  projectState,
+  root = document,
+  sessionState,
+}) {
   const lifecycle = new AbortController();
+  const arrangement = arrangementSection ?? queryRequired(root, ".arrangement-section");
   const dawWorkspace = queryRequired(root, ".daw-workspace");
   const editorDock = queryRequired(root, "#editor-dock");
   const collapse = queryRequired(root, "#workspace-collapse");
   const locate = queryRequired(root, "#dock-context-locate");
   const dockPanels = queryRequired(root, "#dock-panels");
+  const clipInspector = root.querySelector("#selected-clip-inspector");
   const contextDot = queryRequired(root, "#dock-context-dot");
   const contextKicker = queryRequired(root, "#dock-context-kicker");
   const contextTitle = queryRequired(root, "#dock-context-title");
@@ -30,6 +41,7 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
     panelId,
     queryRequired(root, `[role="tab"][data-panel="${panelId}"]`),
   ]));
+  const patternFocusTarget = root.querySelector("#pattern-select") ?? tabs.get("sequencer");
   let locateTimeout = 0;
 
   function select(panelId, { focus = false } = {}) {
@@ -78,8 +90,23 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
   function render() {
     const project = projectState.getState();
     const workspace = sessionState.getState().workspace;
+    const arrangementVisible = hasArrangementClips(project);
+    const activeElement = root.activeElement ?? root.ownerDocument?.activeElement;
+    const restorePatternFocus = !arrangementVisible && (
+      arrangement.contains(activeElement)
+      || clipInspector?.contains(activeElement)
+    );
     const activePanel = panels.has(workspace.activeDockPanel) ? workspace.activeDockPanel : "sequencer";
-    const collapsed = workspace.detailPanelCollapsed === true;
+    const collapsed = arrangementVisible && workspace.detailPanelCollapsed === true;
+    if (!arrangementVisible && workspace.detailPanelCollapsed) {
+      sessionState.setWorkspace({ detailPanelCollapsed: false });
+    }
+    arrangement.hidden = !arrangementVisible;
+    locate.hidden = !arrangementVisible;
+    locate.disabled = !arrangementVisible;
+    collapse.hidden = !arrangementVisible;
+    collapse.disabled = !arrangementVisible;
+    dawWorkspace.classList.toggle("editor-only", !arrangementVisible);
     dawWorkspace.classList.toggle("detail-collapsed", collapsed);
     editorDock.classList.toggle("collapsed", collapsed);
     dockPanels.hidden = collapsed;
@@ -97,6 +124,12 @@ export function createWorkspaceTabs({ projectState, root = document, sessionStat
     contextKicker.textContent = context.kicker;
     contextTitle.textContent = context.title;
     locate.setAttribute("aria-label", `${context.kicker}: ${context.title}. Locate in arrangement`);
+    if (restorePatternFocus) {
+      if (activePanel !== "sequencer") {
+        sessionState.setWorkspace({ activeDockPanel: "sequencer", detailPanelCollapsed: false });
+      }
+      patternFocusTarget.focus();
+    }
   }
 
   function findSource() {
