@@ -19,6 +19,13 @@ test("visualiser configuration is bounded, serializable project state", () => {
   assert.equal(validateVisualiser(normalizeVisualiser({ motion: 0 })), true);
 });
 
+test("current projects retain saved visualiser settings when loaded", () => {
+  const source = createProjectState();
+  source.setVisualiser({ palette: "ocean", preset: "scope", sensitivity: 1.4 });
+  const restored = createProjectState(structuredClone(source.getState()));
+  assert.deepEqual(restored.getState().visualiser, source.getState().visualiser);
+});
+
 test("schema three projects migrate with stable visualiser defaults", () => {
   const current = structuredClone(createProjectState().getState());
   delete current.visualiser;

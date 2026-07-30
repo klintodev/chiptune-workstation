@@ -37,9 +37,21 @@ test("production build bundles pages and Firebase serves only generated output",
   const immutable = configuration.hosting.headers.find(({ source }) => source === "**/*.@(js|css|woff2)");
   assert.match(immutable.headers[0].value, /immutable/);
 
-  for (const stylesheet of ["account", "audio-export", "publishing", "visualiser"]) {
+  for (const stylesheet of ["account", "audio-export", "publishing"]) {
     assert.match(styles, new RegExp(`${stylesheet}\\.css`));
   }
+});
+
+test("the Studio entry point does not mount or style the visualiser", async () => {
+  const [app, html, styles] = await Promise.all([
+    readFile(new URL("src/app.js", root), "utf8"),
+    readFile(new URL("index.html", root), "utf8"),
+    readFile(new URL("styles.css", root), "utf8"),
+  ]);
+
+  assert.doesNotMatch(app, /createVisualiserFeature|features\/visualiser/);
+  assert.doesNotMatch(html, /visualiser-(?:dock|dialog|open)/);
+  assert.doesNotMatch(styles, /features\/visualiser|visualiser\.css/);
 });
 
 test("source modules use canonical identities and production assets are fingerprinted once", async () => {
