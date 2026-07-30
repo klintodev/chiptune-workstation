@@ -188,6 +188,10 @@ export function createArrangementView({
     return sessionState.getState().workspace;
   }
 
+  function hasArrangementClips() {
+    return projectState.getState().tracks.some((track) => track.clips.length > 0);
+  }
+
   function selectTrack(trackId, values = {}) {
     const workspace = getWorkspace();
     if (trackId !== workspace.selectedTrackId || values.selectedPatternId) onBeforeSelectionChange();
@@ -993,7 +997,7 @@ export function createArrangementView({
     if (!clipId) return;
     projectState.removeClip(clipId);
     sessionState.setWorkspace({ selectedClipId: null });
-    elements.scroll.focus();
+    if (hasArrangementClips()) elements.scroll.focus();
     onError("");
   }, { signal: lifecycle.signal });
 

@@ -28,6 +28,7 @@ test("the workstation exposes launch-ready search and sharing metadata", async (
   assert.match(html, /property="og:image" content="https:\/\/studio\.klinto\.dev\/assets\/brand\/social-preview\.png"/);
   assert.match(html, /name="twitter:card" content="summary_large_image"/);
   assert.match(html, /<h1>Klinto Studio<\/h1>/);
+  assert.match(html, /<span class="studio-beta">Beta<\/span>/);
   assert.match(html, /aria-label="Master output volume"/);
 });
 

@@ -51,7 +51,12 @@ function mountWorkspaceTabs({ canvas, scenario }) {
       selectedTrackId: "track-1",
     },
   });
-  const feature = createWorkspaceTabs({ projectState, root, sessionState });
+  const feature = createWorkspaceTabs({
+    arrangementSection: root.querySelector(".story-arrangement-source"),
+    projectState,
+    root,
+    sessionState,
+  });
   return disposeAll(feature);
 }
 

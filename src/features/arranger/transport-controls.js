@@ -50,9 +50,6 @@ export function createTransportControls({
     mode: queryRequired(root, "#playback-mode"),
     play: queryRequired(root, "#transport-play"),
     projectTitle: queryRequired(root, "#project-title"),
-    songHelp: queryRequired(root, "#song-play-help"),
-    songMessage: queryRequired(root, "#song-play-message"),
-    songNext: queryRequired(root, "#song-play-next"),
     start: queryRequired(root, "#transport-start"),
     status: queryRequired(root, "#transport-status"),
     stop: queryRequired(root, "#transport-stop"),
@@ -120,17 +117,6 @@ export function createTransportControls({
     elements.play.title = transport.mode === "arrangement" && !hasArrangement
       ? "Add a non-empty loop to the song before playing Song mode."
       : `${playLabel} (Space ${spaceAction} from the workspace)`;
-    const selectedPattern = project.patterns.find(({ id }) => (
-      id === sessionState.getState().workspace.selectedPatternId
-    )) ?? project.patterns[0];
-    const selectedPatternHasNotes = selectedPattern.steps.some(
-      (step) => step !== null && step.volume > 0,
-    );
-    elements.songHelp.hidden = transport.mode !== "arrangement" || hasArrangement;
-    elements.songMessage.textContent = selectedPatternHasNotes
-      ? "Song needs this loop to be added."
-      : "Song needs a loop with at least one note.";
-    elements.songNext.textContent = selectedPatternHasNotes ? "Go to Add loop" : "Go to pattern";
     elements.stop.disabled = transport.status === "stopped";
     elements.start.disabled = transport.status === "stopped" && scheduler.getPlayheadStep() === 0;
     elements.loop.disabled = !hasArrangement;
@@ -272,23 +258,6 @@ export function createTransportControls({
     event.preventDefault();
     closeMobileMix();
   }, { signal: lifecycle.signal });
-  elements.songNext.addEventListener("click", () => {
-    const workspace = sessionState.getState().workspace;
-    const pattern = projectState.getState().patterns.find(({ id }) => (
-      id === workspace.selectedPatternId
-    ));
-    const hasNotes = pattern?.steps.some((step) => step !== null && step.volume > 0);
-    sessionState.setWorkspace({
-      activeDockPanel: "sequencer",
-      detailPanelCollapsed: false,
-    });
-    globalThis.requestAnimationFrame?.(() => {
-      (hasNotes
-        ? root.querySelector("#place-pattern")
-        : root.querySelector(".pattern-step-set"))?.focus();
-    });
-  }, { signal: lifecycle.signal });
-
   function beginRange(event) {
     if (groupedRange !== null) return;
     groupedRange = event.currentTarget;
