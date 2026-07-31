@@ -91,6 +91,22 @@ export function createTransportControls({
     return root.activeElement ?? root.ownerDocument?.activeElement ?? null;
   }
 
+  function isRendered(element) {
+    if (element.hidden) return false;
+    const clientRects = element.getClientRects?.();
+    if (clientRects && clientRects.length === 0) return false;
+    const view = element.ownerDocument?.defaultView
+      ?? root.defaultView
+      ?? root.ownerDocument?.defaultView;
+    const style = view?.getComputedStyle?.(element);
+    return style?.display !== "none" && style?.visibility !== "hidden";
+  }
+
+  function focusFirstRendered(...candidates) {
+    const target = candidates.find((candidate) => !candidate.disabled && isRendered(candidate));
+    target?.focus();
+  }
+
   function renderPlayhead() {
     const transport = scheduler.getState();
     const stepIndex = scheduler.getPlayheadStep();
@@ -125,6 +141,7 @@ export function createTransportControls({
   function render() {
     const project = projectState.getState();
     const transport = scheduler.getState();
+    const activeElement = getActiveElement();
     const playing = transport.status === "playing";
     const arrangementAvailable = hasArrangementClips(project);
     const arrangementPlayable = hasPlayableArrangement(project);
@@ -136,7 +153,7 @@ export function createTransportControls({
     elements.mode.value = transport.mode;
     elements.mobileMode.value = transport.mode;
     elements.tempo.value = String(project.transport.bpm);
-    if (getActiveElement() !== elements.mobileTempo) {
+    if (activeElement !== elements.mobileTempo) {
       elements.mobileTempo.value = String(project.transport.bpm);
     }
     elements.tempoValue.value = String(project.transport.bpm);
@@ -153,11 +170,11 @@ export function createTransportControls({
       || patternUnavailable
     );
     elements.play.disabled = playUnavailable;
-    const activeElement = getActiveElement();
     if (!arrangementAvailable) {
-      if (activeElement === elements.mobileMode) elements.mobileTempo.focus();
-      else if (activeElement === elements.mode || activeElement === elements.loop) {
-        (playUnavailable ? elements.tempo : elements.play).focus();
+      if (activeElement === elements.mobileMode) {
+        focusFirstRendered(elements.mobileTempo, elements.mobileMixOpen, elements.play);
+      } else if (activeElement === elements.mode || activeElement === elements.loop) {
+        focusFirstRendered(elements.play, elements.tempo, elements.mobileMixOpen);
       }
     }
     elements.modeControl.hidden = !arrangementAvailable;

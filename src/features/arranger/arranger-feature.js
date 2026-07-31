@@ -4,29 +4,7 @@ import { createArrangementView } from "./arrangement-view.js";
 import { createPatternLibrary } from "./pattern-library.js";
 import { createTransportControls } from "./transport-controls.js";
 
-export function createArrangerFeature({
-  audioEngine,
-  inputController,
-  notePreview,
-  onPatternPlayhead = () => {},
-  projectState,
-  root = document,
-  scheduler,
-  sessionState,
-}) {
-  const lifecycle = new AbortController();
-  const error = queryRequired(root, "#arrangement-error");
-
-  function showError(message) {
-    setTextIfChanged(error, message);
-    error.hidden = !message;
-  }
-
-  function stopEditingVoices() {
-    notePreview.stop();
-    inputController.stopAll();
-  }
-
+export function synchronizeWorkspaceSelection({ projectState, sessionState, signal }) {
   function repairWorkspace() {
     const project = projectState.getState();
     const workspace = sessionState.getState().workspace;
@@ -53,6 +31,47 @@ export function createArrangerFeature({
       selectedTrackId: selectedTrack.id,
     });
   }
+
+  projectState.addEventListener("change", repairWorkspace, { signal });
+  repairWorkspace();
+  return repairWorkspace;
+}
+
+export function createArrangerFeature({
+  audioEngine,
+  inputController,
+  notePreview,
+  onPatternPlayhead = () => {},
+  projectState,
+  root = document,
+  scheduler,
+  sessionState,
+}) {
+  const lifecycle = new AbortController();
+  const error = queryRequired(root, "#arrangement-error");
+
+  function showError(message) {
+    setTextIfChanged(error, message);
+    error.hidden = !message;
+  }
+
+  function stopEditingVoices() {
+    notePreview.stop();
+    inputController.stopAll();
+  }
+
+  const handleProjectChange = (event) => {
+    if (event.detail.operation === "remove-clip" && event.detail.clipId) {
+      scheduler.releaseOwnedBy({ clipId: event.detail.clipId });
+    }
+    if (event.detail.operation === "delete-pattern") {
+      for (const clipId of event.detail.removedClipIds ?? []) scheduler.releaseOwnedBy({ clipId });
+    }
+    if (event.detail.operation === "remove-track" && event.detail.trackId) {
+      scheduler.releaseOwnedBy({ trackId: event.detail.trackId });
+    }
+  };
+  projectState.addEventListener("change", handleProjectChange, { signal: lifecycle.signal });
 
   const arrangementView = createArrangementView({
     onBeforeSelectionChange: stopEditingVoices,
@@ -89,21 +108,6 @@ export function createArrangerFeature({
     scheduler,
     sessionState,
   });
-
-  const handleProjectChange = (event) => {
-    if (event.detail.operation === "remove-clip" && event.detail.clipId) {
-      scheduler.releaseOwnedBy({ clipId: event.detail.clipId });
-    }
-    if (event.detail.operation === "delete-pattern") {
-      for (const clipId of event.detail.removedClipIds ?? []) scheduler.releaseOwnedBy({ clipId });
-    }
-    if (event.detail.operation === "remove-track" && event.detail.trackId) {
-      scheduler.releaseOwnedBy({ trackId: event.detail.trackId });
-    }
-    repairWorkspace();
-  };
-  projectState.addEventListener("change", handleProjectChange, { signal: lifecycle.signal });
-  repairWorkspace();
 
   function render() {
     arrangementView.render();
