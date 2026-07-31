@@ -16,7 +16,8 @@ function arrangerMarkup() {
           <button id="transport-stop" type="button" aria-label="Stop">■</button>
           <button id="transport-loop" type="button" aria-label="Loop arrangement" aria-pressed="false">↻</button>
         </div>
-        <label class="mode-control"><span>Play</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
+        <span id="transport-play-note-help" class="transport-play-note-help" hidden>Add a note to play.</span>
+        <label id="playback-mode-control" class="mode-control"><span>Play</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
         <label class="tempo-control"><span>Tempo</span><input id="tempo" value="120" /><output id="tempo-value">120</output></label>
         <label class="master-control"><span>Master</span><input id="master-volume" type="range" min="0" max="100" /><output id="master-volume-value">35%</output></label>
         <button id="mobile-mix-open" type="button">Mix</button>
@@ -67,7 +68,7 @@ function arrangerMarkup() {
       </section>
       <dialog id="mobile-mix-dialog" class="mobile-mix-dialog">
         <div>
-          <label>Play <select id="mobile-playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
+          <label id="mobile-playback-mode-control">Play <select id="mobile-playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
           <label>Tempo <input id="mobile-tempo" value="120" /></label>
           <label>Master <input id="mobile-master-volume" type="range" min="0" max="100" /><output id="mobile-master-volume-value">35%</output></label>
           <button id="mobile-mix-close" type="button">Close</button>

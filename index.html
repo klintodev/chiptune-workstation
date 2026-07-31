@@ -54,7 +54,8 @@
             <button id="transport-stop" type="button" disabled aria-label="Stop">&#9632;</button>
             <button id="transport-loop" type="button" disabled aria-label="Loop arrangement" aria-pressed="false">&#8635;</button>
           </div>
-          <label class="mode-control"><span>Play</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
+          <span id="transport-play-note-help" class="transport-play-note-help" hidden>Add a note to play.</span>
+          <label id="playback-mode-control" class="mode-control"><span>Play</span><select id="playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
           <label class="tempo-control"><span>Tempo</span><span><input id="tempo" type="number" min="40" max="240" step="1" value="120" inputmode="numeric" aria-label="Tempo in BPM" /><output id="tempo-value" for="tempo">120</output><small>BPM</small></span></label>
           <label class="master-control"><span>Master <output id="master-volume-value" for="master-volume">35%</output></span><input id="master-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Master output volume" /></label>
           <button id="mobile-mix-open" class="mobile-mix-open" type="button" aria-haspopup="dialog">Mix</button>
@@ -252,7 +253,7 @@
     <dialog id="mobile-mix-dialog" class="mobile-mix-dialog" aria-labelledby="mobile-mix-title">
       <div class="mobile-mix-panel">
         <header><div><span class="panel-context">Playback controls</span><h2 id="mobile-mix-title">Song and mix</h2></div><button id="mobile-mix-close" type="button" aria-label="Close song and mix controls">&times;</button></header>
-        <label><span>Play</span><select id="mobile-playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
+        <label id="mobile-playback-mode-control"><span>Play</span><select id="mobile-playback-mode"><option value="arrangement">Song</option><option value="pattern">Pattern</option></select></label>
         <label><span>Tempo</span><span><input id="mobile-tempo" type="number" min="40" max="240" step="1" value="120" inputmode="numeric" aria-label="Mobile tempo in BPM" /><small>BPM</small></span></label>
         <label><span>Master volume</span><input id="mobile-master-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Mobile master output volume" /><output id="mobile-master-volume-value" for="mobile-master-volume">35%</output></label>
         <div class="mobile-mix-actions"><button id="mobile-audio-open" type="button">Audio setup</button><button id="mobile-mix-done" class="safe-action" type="button">Done</button></div>
