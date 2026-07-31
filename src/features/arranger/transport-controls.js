@@ -87,6 +87,10 @@ export function createTransportControls({
     return changed;
   }
 
+  function getActiveElement() {
+    return root.activeElement ?? root.ownerDocument?.activeElement ?? null;
+  }
+
   function renderPlayhead() {
     const transport = scheduler.getState();
     const stepIndex = scheduler.getPlayheadStep();
@@ -131,12 +135,8 @@ export function createTransportControls({
     elements.projectTitle.value = project.metadata.title;
     elements.mode.value = transport.mode;
     elements.mobileMode.value = transport.mode;
-    elements.modeControl.hidden = !arrangementAvailable;
-    elements.mode.disabled = !arrangementAvailable;
-    elements.mobileModeControl.hidden = !arrangementAvailable;
-    elements.mobileMode.disabled = !arrangementAvailable;
     elements.tempo.value = String(project.transport.bpm);
-    if (root.activeElement !== elements.mobileTempo) {
+    if (getActiveElement() !== elements.mobileTempo) {
       elements.mobileTempo.value = String(project.transport.bpm);
     }
     elements.tempoValue.value = String(project.transport.bpm);
@@ -144,25 +144,40 @@ export function createTransportControls({
     elements.mobileMaster.value = String(project.transport.masterVolume * 100);
     elements.masterValue.value = `${Math.round(project.transport.masterVolume * 100)}%`;
     elements.mobileMasterValue.value = `${Math.round(project.transport.masterVolume * 100)}%`;
-    const emptyPatternUnavailable = !arrangementAvailable
-      && transport.mode === "pattern"
+    const patternUnavailable = transport.mode === "pattern"
+      && !playing
       && !patternPlayable;
-    elements.play.disabled = !audioEngine.isReady()
+    const playUnavailable = !playing && (
+      !audioEngine.isReady()
       || (transport.mode === "arrangement" && !arrangementPlayable)
-      || emptyPatternUnavailable;
+      || patternUnavailable
+    );
+    elements.play.disabled = playUnavailable;
+    const activeElement = getActiveElement();
+    if (!arrangementAvailable) {
+      if (activeElement === elements.mobileMode) elements.mobileTempo.focus();
+      else if (activeElement === elements.mode || activeElement === elements.loop) {
+        (playUnavailable ? elements.tempo : elements.play).focus();
+      }
+    }
+    elements.modeControl.hidden = !arrangementAvailable;
+    elements.mode.disabled = !arrangementAvailable;
+    elements.mobileModeControl.hidden = !arrangementAvailable;
+    elements.mobileMode.disabled = !arrangementAvailable;
     const playLabel = playing ? "Pause" : transport.status === "paused" ? "Resume" : "Play";
     const playbackContext = transport.mode === "pattern" ? "pattern" : "song";
     elements.play.textContent = playing ? "❙❙" : "▶";
     elements.play.classList.toggle("playing", playing);
     elements.play.setAttribute("aria-label", `${playLabel} ${playbackContext}`);
-    elements.playHelp.hidden = !emptyPatternUnavailable;
-    if (emptyPatternUnavailable) {
+    const showPatternHelp = !arrangementAvailable && patternUnavailable;
+    elements.playHelp.hidden = !showPatternHelp;
+    if (showPatternHelp) {
       elements.play.setAttribute("aria-describedby", "transport-play-note-help");
     } else {
       elements.play.removeAttribute("aria-describedby");
     }
     const spaceAction = playing ? "stops and returns to step 1" : transport.status === "paused" ? "resumes playback" : "starts playback";
-    elements.play.title = emptyPatternUnavailable
+    elements.play.title = patternUnavailable
       ? ""
       : transport.mode === "arrangement" && !arrangementPlayable
         ? "Add a non-empty loop to the song before playing Song mode."
@@ -191,7 +206,6 @@ export function createTransportControls({
     if (nextMode === "arrangement" && !hasPlayableArrangement(project)) return false;
     if (
       nextMode === "pattern"
-      && !hasArrangementClips(project)
       && !hasPlayablePattern(project, sessionState.getState().workspace.selectedPatternId)
     ) return false;
     try {
@@ -351,6 +365,7 @@ export function createTransportControls({
     const project = projectState.getState();
     resolvingPlaybackContext = true;
     try {
+      scheduler.releaseInvalidOwnership();
       resolvePlaybackContext(project);
       const bpm = project.transport.bpm;
       if (scheduler.getState().bpm !== bpm) scheduler.setBpm(bpm);

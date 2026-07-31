@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -12,6 +13,7 @@ import {
   createProjectState,
 } from "../src/state/project-state.js";
 import { createSessionState } from "../src/state/session-state.js";
+import { createArrangementScheduler } from "../src/transport/arrangement-scheduler.js";
 
 const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
 const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
@@ -123,6 +125,9 @@ function createScheduler({
       emit();
       return true;
     },
+    releaseInvalidOwnership() {
+      return false;
+    },
     removeEventListener: events.removeEventListener.bind(events),
     setBpm(nextBpm) {
       if (state.bpm === nextBpm) return false;
@@ -162,6 +167,7 @@ function createScheduler({
 }
 
 function createTransportHarness({
+  onError = () => {},
   projectState = createProjectState(),
   scheduler = createScheduler(),
   sessionState = createSessionState(),
@@ -202,6 +208,7 @@ function createTransportHarness({
   ]) register(selector);
   const feature = createTransportControls({
     audioEngine: { isReady: () => true },
+    onError,
     projectState,
     root,
     scheduler,
@@ -231,6 +238,75 @@ function createArrangedProject() {
   addNote(projectState);
   const clipId = projectState.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
   return { clipId, projectState };
+}
+
+function clearPattern(projectState, patternId = DEFAULT_PATTERN_ID) {
+  projectState.updatePattern(patternId, (pattern) => ({
+    ...pattern,
+    steps: pattern.steps.map(() => null),
+  }));
+}
+
+function pressSpace(root) {
+  const event = new Event("keydown", { cancelable: true });
+  Object.defineProperties(event, {
+    altKey: { value: false },
+    code: { value: "Space" },
+    ctrlKey: { value: false },
+    key: { value: " " },
+    metaKey: { value: false },
+    repeat: { value: false },
+  });
+  root.dispatchEvent(event);
+  return event;
+}
+
+function createRealSchedulerHarness() {
+  const projectState = createProjectState();
+  const sessionState = createSessionState();
+  const schedulerErrors = [];
+  const transportErrors = [];
+  let intervalCallback = null;
+  let activeTimer = null;
+  let nextTimer = 1;
+  const scheduler = createArrangementScheduler({
+    clearIntervalFn(timer) {
+      if (timer !== activeTimer) return;
+      activeTimer = null;
+      intervalCallback = null;
+    },
+    getAudioTime: () => 10,
+    getProjectState: projectState.getState,
+    getSelectedPatternId: () => sessionState.getState().workspace.selectedPatternId,
+    getSelectedTrackId: () => sessionState.getState().workspace.selectedTrackId,
+    getVoiceEngine: () => ({
+      trigger: () => ({ stop() {} }),
+    }),
+    setIntervalFn(callback) {
+      activeTimer = nextTimer;
+      nextTimer += 1;
+      intervalCallback = callback;
+      return activeTimer;
+    },
+    startLeadSeconds: 0,
+  });
+  scheduler.addEventListener("statechange", (event) => {
+    if (event.detail.error) schedulerErrors.push(event.detail.error);
+  });
+  const harness = createTransportHarness({
+    onError(message) {
+      if (message) transportErrors.push(message);
+    },
+    projectState,
+    scheduler,
+    sessionState,
+  });
+  return {
+    ...harness,
+    getIntervalCallback: () => intervalCallback,
+    schedulerErrors,
+    transportErrors,
+  };
 }
 
 test("an empty project starts in Pattern mode with arrangement-only controls unavailable", () => {
@@ -441,4 +517,163 @@ test("deleting a pattern and its final clip references restores Pattern-only tra
   assert.equal(scheduler.stopCount, 1);
   assert.equal(harness.elements.get("#playback-mode-control").hidden, true);
   harness.feature.dispose();
+});
+
+test("active Pattern playback keeps Pause available after its last note is cleared", () => {
+  const harness = createTransportHarness();
+  const play = harness.elements.get("#transport-play");
+  const stop = harness.elements.get("#transport-stop");
+  const help = harness.elements.get("#transport-play-note-help");
+
+  addNote(harness.projectState);
+  play.click();
+  clearPattern(harness.projectState);
+
+  assert.equal(harness.scheduler.getState().status, "playing");
+  assert.equal(play.disabled, false);
+  assert.equal(play.getAttribute("aria-label"), "Pause pattern");
+  assert.equal(stop.disabled, false);
+  assert.equal(help.hidden, true);
+  assert.equal(play.getAttribute("aria-describedby"), null);
+
+  play.click();
+  assert.equal(harness.scheduler.getState().status, "paused");
+  assert.equal(play.disabled, true);
+  assert.equal(play.getAttribute("aria-label"), "Resume pattern");
+  assert.equal(stop.disabled, false);
+  assert.equal(help.hidden, false);
+
+  const playCallCount = harness.scheduler.playCalls.length;
+  assert.equal(pressSpace(harness.root).defaultPrevented, true);
+  assert.equal(harness.scheduler.getState().status, "paused");
+  assert.equal(harness.scheduler.playCalls.length, playCallCount);
+
+  addNote(harness.projectState);
+  assert.equal(play.disabled, false);
+  assert.equal(help.hidden, true);
+  pressSpace(harness.root);
+  assert.equal(harness.scheduler.getState().status, "playing");
+  assert.equal(harness.scheduler.playCalls.length, playCallCount + 1);
+  harness.feature.dispose();
+});
+
+test("final clip removal recovers focus before arrangement-only controls disappear", async (t) => {
+  await t.test("desktop mode selector prefers Play", () => {
+    const { clipId, projectState } = createArrangedProject();
+    const harness = createTransportHarness({ projectState });
+    harness.elements.get("#playback-mode").focus();
+
+    projectState.removeClip(clipId);
+
+    assert.equal(harness.root.activeElement, harness.elements.get("#transport-play"));
+    assert.equal(harness.root.activeElement.hidden, false);
+    assert.equal(harness.root.activeElement.disabled, false);
+    harness.feature.dispose();
+  });
+
+  await t.test("arrangement loop prefers Play", () => {
+    const { clipId, projectState } = createArrangedProject();
+    const harness = createTransportHarness({ projectState });
+    harness.elements.get("#transport-loop").focus();
+
+    projectState.removeClip(clipId);
+
+    assert.equal(harness.root.activeElement, harness.elements.get("#transport-play"));
+    assert.equal(harness.root.activeElement.hidden, false);
+    assert.equal(harness.root.activeElement.disabled, false);
+    harness.feature.dispose();
+  });
+
+  await t.test("desktop mode selector falls back to Tempo when Play is unavailable", () => {
+    const projectState = createProjectState();
+    const clipId = projectState.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+    const harness = createTransportHarness({ projectState });
+    harness.elements.get("#playback-mode").focus();
+
+    projectState.removeClip(clipId);
+
+    assert.equal(harness.elements.get("#transport-play").disabled, true);
+    assert.equal(harness.root.activeElement, harness.elements.get("#tempo"));
+    assert.equal(harness.root.activeElement.hidden, false);
+    assert.equal(harness.root.activeElement.disabled, false);
+    harness.feature.dispose();
+  });
+
+  await t.test("mobile mode selector moves to mobile Tempo", () => {
+    const { clipId, projectState } = createArrangedProject();
+    const harness = createTransportHarness({ projectState });
+    harness.elements.get("#mobile-playback-mode").focus();
+
+    projectState.removeClip(clipId);
+
+    assert.equal(harness.root.activeElement, harness.elements.get("#mobile-tempo"));
+    assert.equal(harness.root.activeElement.hidden, false);
+    assert.equal(harness.root.activeElement.disabled, false);
+    harness.feature.dispose();
+  });
+});
+
+test("real scheduler stops only when active Pattern ownership is removed", async (t) => {
+  await t.test("active pattern deletion stops before a stale tick", () => {
+    const harness = createRealSchedulerHarness();
+    harness.projectState.createPattern();
+    addNote(harness.projectState);
+    harness.elements.get("#transport-play").click();
+    const staleTick = harness.getIntervalCallback();
+
+    harness.projectState.deletePattern(DEFAULT_PATTERN_ID, { removeReferences: true });
+
+    assert.equal(harness.scheduler.getState().status, "stopped");
+    assert.equal(harness.getIntervalCallback(), null);
+    staleTick();
+    assert.deepEqual(harness.schedulerErrors, []);
+    assert.deepEqual(harness.transportErrors, []);
+    harness.feature.dispose();
+  });
+
+  await t.test("active track deletion stops before a stale tick", () => {
+    const harness = createRealSchedulerHarness();
+    harness.projectState.addTrack("Replacement");
+    addNote(harness.projectState);
+    harness.elements.get("#transport-play").click();
+    const staleTick = harness.getIntervalCallback();
+
+    harness.projectState.removeTrack(DEFAULT_TRACK_ID);
+
+    assert.equal(harness.scheduler.getState().status, "stopped");
+    assert.equal(harness.getIntervalCallback(), null);
+    staleTick();
+    assert.deepEqual(harness.schedulerErrors, []);
+    assert.deepEqual(harness.transportErrors, []);
+    harness.feature.dispose();
+  });
+
+  await t.test("unrelated edits and final clip removal keep valid playback running", () => {
+    const harness = createRealSchedulerHarness();
+    const unrelatedPatternId = harness.projectState.createPattern();
+    const unrelatedTrackId = harness.projectState.addTrack("Unused");
+    addNote(harness.projectState);
+    harness.elements.get("#transport-play").click();
+
+    harness.projectState.deletePattern(unrelatedPatternId);
+    harness.projectState.removeTrack(unrelatedTrackId);
+    clearPattern(harness.projectState);
+    const clipId = harness.projectState.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+    harness.projectState.removeClip(clipId);
+
+    assert.equal(harness.scheduler.getState().status, "playing");
+    assert.equal(harness.scheduler.getState().mode, "pattern");
+    assert.deepEqual(harness.schedulerErrors, []);
+    assert.deepEqual(harness.transportErrors, []);
+    harness.scheduler.stop();
+    harness.feature.dispose();
+  });
+});
+
+test("mobile mix copy stays neutral in Pattern-only projects", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+
+  assert.match(html, /id="mobile-mix-title">Playback and mix</);
+  assert.match(html, /aria-label="Close playback and mix controls"/);
+  assert.doesNotMatch(html, /Song and mix|Close song and mix controls/);
 });
