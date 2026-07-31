@@ -535,6 +535,13 @@ export function createArrangementScheduler({
     const project = getProjectState();
     const trackIds = new Set(project.tracks.map((track) => track.id));
     const patternIds = new Set(project.patterns.map((pattern) => pattern.id));
+    if (
+      session.mode === "pattern" &&
+      (!trackIds.has(session.trackId) || !patternIds.has(session.patternId))
+    ) {
+      stop();
+      return true;
+    }
     const clipIds = new Set(project.tracks.flatMap((track) => track.clips.map((clip) => clip.id)));
     const now = getAudioTime();
     const before = session.voices.size;
