@@ -40,6 +40,7 @@
 .project-name output { overflow: hidden; max-width: 220px; color: var(--ink); font-size: 1.25rem; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 
 .global-transport { position: relative; justify-content: center; gap: 10px; }
+.transport-play-note-help { max-width: 96px; color: var(--muted); font-size: 0.68rem; line-height: 1.15; }
 .mobile-mix-open { display: none; min-width: 52px; border-color: var(--line-strong); color: var(--label); background: var(--bg-1); }
 .arrangement-transport { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--bg-1); }
 .arrangement-transport button { width: 34px; height: 32px; padding: 0; border-color: var(--line-strong); color: var(--label); background: var(--surface-strong); font-family: sans-serif; font-size: 0.8rem; }

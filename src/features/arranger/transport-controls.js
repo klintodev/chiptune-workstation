@@ -9,6 +9,15 @@ export function hasPlayableArrangement(project) {
   )));
 }
 
+export function hasArrangementClips(project) {
+  return project.tracks.some((track) => track.clips.length > 0);
+}
+
+export function hasPlayablePattern(project, patternId) {
+  const pattern = project.patterns.find(({ id }) => id === patternId) ?? project.patterns[0];
+  return Boolean(pattern?.steps.some((step) => step !== null && step.volume > 0));
+}
+
 export function handlePlaybackShortcut(event, {
   root,
   scheduler,
@@ -46,9 +55,12 @@ export function createTransportControls({
     mobileMixDone: queryRequired(root, "#mobile-mix-done"),
     mobileMixOpen: queryRequired(root, "#mobile-mix-open"),
     mobileMode: queryRequired(root, "#mobile-playback-mode"),
+    mobileModeControl: queryRequired(root, "#mobile-playback-mode-control"),
     mobileTempo: queryRequired(root, "#mobile-tempo"),
     mode: queryRequired(root, "#playback-mode"),
+    modeControl: queryRequired(root, "#playback-mode-control"),
     play: queryRequired(root, "#transport-play"),
+    playHelp: queryRequired(root, "#transport-play-note-help"),
     projectTitle: queryRequired(root, "#project-title"),
     start: queryRequired(root, "#transport-start"),
     status: queryRequired(root, "#transport-status"),
@@ -59,6 +71,41 @@ export function createTransportControls({
   let playheadFrame = null;
   let groupedRange = null;
   let previousAnnouncedStatus = scheduler.getState().status;
+  let resolvingPlaybackContext = false;
+
+  function resolvePlaybackContext(project = projectState.getState()) {
+    if (hasArrangementClips(project)) return false;
+    let changed = false;
+    if (scheduler.getState().mode !== "pattern") {
+      scheduler.setMode("pattern");
+      changed = true;
+    }
+    if (sessionState.getState().workspace.playbackMode !== "pattern") {
+      sessionState.setWorkspace({ playbackMode: "pattern" });
+      changed = true;
+    }
+    return changed;
+  }
+
+  function getActiveElement() {
+    return root.activeElement ?? root.ownerDocument?.activeElement ?? null;
+  }
+
+  function isRendered(element) {
+    if (element.hidden) return false;
+    const clientRects = element.getClientRects?.();
+    if (clientRects && clientRects.length === 0) return false;
+    const view = element.ownerDocument?.defaultView
+      ?? root.defaultView
+      ?? root.ownerDocument?.defaultView;
+    const style = view?.getComputedStyle?.(element);
+    return style?.display !== "none" && style?.visibility !== "hidden";
+  }
+
+  function focusFirstRendered(...candidates) {
+    const target = candidates.find((candidate) => !candidate.disabled && isRendered(candidate));
+    target?.focus();
+  }
 
   function renderPlayhead() {
     const transport = scheduler.getState();
@@ -94,13 +141,19 @@ export function createTransportControls({
   function render() {
     const project = projectState.getState();
     const transport = scheduler.getState();
+    const activeElement = getActiveElement();
     const playing = transport.status === "playing";
-    const hasArrangement = hasPlayableArrangement(project);
+    const arrangementAvailable = hasArrangementClips(project);
+    const arrangementPlayable = hasPlayableArrangement(project);
+    const patternPlayable = hasPlayablePattern(
+      project,
+      sessionState.getState().workspace.selectedPatternId,
+    );
     elements.projectTitle.value = project.metadata.title;
     elements.mode.value = transport.mode;
     elements.mobileMode.value = transport.mode;
     elements.tempo.value = String(project.transport.bpm);
-    if (root.activeElement !== elements.mobileTempo) {
+    if (activeElement !== elements.mobileTempo) {
       elements.mobileTempo.value = String(project.transport.bpm);
     }
     elements.tempoValue.value = String(project.transport.bpm);
@@ -108,18 +161,51 @@ export function createTransportControls({
     elements.mobileMaster.value = String(project.transport.masterVolume * 100);
     elements.masterValue.value = `${Math.round(project.transport.masterVolume * 100)}%`;
     elements.mobileMasterValue.value = `${Math.round(project.transport.masterVolume * 100)}%`;
-    elements.play.disabled = !audioEngine.isReady() || (transport.mode === "arrangement" && !hasArrangement);
+    const patternUnavailable = transport.mode === "pattern"
+      && !playing
+      && !patternPlayable;
+    const playUnavailable = !playing && (
+      !audioEngine.isReady()
+      || (transport.mode === "arrangement" && !arrangementPlayable)
+      || patternUnavailable
+    );
+    elements.stop.disabled = transport.status === "stopped";
+    if (activeElement === elements.play && playUnavailable) {
+      focusFirstRendered(elements.stop, elements.tempo, elements.mobileMixOpen);
+    }
+    elements.play.disabled = playUnavailable;
+    if (!arrangementAvailable) {
+      if (activeElement === elements.mobileMode) {
+        focusFirstRendered(elements.mobileTempo, elements.mobileMixOpen, elements.play);
+      } else if (activeElement === elements.mode || activeElement === elements.loop) {
+        focusFirstRendered(elements.play, elements.tempo, elements.mobileMixOpen);
+      }
+    }
+    elements.modeControl.hidden = !arrangementAvailable;
+    elements.mode.disabled = !arrangementAvailable;
+    elements.mobileModeControl.hidden = !arrangementAvailable;
+    elements.mobileMode.disabled = !arrangementAvailable;
     const playLabel = playing ? "Pause" : transport.status === "paused" ? "Resume" : "Play";
+    const playbackContext = transport.mode === "pattern" ? "pattern" : "song";
     elements.play.textContent = playing ? "❙❙" : "▶";
     elements.play.classList.toggle("playing", playing);
-    elements.play.setAttribute("aria-label", playLabel);
+    elements.play.setAttribute("aria-label", `${playLabel} ${playbackContext}`);
+    const showPatternHelp = !arrangementAvailable && patternUnavailable;
+    elements.playHelp.hidden = !showPatternHelp;
+    if (showPatternHelp) {
+      elements.play.setAttribute("aria-describedby", "transport-play-note-help");
+    } else {
+      elements.play.removeAttribute("aria-describedby");
+    }
     const spaceAction = playing ? "stops and returns to step 1" : transport.status === "paused" ? "resumes playback" : "starts playback";
-    elements.play.title = transport.mode === "arrangement" && !hasArrangement
-      ? "Add a non-empty loop to the song before playing Song mode."
-      : `${playLabel} (Space ${spaceAction} from the workspace)`;
-    elements.stop.disabled = transport.status === "stopped";
+    elements.play.title = patternUnavailable
+      ? ""
+      : transport.mode === "arrangement" && !arrangementPlayable
+        ? "Add a non-empty loop to the song before playing Song mode."
+        : `${playLabel} (Space ${spaceAction} from the workspace)`;
     elements.start.disabled = transport.status === "stopped" && scheduler.getPlayheadStep() === 0;
-    elements.loop.disabled = !hasArrangement;
+    elements.loop.hidden = !arrangementAvailable;
+    elements.loop.disabled = !arrangementAvailable || !arrangementPlayable;
     elements.loop.classList.toggle("active", project.transport.loop.enabled);
     elements.loop.setAttribute("aria-pressed", String(project.transport.loop.enabled));
     elements.loop.title = project.transport.loop.enabled ? "Disable arrangement loop" : "Loop the whole arrangement";
@@ -135,9 +221,15 @@ export function createTransportControls({
 
   function startPlayback() {
     if (!audioEngine.isReady()) return false;
-    if (elements.mode.value === "arrangement" && !hasPlayableArrangement(projectState.getState())) return false;
+    const project = projectState.getState();
+    const nextMode = hasArrangementClips(project) ? elements.mode.value : "pattern";
+    if (nextMode === "arrangement" && !hasPlayableArrangement(project)) return false;
+    if (
+      nextMode === "pattern"
+      && !hasPlayablePattern(project, sessionState.getState().workspace.selectedPatternId)
+    ) return false;
     try {
-      scheduler.play(elements.mode.value);
+      scheduler.play(nextMode);
       onError("");
       return true;
     } catch (error) {
@@ -180,8 +272,14 @@ export function createTransportControls({
   }
 
   function changeMode(value) {
-    scheduler.setMode(value);
-    sessionState.setWorkspace({ playbackMode: value });
+    const mode = hasArrangementClips(projectState.getState()) ? value : "pattern";
+    resolvingPlaybackContext = true;
+    try {
+      scheduler.setMode(mode);
+      sessionState.setWorkspace({ playbackMode: mode });
+    } finally {
+      resolvingPlaybackContext = false;
+    }
     onError("");
     render();
   }
@@ -250,7 +348,7 @@ export function createTransportControls({
   elements.mobileMixOpen.addEventListener("click", () => {
     render();
     if (!elements.mobileMixDialog.open) elements.mobileMixDialog.showModal();
-    elements.mobileMode.focus();
+    (elements.mobileModeControl.hidden ? elements.mobileTempo : elements.mobileMode).focus();
   }, { signal: lifecycle.signal });
   elements.mobileMixClose.addEventListener("click", closeMobileMix, { signal: lifecycle.signal });
   elements.mobileMixDone.addEventListener("click", closeMobileMix, { signal: lifecycle.signal });
@@ -284,18 +382,52 @@ export function createTransportControls({
   elements.mobileMaster.addEventListener("change", finishRange, { signal: lifecycle.signal });
 
   const handleProjectChange = () => {
-    const bpm = projectState.getState().transport.bpm;
-    if (scheduler.getState().bpm !== bpm) scheduler.setBpm(bpm);
+    const project = projectState.getState();
+    resolvingPlaybackContext = true;
+    try {
+      scheduler.releaseInvalidOwnership();
+      resolvePlaybackContext(project);
+      const bpm = project.transport.bpm;
+      if (scheduler.getState().bpm !== bpm) scheduler.setBpm(bpm);
+    } finally {
+      resolvingPlaybackContext = false;
+    }
     render();
   };
   const handleSchedulerChange = (event) => {
-    const transport = scheduler.getState();
-    sessionState.setTransport({ retainedStepIndex: transport.retainedStepIndex, status: transport.status });
-    if (event.detail.error) onError(event.detail.error.message);
+    const wasResolving = resolvingPlaybackContext;
+    resolvingPlaybackContext = true;
+    try {
+      const transport = scheduler.getState();
+      sessionState.setTransport({ retainedStepIndex: transport.retainedStepIndex, status: transport.status });
+      if (sessionState.getState().workspace.playbackMode !== transport.mode) {
+        sessionState.setWorkspace({ playbackMode: transport.mode });
+      }
+      if (event.detail.error) onError(event.detail.error.message);
+    } finally {
+      resolvingPlaybackContext = wasResolving;
+    }
+    if (!wasResolving) render();
+  };
+  const handleSessionChange = (event) => {
+    if (event.detail.slice !== "workspace" || resolvingPlaybackContext) return;
+    resolvingPlaybackContext = true;
+    try {
+      resolvePlaybackContext();
+    } finally {
+      resolvingPlaybackContext = false;
+    }
     render();
   };
+  resolvingPlaybackContext = true;
+  try {
+    resolvePlaybackContext();
+  } finally {
+    resolvingPlaybackContext = false;
+  }
   projectState.addEventListener("change", handleProjectChange, { signal: lifecycle.signal });
   scheduler.addEventListener("statechange", handleSchedulerChange, { signal: lifecycle.signal });
+  sessionState.addEventListener("change", handleSessionChange, { signal: lifecycle.signal });
   render();
 
   return Object.freeze({

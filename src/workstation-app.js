@@ -6,7 +6,7 @@ import {
 import { createNotePreview } from "./audio/note-preview.js";
 import { createTrackRuntimeRegistry } from "./audio/track-runtime-registry.js";
 import { createAudioStatusFeature } from "./features/audio-status/audio-status.js";
-import { createArrangerFeature } from "./features/arranger/arranger-feature.js";
+import { createArrangerFeature, synchronizeWorkspaceSelection } from "./features/arranger/arranger-feature.js";
 import { createInstrumentFeature } from "./features/instrument/instrument.js";
 import { createHelpFeature } from "./features/help/help.js";
 import { createInputController } from "./features/keyboard/input-controller.js";
@@ -66,6 +66,12 @@ export const projectPersistence = createProjectPersistence({
   repository: projectRepository,
 });
 export const sessionState = createSessionState();
+const applicationLifecycle = new AbortController();
+synchronizeWorkspaceSelection({
+  projectState,
+  sessionState,
+  signal: applicationLifecycle.signal,
+});
 export const remixProvenanceRepository = createLocalRemixProvenanceRepository();
 const themeFeature = createThemeFeature({ sessionState });
 const helpFeature = createHelpFeature();
@@ -179,7 +185,6 @@ const projectLibraryFeature = createProjectLibraryFeature({
   persistence: projectPersistence,
   projectState,
 });
-const applicationLifecycle = new AbortController();
 const audioStatusFeature = createAudioStatusFeature({
   audioEngine,
   createUnexpectedError: (error) => createAudioEngineError(
