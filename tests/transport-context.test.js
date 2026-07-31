@@ -44,23 +44,25 @@ class MockClassList {
 class MockElement extends EventTarget {
   constructor(root) {
     super();
+    this.root = root;
     this.attributes = new Map();
     this.classList = new MockClassList();
-    this.disabled = false;
+    this._disabled = false;
     this.hidden = false;
     this.open = false;
     this.rendered = true;
-    this.root = root;
     this.textContent = "";
     this.title = "";
     this.value = "";
   }
 
   blur() {
-    if (this.root.activeElement === this) this.root.activeElement = null;
+    if (this.root.activeElement === this) this.root.activeElement = this.root.body;
   }
 
   click() {
+    if (this.disabled) return;
+    this.focus();
     this.dispatchEvent(new Event("click"));
   }
 
@@ -69,7 +71,19 @@ class MockElement extends EventTarget {
   }
 
   focus() {
+    if (this.disabled) return;
     this.root.activeElement = this;
+  }
+
+  get disabled() {
+    return this._disabled;
+  }
+
+  set disabled(value) {
+    this._disabled = Boolean(value);
+    if (this._disabled && this.root.activeElement === this) {
+      this.root.activeElement = this.root.body;
+    }
   }
 
   getAttribute(name) {
@@ -173,6 +187,7 @@ function createScheduler({
 }
 
 function createTransportHarness({
+  audioReady = true,
   onError = () => {},
   projectState = createProjectState(),
   scheduler = createScheduler(),
@@ -182,7 +197,8 @@ function createTransportHarness({
   const root = new EventTarget();
   const elements = new Map();
   const unrendered = new Set(unrenderedSelectors);
-  root.activeElement = null;
+  root.body = Object.freeze({ nodeName: "BODY" });
+  root.activeElement = root.body;
   root.querySelector = (selector) => elements.get(selector) ?? null;
   const register = (selector) => {
     const element = new MockElement(root);
@@ -216,7 +232,7 @@ function createTransportHarness({
     "#workstation-status",
   ]) register(selector);
   const feature = createTransportControls({
-    audioEngine: { isReady: () => true },
+    audioEngine: { isReady: () => audioReady },
     onError,
     projectState,
     root,
@@ -562,7 +578,7 @@ test("deleting a pattern and its final clip references restores Pattern-only tra
   harness.feature.dispose();
 });
 
-test("active Pattern playback keeps Pause available after its last note is cleared", () => {
+test("a silent active Pattern keeps Pause available and transfers focus to Stop when paused", () => {
   const harness = createTransportHarness();
   const play = harness.elements.get("#transport-play");
   const stop = harness.elements.get("#transport-stop");
@@ -579,12 +595,16 @@ test("active Pattern playback keeps Pause available after its last note is clear
   assert.equal(help.hidden, true);
   assert.equal(play.getAttribute("aria-describedby"), null);
 
+  play.focus();
+  assert.equal(harness.root.activeElement, play);
   play.click();
   assert.equal(harness.scheduler.getState().status, "paused");
   assert.equal(play.disabled, true);
   assert.equal(play.getAttribute("aria-label"), "Resume pattern");
   assert.equal(stop.disabled, false);
   assert.equal(help.hidden, false);
+  assert.equal(harness.root.activeElement, stop);
+  assert.notEqual(harness.root.activeElement, harness.root.body);
 
   const playCallCount = harness.scheduler.playCalls.length;
   assert.equal(pressSpace(harness.root).defaultPrevented, true);
@@ -643,9 +663,9 @@ test("final clip removal recovers focus before arrangement-only controls disappe
   });
 
   await t.test("mobile layout skips CSS-hidden desktop Tempo and focuses Mix", () => {
-    const projectState = createProjectState();
-    const clipId = projectState.addClip(DEFAULT_TRACK_ID, DEFAULT_PATTERN_ID, 0);
+    const { clipId, projectState } = createArrangedProject();
     const harness = createTransportHarness({
+      audioReady: false,
       projectState,
       unrenderedSelectors: ["#tempo"],
     });

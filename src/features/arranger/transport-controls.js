@@ -169,6 +169,10 @@ export function createTransportControls({
       || (transport.mode === "arrangement" && !arrangementPlayable)
       || patternUnavailable
     );
+    elements.stop.disabled = transport.status === "stopped";
+    if (activeElement === elements.play && playUnavailable) {
+      focusFirstRendered(elements.stop, elements.tempo, elements.mobileMixOpen);
+    }
     elements.play.disabled = playUnavailable;
     if (!arrangementAvailable) {
       if (activeElement === elements.mobileMode) {
@@ -199,7 +203,6 @@ export function createTransportControls({
       : transport.mode === "arrangement" && !arrangementPlayable
         ? "Add a non-empty loop to the song before playing Song mode."
         : `${playLabel} (Space ${spaceAction} from the workspace)`;
-    elements.stop.disabled = transport.status === "stopped";
     elements.start.disabled = transport.status === "stopped" && scheduler.getPlayheadStep() === 0;
     elements.loop.hidden = !arrangementAvailable;
     elements.loop.disabled = !arrangementAvailable || !arrangementPlayable;
