@@ -34,6 +34,17 @@ Run the full production build and test gate with:
 npm run check
 ```
 
+### End-to-end tests
+
+Install the Chromium test browser once, then run the Playwright suite against a locally served production build:
+
+```powershell
+npx playwright install chromium
+npm run test:e2e
+```
+
+Screenshots, traces, and video are retained only for failures and are written under `test-results/e2e/`.
+
 ## Production build
 
 Install the development dependency and build the deployable site:
