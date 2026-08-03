@@ -19,3 +19,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-failure-artifacts
+          path: test-results/e2e/
+          if-no-files-found: ignore

@@ -5,12 +5,14 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "npm run build && node --check src/app.js && node --test",
-    "test": "node --test"
+    "test": "node --test",
+    "test:e2e": "npm run build && playwright test"
   },
   "engines": {
     "node": ">=22"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "esbuild": "^0.28.1"
   }
 }
