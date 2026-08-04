@@ -89,11 +89,14 @@
 .account-cloud-list { display: grid; max-height: min(260px, 34vh); gap: 5px; overflow-y: auto; }
 .account-cloud-list > p { margin: 0; padding: 12px; border: 1px dashed var(--line-strong); color: var(--muted); text-align: center; }
 .account-cloud-project { display: grid; grid-template-columns: minmax(0, 1fr) 36px; gap: 5px; }
+.account-cloud-project.unavailable { grid-template-columns: minmax(0, 1fr) auto; }
 .account-cloud-open { display: grid; min-height: 46px; justify-items: start; gap: 1px; padding: 6px 9px; background: var(--surface); text-align: left; text-transform: none; }
+.account-cloud-unavailable-summary { border: 1px solid var(--line-strong); }
 .account-cloud-open strong { overflow: hidden; max-width: 100%; color: var(--ink); font-family: "VT323", monospace; font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
 .account-cloud-open span { color: var(--muted); font-family: "VT323", monospace; font-size: 0.78rem; }
 .account-cloud-delete { min-width: 36px; width: 36px; padding: 0; color: var(--muted); background: var(--surface); font-family: sans-serif; font-size: 1rem; }
 .account-cloud-delete:hover, .account-cloud-delete:focus-visible { border-color: var(--danger); color: var(--danger); }
+.account-cloud-recover { align-self: stretch; padding-inline: 10px; white-space: nowrap; }
 .account-signed-in-actions { display: flex; justify-content: space-between; gap: 8px; }
 .account-signed-in-actions button { min-width: 110px; }
 .account-signed-in-actions .neutral-action { color: var(--muted); background: var(--surface); }

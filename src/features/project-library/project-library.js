@@ -1,5 +1,8 @@
 import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js";
-import { downloadProjectFile } from "../../persistence/project-download.js";
+import {
+  downloadProjectFile,
+  downloadRawProjectFile,
+} from "../../persistence/project-download.js";
 import { queryRequired } from "../../shared/query-required.js";
 import { announceStatus, setTextIfChanged } from "../../shared/status-announcer.js";
 
@@ -12,14 +15,67 @@ const STATUS_LABELS = Object.freeze({
 });
 
 function formatUpdatedAt(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(date);
+}
+
+export function getProjectLibraryRowModel(summary, activeId = null) {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+    throw new TypeError("A project summary must be an object.");
+  }
+  const id = typeof summary.id === "string" && summary.id.trim() ? summary.id : null;
+  const recoveryKey = summary.storageKey !== undefined && summary.storageKey !== null
+    ? summary.storageKey
+    : id;
+  const unavailable = summary.availability === "unavailable";
+  const title = typeof summary.title === "string" && summary.title.trim()
+    ? summary.title
+    : "Unavailable project";
+  const updatedAt = formatUpdatedAt(summary.updatedAt);
+  const revision = Number.isInteger(summary.revision) && summary.revision >= 0
+    ? `revision ${summary.revision}`
+    : "revision unavailable";
+  const reason = typeof summary.reason === "string" && summary.reason.trim()
+    ? summary.reason.trim()
+    : "This record cannot be opened safely.";
+  return Object.freeze({
+    availability: unavailable ? "unavailable" : "ready",
+    canDelete: !unavailable && id !== null,
+    canOpen: !unavailable && id !== null,
+    canRecover: unavailable && recoveryKey !== null,
+    id,
+    isActive: !unavailable && id !== null && id === activeId,
+    meta: unavailable
+      ? `Unavailable \u00b7 ${updatedAt} \u00b7 ${reason.slice(0, 160)}`
+      : `${updatedAt} \u00b7 ${revision}`,
+    reason,
+    recoveryKey,
+    title,
+  });
+}
+
+export async function downloadUnavailableProjectRecovery(summary, {
+  downloadRecoveryProject = downloadRawProjectFile,
+  persistence,
+} = {}) {
+  const model = getProjectLibraryRowModel(summary);
+  if (model.availability !== "unavailable" || !model.canRecover) {
+    throw new RangeError("Only an unavailable stored record can be downloaded as a raw recovery copy.");
+  }
+  if (typeof persistence?.getRawRecoveryText !== "function") {
+    throw new Error("A raw recovery copy is not available for this record.");
+  }
+  const text = await persistence.getRawRecoveryText(model.recoveryKey);
+  return downloadRecoveryProject(text, model.title);
 }
 
 export function createProjectLibraryFeature({
   downloadProject = downloadProjectFile,
+  downloadRecoveryProject = downloadRawProjectFile,
   onBeforeProjectChange = () => {},
   onProjectDeleted = async () => {},
   persistence,
@@ -54,6 +110,7 @@ export function createProjectLibraryFeature({
   let busy = false;
   let previousPersistenceStatus = persistence.getState().status;
   let pendingDelete = null;
+  let projectSummaries = new Map();
   let renderGeneration = 0;
 
   function showError(message = "") {
@@ -70,7 +127,7 @@ export function createProjectLibraryFeature({
     elements.librarySaveStatus.value = STATUS_LABELS[state.status] ?? state.status;
     elements.librarySaveStatus.dataset.state = state.status;
     elements.open.dataset.saveState = state.status;
-    elements.open.title = `${project.metadata.title} · ${STATUS_LABELS[state.status] ?? state.status}`;
+    elements.open.title = `${project.metadata.title} \u00b7 ${STATUS_LABELS[state.status] ?? state.status}`;
     if (state.status !== previousPersistenceStatus) {
       previousPersistenceStatus = state.status;
       if (state.status === "saved") announceStatus(root, "Saved");
@@ -90,30 +147,59 @@ export function createProjectLibraryFeature({
     }
   }
 
-  function createProjectRow(summary, activeId) {
+  function createProjectRow(summary, activeId, summaryKey) {
+    const model = getProjectLibraryRowModel(summary, activeId);
     const row = root.createElement("div");
     row.className = "project-list-row";
-    row.classList.toggle("active", summary.id === activeId);
-    const open = root.createElement("button");
-    open.type = "button";
-    open.className = "project-list-open";
-    open.dataset.action = "open-project";
-    open.dataset.projectId = summary.id;
-    open.setAttribute("aria-current", summary.id === activeId ? "true" : "false");
+    row.classList.toggle("active", model.isActive);
+    row.classList.toggle("unavailable", model.availability === "unavailable");
+    row.dataset.availability = model.availability;
+
     const title = root.createElement("strong");
-    title.textContent = summary.title;
+    title.textContent = model.title;
     const meta = root.createElement("span");
-    meta.textContent = `${formatUpdatedAt(summary.updatedAt)} · revision ${summary.revision}`;
-    open.append(title, meta);
-    const remove = root.createElement("button");
-    remove.type = "button";
-    remove.className = "project-list-delete";
-    remove.dataset.action = "delete-project";
-    remove.dataset.projectId = summary.id;
-    remove.setAttribute("aria-label", `Delete ${summary.title}`);
-    remove.title = `Delete ${summary.title}`;
-    remove.textContent = "×";
-    row.append(open, remove);
+    meta.textContent = model.meta;
+
+    if (model.canOpen) {
+      const open = root.createElement("button");
+      open.type = "button";
+      open.className = "project-list-open";
+      open.dataset.action = "open-project";
+      open.dataset.projectId = model.id;
+      open.dataset.summaryKey = summaryKey;
+      open.setAttribute("aria-current", model.isActive ? "true" : "false");
+      open.append(title, meta);
+
+      const remove = root.createElement("button");
+      remove.type = "button";
+      remove.className = "project-list-delete";
+      remove.dataset.action = "delete-project";
+      remove.dataset.projectId = model.id;
+      remove.dataset.summaryKey = summaryKey;
+      remove.setAttribute("aria-label", `Delete ${model.title}`);
+      remove.title = `Delete ${model.title}`;
+      remove.textContent = "\u00d7";
+      row.append(open, remove);
+      return row;
+    }
+
+    const details = root.createElement("div");
+    details.className = "project-list-open project-list-unavailable-summary";
+    details.setAttribute("aria-label", `${model.title}. ${model.meta}`);
+    details.append(title, meta);
+
+    const recover = root.createElement("button");
+    recover.type = "button";
+    recover.className = "project-list-recover";
+    recover.disabled = !model.canRecover;
+    if (model.canRecover) {
+      recover.dataset.action = "recover-project";
+      recover.dataset.summaryKey = summaryKey;
+    }
+    recover.setAttribute("aria-label", `Download raw recovery copy for ${model.title}`);
+    recover.title = `Download raw recovery copy for ${model.title}`;
+    recover.textContent = "\u2193";
+    row.append(details, recover);
     return row;
   }
 
@@ -124,7 +210,11 @@ export function createProjectLibraryFeature({
       const projects = await persistence.listProjects();
       if (generation !== renderGeneration) return;
       const activeId = persistence.getActiveDocument().id;
-      elements.list.replaceChildren(...projects.map((summary) => createProjectRow(summary, activeId)));
+      const entries = projects.map((summary, index) => [`${generation}:${index}`, summary]);
+      projectSummaries = new Map(entries);
+      elements.list.replaceChildren(...entries.map(([summaryKey, summary]) => (
+        createProjectRow(summary, activeId, summaryKey)
+      )));
       elements.count.value = `${projects.length} project${projects.length === 1 ? "" : "s"}`;
       showError("");
     } catch (error) {
@@ -196,7 +286,7 @@ export function createProjectLibraryFeature({
 
   function requestDelete(summary) {
     pendingDelete = summary;
-    elements.deleteMessage.textContent = `Delete “${summary.title}” from this browser? This cannot be undone.`;
+    elements.deleteMessage.textContent = `Delete "${summary.title}" from this browser? This cannot be undone.`;
     if (elements.dialog.open) elements.dialog.close();
     elements.deleteDialog.showModal();
     elements.cancelDelete.focus();
@@ -252,8 +342,23 @@ export function createProjectLibraryFeature({
   elements.list.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button || busy) return;
-    const projectId = button.dataset.projectId;
+    const summary = projectSummaries.get(button.dataset.summaryKey);
+    const projectId = summary?.id ?? button.dataset.projectId;
+
+    if (button.dataset.action === "recover-project") {
+      if (summary?.availability !== "unavailable") return;
+      void run(() => downloadUnavailableProjectRecovery(summary, {
+        downloadRecoveryProject,
+        persistence,
+      }));
+      return;
+    }
+
     if (button.dataset.action === "open-project") {
+      if (!summary || summary.availability === "unavailable") {
+        showError("This project is unavailable for editing. Download its raw recovery copy instead.");
+        return;
+      }
       if (projectId === persistence.getActiveDocument().id) {
         elements.dialog.close();
         return;
@@ -264,10 +369,15 @@ export function createProjectLibraryFeature({
       }, { closeAfter: true });
       return;
     }
+
     if (button.dataset.action === "delete-project") {
+      if (!summary || summary.availability === "unavailable") {
+        showError("Unavailable records are preserved for recovery and cannot be deleted here.");
+        return;
+      }
       void persistence.listProjects().then((projects) => {
-        const summary = projects.find(({ id }) => id === projectId);
-        if (summary) requestDelete(summary);
+        const current = projects.find(({ id }) => id === projectId);
+        if (current && current.availability !== "unavailable") requestDelete(current);
       }).catch((error) => showError(error.message));
     }
   }, { signal: lifecycle.signal });

@@ -1,5 +1,6 @@
 import {
   normalizeProjectDocument,
+  normalizeProjectDocumentToV7,
   summarizeProjectDocument,
 } from "../persistence/project-document.js";
 
@@ -16,6 +17,18 @@ function requireText(value, field) {
     throw new TypeError(`Cloud project ${field} must be text.`);
   }
   return value;
+}
+
+function safeText(value, fallback, maximumLength = 160) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, maximumLength)
+    : fallback;
+}
+
+function safeTimestamp(candidate, fallback = null) {
+  return typeof candidate === "string" && !Number.isNaN(Date.parse(candidate))
+    ? candidate
+    : fallback;
 }
 
 export function createCloudProjectRecord(ownerId, document, cloudRevision) {
@@ -58,13 +71,71 @@ export function normalizeCloudProjectRecord(candidate, { ownerId } = {}) {
   return createCloudProjectRecord(normalizedOwnerId, document, candidate.cloudRevision);
 }
 
+export function normalizeCloudProjectRecordToV7(candidate, options) {
+  const source = normalizeCloudProjectRecord(candidate, options);
+  return createCloudProjectRecord(
+    source.ownerId,
+    normalizeProjectDocumentToV7(source.document),
+    source.cloudRevision,
+  );
+}
+
 export function summarizeCloudProjectRecord(candidate, options) {
   const record = normalizeCloudProjectRecord(candidate, options);
   return Object.freeze({
     ...summarizeProjectDocument(record.document),
     cloudRevision: record.cloudRevision,
     ownerId: record.ownerId,
+    recoveryKey: options?.recoveryKey ?? record.projectId,
   });
+}
+
+/**
+ * Summarize a Firestore record without allowing malformed nested Project data
+ * to disappear from account listings. The Firestore document key is kept
+ * separate from payload IDs so recovery never trusts or activates the record.
+ */
+export function summarizeCloudProjectRecordForRecovery(candidate, {
+  ownerId,
+  recoveryKey,
+} = {}) {
+  try {
+    return summarizeCloudProjectRecord(candidate, { ownerId, recoveryKey });
+  } catch (error) {
+    const document = candidate?.document;
+    const nestedTitle = document?.project?.metadata?.title;
+    const title = safeText(candidate?.title, safeText(nestedTitle, "Unavailable cloud project", 100), 100);
+    const updatedAt = safeTimestamp(candidate?.updatedAt, safeTimestamp(document?.updatedAt));
+    return Object.freeze({
+      availability: "unavailable",
+      cloudRevision: Number.isInteger(candidate?.cloudRevision) && candidate.cloudRevision >= 1
+        ? candidate.cloudRevision
+        : null,
+      createdAt: safeTimestamp(candidate?.createdAt, safeTimestamp(document?.createdAt)),
+      id: null,
+      ownerId: typeof candidate?.ownerId === "string" ? candidate.ownerId : null,
+      reason: error instanceof Error ? error.message : "This cloud project cannot be opened safely.",
+      recoveryKey: typeof recoveryKey === "string" && recoveryKey ? recoveryKey : null,
+      revision: Number.isInteger(document?.revision) && document.revision >= 0
+        ? document.revision
+        : null,
+      schemaVersion: Number.isInteger(document?.project?.schemaVersion)
+        ? document.project.schemaVersion
+        : null,
+      sourceSchemaVersion: Number.isInteger(document?.project?.schemaVersion)
+        ? document.project.schemaVersion
+        : null,
+      title,
+      updatedAt,
+    });
+  }
+}
+
+export function serializeRawCloudProjectRecord(candidate) {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    throw new TypeError("Cloud recovery data must be a JSON object.");
+  }
+  return `${JSON.stringify(candidate, null, 2)}\n`;
 }
 
 export function createCloudConflictError(remoteRecord) {

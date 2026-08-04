@@ -10,6 +10,7 @@ const outputDirectory = path.join(dist, "assets");
 const entries = Object.freeze({
   app: "src/app.js",
   player: "src/player.js",
+  "rollback-app": "src/rollback-app.js",
   "player-styles": "player.css",
   styles: "styles.css",
   workbench: "src/workbench.js",
@@ -114,6 +115,12 @@ await Promise.all([
     appAsset: emittedAsset(result.metafile, entries.app),
     cssAsset: emittedAsset(result.metafile, entries.styles),
     filename: "index.html",
+    sourceFile: "index.html",
+  }),
+  writeHtml({
+    appAsset: emittedAsset(result.metafile, entries["rollback-app"]),
+    cssAsset: emittedAsset(result.metafile, entries.styles),
+    filename: "studio-v1-rollback.html",
     sourceFile: "index.html",
   }),
   writeHtml({

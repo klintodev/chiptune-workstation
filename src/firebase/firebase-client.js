@@ -2,7 +2,7 @@ import {
   createCloudConflictError,
   createCloudProjectRecord,
   normalizeCloudProjectRecord,
-  summarizeCloudProjectRecord,
+  summarizeCloudProjectRecordForRecovery,
 } from "./cloud-project.js";
 import { FIREBASE_CONFIG, isFirebaseConfigured } from "./firebase-config.js";
 import {
@@ -275,20 +275,33 @@ export async function createFirebaseClient({
         ? normalizeCloudProjectRecord(snapshot.data(), { ownerId: uid })
         : null;
     },
+    async getRawProject(uid, recoveryKey) {
+      await prepareFirestore(uid);
+      if (typeof recoveryKey !== "string" || recoveryKey === "") {
+        throw new TypeError("Cloud recovery key must be text.");
+      }
+      const snapshot = await firestore.getDoc(projectDocument(uid, recoveryKey));
+      if (!snapshot.exists()) return null;
+      const raw = snapshot.data();
+      return typeof structuredClone === "function"
+        ? structuredClone(raw)
+        : JSON.parse(JSON.stringify(raw));
+    },
     async listProjects(uid) {
       await prepareFirestore(uid);
-      const request = firestore.query(
-        projectsCollection(uid),
-        firestore.orderBy("updatedAt", "desc"),
-      );
-      const snapshot = await firestore.getDocs(request);
-      return snapshot.docs.flatMap((entry) => {
-        try {
-          return [summarizeCloudProjectRecord(entry.data(), { ownerId: uid })];
-        } catch {
-          return [];
-        }
-      });
+      // Firestore orderBy excludes documents that lack the ordered field,
+      // precisely the malformed records this recovery list must retain.
+      const snapshot = await firestore.getDocs(projectsCollection(uid));
+      return snapshot.docs
+        .map((entry) => summarizeCloudProjectRecordForRecovery(entry.data(), {
+          ownerId: uid,
+          recoveryKey: entry.id,
+        }))
+        .sort((left, right) => {
+          const leftTime = Date.parse(left.updatedAt ?? "") || 0;
+          const rightTime = Date.parse(right.updatedAt ?? "") || 0;
+          return rightTime - leftTime || left.title.localeCompare(right.title);
+        });
     },
     onAuthStateChanged(listener, onError) {
       return sdk.auth.onAuthStateChanged(auth, (user) => {

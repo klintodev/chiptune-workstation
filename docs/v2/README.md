@@ -31,6 +31,7 @@ The direction borrows FL Studio's object separation and workflow, not its densit
 | [PRD 30](./30-mixer-routing-and-effects.md) | Mixer, bounded routing, Klinto Filter and Klinto Delay | PRDs 27â€“29 |
 | [PRD 32](./32-v2-compatibility-and-release.md) | Schema activation, migration, hosted compatibility and release gates | PRDs 26â€“31 |
 | [V2 schema contract](./v2-project-schema-contract.md) | Normative Project/document shape, defaults, bounds and V1 field map | Finalized PRDs 28â€“30; required before PRD 32 activation |
+| [Release and rollback runbook](./release-and-rollback-runbook.md) | Exact PRD 32 artifacts, cutover order, recovery evidence and emergency rollback | PRD 32 compatibility implementation |
 
 The numbering follows the existing product-document sequence. Delivery order is intentionally not numerical: Playlist is part of the core compose-to-song journey and does not wait for effects.
 

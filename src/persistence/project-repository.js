@@ -1,38 +1,47 @@
 import {
   normalizeProjectDocument,
-  summarizeProjectDocument,
+  summarizeProjectDocumentForSchema,
 } from "./project-document.js";
+import { PROJECT_SCHEMA_VERSION } from "../state/project-state.js";
 
 const DATABASE_NAME = "chiptune-workstation";
 const DATABASE_VERSION = 1;
 const PROJECT_STORE = "projects";
 const LAST_PROJECT_KEY = "chiptune-workstation:last-project-id";
 
-function cloneDocument(document) {
-  return normalizeProjectDocument(JSON.parse(JSON.stringify(document)));
+function rawClone(value) {
+  if (typeof structuredClone === "function") return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeClone(document) {
+  return normalizeProjectDocument(rawClone(document));
 }
 
 function sortSummaries(summaries) {
-  return summaries.sort((left, right) => (
-    Date.parse(right.updatedAt) - Date.parse(left.updatedAt) || left.title.localeCompare(right.title)
-  ));
+  return summaries.sort((left, right) => {
+    const leftTime = Date.parse(left.updatedAt ?? "") || 0;
+    const rightTime = Date.parse(right.updatedAt ?? "") || 0;
+    return rightTime - leftTime || left.title.localeCompare(right.title);
+  });
 }
 
-function summarizeValidDocuments(documents) {
-  return sortSummaries(documents.flatMap((document) => {
-    try {
-      return [summarizeProjectDocument(document)];
-    } catch {
-      return [];
-    }
-  }));
+function summarizeRawDocuments(documents, storageKeys = documents.map((document) => document?.id)) {
+  return sortSummaries(documents.map((document, index) => Object.freeze({
+    ...summarizeProjectDocumentForSchema(document, PROJECT_SCHEMA_VERSION),
+    storageKey: rawClone(storageKeys[index]),
+  })));
 }
 
 export function createMemoryProjectRepository(initialDocuments = []) {
-  const documents = new Map(initialDocuments.map((document) => {
-    const normalized = cloneDocument(document);
-    return [normalized.id, normalized];
-  }));
+  const documents = new Map();
+  for (const document of initialDocuments) {
+    const raw = rawClone(document);
+    if (!raw || !Object.hasOwn(raw, "id") || raw.id === undefined || raw.id === null) {
+      throw new TypeError("A stored project record must have an identifier.");
+    }
+    documents.set(raw.id, raw);
+  }
 
   return Object.freeze({
     close() {},
@@ -42,15 +51,19 @@ export function createMemoryProjectRepository(initialDocuments = []) {
     dispose() {},
     async get(id) {
       const document = documents.get(id);
-      return document ? cloneDocument(document) : null;
+      return document ? normalizeClone(document) : null;
+    },
+    async getRaw(id) {
+      const document = documents.get(id);
+      return document ? rawClone(document) : null;
     },
     async list() {
-      return summarizeValidDocuments([...documents.values()]);
+      return summarizeRawDocuments([...documents.values()], [...documents.keys()]);
     },
     async save(document) {
-      const normalized = cloneDocument(document);
-      documents.set(normalized.id, normalized);
-      return cloneDocument(normalized);
+      const normalized = normalizeClone(document);
+      documents.set(normalized.id, rawClone(normalized));
+      return normalizeClone(normalized);
     },
   });
 }
@@ -87,9 +100,9 @@ export function createIndexedDbProjectRepository({
     databasePromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(databaseName, DATABASE_VERSION);
       request.addEventListener("upgradeneeded", () => {
-        const database = request.result;
-        if (!database.objectStoreNames.contains(PROJECT_STORE)) {
-          const store = database.createObjectStore(PROJECT_STORE, { keyPath: "id" });
+        const opened = request.result;
+        if (!opened.objectStoreNames.contains(PROJECT_STORE)) {
+          const store = opened.createObjectStore(PROJECT_STORE, { keyPath: "id" });
           store.createIndex("updatedAt", "updatedAt");
         }
       });
@@ -129,43 +142,51 @@ export function createIndexedDbProjectRepository({
     databasePromise = null;
   }
 
+  async function read(id, { raw = false } = {}) {
+    const opened = await getDatabase();
+    const transaction = opened.transaction(PROJECT_STORE, "readonly");
+    const complete = transactionComplete(transaction);
+    const result = await requestResult(transaction.objectStore(PROJECT_STORE).get(id));
+    await complete;
+    if (!result) return null;
+    return raw ? rawClone(result) : normalizeClone(result);
+  }
+
   return Object.freeze({
     close,
     async delete(id) {
-      const database = await getDatabase();
-      const transaction = database.transaction(PROJECT_STORE, "readwrite");
+      const opened = await getDatabase();
+      const transaction = opened.transaction(PROJECT_STORE, "readwrite");
       transaction.objectStore(PROJECT_STORE).delete(id);
       await transactionComplete(transaction);
       return true;
-    },
-    async get(id) {
-      const database = await getDatabase();
-      const transaction = database.transaction(PROJECT_STORE, "readonly");
-      const complete = transactionComplete(transaction);
-      const result = await requestResult(transaction.objectStore(PROJECT_STORE).get(id));
-      await complete;
-      return result ? cloneDocument(result) : null;
-    },
-    async list() {
-      const database = await getDatabase();
-      const transaction = database.transaction(PROJECT_STORE, "readonly");
-      const complete = transactionComplete(transaction);
-      const documents = await requestResult(transaction.objectStore(PROJECT_STORE).getAll());
-      await complete;
-      return summarizeValidDocuments(documents);
-    },
-    async save(document) {
-      const normalized = cloneDocument(document);
-      const database = await getDatabase();
-      const transaction = database.transaction(PROJECT_STORE, "readwrite");
-      transaction.objectStore(PROJECT_STORE).put(normalized);
-      await transactionComplete(transaction);
-      return cloneDocument(normalized);
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       close();
+    },
+    get: (id) => read(id),
+    getRaw: (id) => read(id, { raw: true }),
+    async list() {
+      const opened = await getDatabase();
+      const transaction = opened.transaction(PROJECT_STORE, "readonly");
+      const complete = transactionComplete(transaction);
+      const store = transaction.objectStore(PROJECT_STORE);
+      const [documents, storageKeys] = await Promise.all([
+        requestResult(store.getAll()),
+        requestResult(store.getAllKeys()),
+      ]);
+      await complete;
+      return summarizeRawDocuments(documents, storageKeys);
+    },
+    async save(document) {
+      const normalized = normalizeClone(document);
+      const opened = await getDatabase();
+      const transaction = opened.transaction(PROJECT_STORE, "readwrite");
+      transaction.objectStore(PROJECT_STORE).put(normalized);
+      await transactionComplete(transaction);
+      return normalizeClone(normalized);
     },
   });
 }

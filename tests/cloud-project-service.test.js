@@ -9,6 +9,7 @@ import { createMemoryCloudLinkRepository } from "../src/firebase/cloud-link-repo
 import { createCloudProjectService } from "../src/firebase/cloud-project-service.js";
 import {
   createProjectDocument,
+  normalizeProjectDocumentToV7,
   reviseProjectDocument,
   serializeProjectDocument,
 } from "../src/persistence/project-document.js";
@@ -522,5 +523,76 @@ test("conflict-copy names remain valid at the project title limit", async () => 
   const title = (await localRepository.get("bounded-conflict")).project.metadata.title;
   assert.ok(title.length <= 100);
   assert.match(title, / \(cloud conflict\)$/);
+  service.dispose();
+});
+
+test("authenticated cloud recovery downloads the untouched raw Firestore object", async () => {
+  const raw = {
+    title: "Future cloud tune",
+    document: {
+      format: "chiptune-workstation",
+      documentVersion: 1,
+      id: "future",
+      project: { schemaVersion: 99, unknown: { exact: [3, 2, 1] } },
+    },
+  };
+  const calls = [];
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getRawProject(uid, recoveryKey) {
+        calls.push({ recoveryKey, uid });
+        return structuredClone(raw);
+      },
+    }),
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository: createMemoryProjectRepository(),
+    preferences: createPreferences(),
+  });
+
+  const text = await service.getRawRecoveryText("firestore-document-key");
+
+  assert.equal(text, `${JSON.stringify(raw, null, 2)}\n`);
+  assert.deepEqual(calls, [{
+    recoveryKey: "firestore-document-key",
+    uid: "user-one",
+  }]);
+  service.dispose();
+});
+
+test("opening a V1 cloud Project into V2 queues the one-time upgrade disclosure", async () => {
+  const source = createProjectDocument(createDefaultProject(), {
+    id: "migrated-cloud",
+    now: FIRST_TIME,
+  });
+  const activeV7 = normalizeProjectDocumentToV7(source);
+  const upgrades = [];
+  let reloadCount = 0;
+  const localRepository = createMemoryProjectRepository([source]);
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        return createCloudProjectRecord("user-one", source, 4);
+      },
+    }),
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository,
+    onProjectUpgrade: (detail) => upgrades.push(detail),
+    persistence: {
+      getActiveDocument: () => activeV7,
+      getExportText: () => serializeProjectDocument(activeV7),
+      async saveNow() {},
+    },
+    preferences: createPreferences(source.id),
+    reload: () => { reloadCount += 1; },
+  });
+
+  const opened = await service.openProject(source.id);
+
+  assert.equal(opened.project.schemaVersion, 7);
+  assert.deepEqual(upgrades, [{
+    fromSchemaVersion: 6,
+    projectId: source.id,
+  }]);
+  assert.equal(reloadCount, 1);
   service.dispose();
 });

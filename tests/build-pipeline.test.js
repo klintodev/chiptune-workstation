@@ -54,6 +54,22 @@ test("the Studio entry point does not mount or style the visualiser", async () =
   assert.doesNotMatch(styles, /features\/visualiser|visualiser\.css/);
 });
 
+test("production emits a recovery-aware V1 Studio without downgrading the public player", async () => {
+  const [buildScript, rollbackEntry, rollbackHtml, playerHtml] = await Promise.all([
+    readFile(new URL("scripts/build.mjs", root), "utf8"),
+    readFile(new URL("src/rollback-app.js", root), "utf8"),
+    readFile(new URL("dist/studio-v1-rollback.html", root), "utf8"),
+    readFile(new URL("dist/player.html", root), "utf8"),
+  ]);
+
+  assert.match(buildScript, /"rollback-app": "src\/rollback-app\.js"/);
+  assert.match(buildScript, /filename: "studio-v1-rollback\.html"/);
+  assert.match(rollbackEntry, /__KLINTO_STUDIO_RELEASE_VARIANT__ = "v1-recovery"/);
+  assert.match(rollbackHtml, /\.\/assets\/rollback-app-[A-Z0-9]+\.js/i);
+  assert.match(playerHtml, /\.\/assets\/player-[A-Z0-9]+\.js/i);
+  assert.doesNotMatch(playerHtml, /rollback-app|v1-recovery/);
+});
+
 test("source modules use canonical identities and production assets are fingerprinted once", async () => {
   const sourceFiles = [
     new URL("src/", root),
