@@ -189,3 +189,68 @@ test("Device range cancellation closes only its owned history group and live sta
   await expect(bypass).toHaveText("Bypass Effect");
   await expectFocused(bypass);
 });
+
+test("Mixer Open and Bypass keep separate mobile hit targets", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel("Pulse 1 Effects").getByRole("button", { name: "Add Effect in slot 1" }).click();
+
+  const open = page.locator('[data-channel-id="track-1"][data-effect-action="open"]');
+  const bypass = page.locator('[data-channel-id="track-1"][data-effect-action="bypass"]');
+  await expect(open).toBeVisible();
+  await expect(bypass).toBeVisible();
+
+  const [openBox, bypassBox] = await Promise.all([open.boundingBox(), bypass.boundingBox()]);
+  expect(openBox).not.toBeNull();
+  expect(bypassBox).not.toBeNull();
+  const horizontalOverlap = Math.min(openBox.x + openBox.width, bypassBox.x + bypassBox.width)
+    - Math.max(openBox.x, bypassBox.x);
+  const verticalOverlap = Math.min(openBox.y + openBox.height, bypassBox.y + bypassBox.height)
+    - Math.max(openBox.y, bypassBox.y);
+  expect(horizontalOverlap <= 0 || verticalOverlap <= 0).toBe(true);
+
+  await open.click();
+  await expect(page.locator("#v2-device-host")).toHaveAttribute("data-surface-kind", "effect");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expectFocused(open);
+
+  await bypass.click();
+  await expect(bypass).toHaveText("Enable");
+  await expectFocused(bypass);
+});
+
+test("theme changes the rendered workspace palette and the responsive header stays contained", async ({ page }) => {
+  const workspace = page.locator(".v2-workspace");
+  const shell = page.locator(".v2-workspace-shell");
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 800, height: 700 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expect.poll(() => shell.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect(page.getByLabel("Open Studio menu")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Piano Roll", exact: true })).toBeVisible();
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const darkPalette = await workspace.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  });
+
+  await page.getByLabel("Open Studio menu").click();
+  const themeToggle = page.locator("#theme-toggle");
+  await expect(themeToggle).toHaveText("Theme: Dark");
+  await themeToggle.click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect.poll(() => workspace.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  })).not.toEqual(darkPalette);
+
+  const lightPalette = await workspace.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  expect(lightPalette.background).not.toBe(darkPalette.background);
+  expect(lightPalette.color).not.toBe(darkPalette.color);
+});

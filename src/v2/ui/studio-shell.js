@@ -71,12 +71,12 @@ export function createStudioShell({
     id: "loop-enabled",
     type: "checkbox",
   });
-  const loopMode = createElement("select", { "aria-label": "Song loop range mode", id: "loop-mode" }, [
+  const loopMode = createElement("select", { "aria-label": "Song loop range", id: "loop-mode" }, [
     createElement("option", { textContent: "Custom", value: "custom" }),
     createElement("option", { textContent: "Whole Playlist", value: "arrangement" }),
   ]);
   const loopStart = createElement("input", {
-    "aria-label": "Loop start tick",
+    "aria-label": "Song loop start tick",
     id: "loop-start",
     inputMode: "numeric",
     max: MAX_SONG_TICKS - 1,
@@ -85,7 +85,7 @@ export function createStudioShell({
     type: "number",
   });
   const loopEnd = createElement("input", {
-    "aria-label": "Loop end tick",
+    "aria-label": "Song loop end tick",
     id: "loop-end",
     inputMode: "numeric",
     max: MAX_SONG_TICKS,
@@ -93,14 +93,23 @@ export function createStudioShell({
     step: 1,
     type: "number",
   });
-  const loopSummary = createElement("summary", { textContent: "Loop" });
+  const loopSummary = createElement("summary", {
+    dataset: { mobileLabel: "Repeat" },
+    id: "loop-summary",
+    textContent: "Pattern repeats",
+  });
+  const loopHelp = createElement("p", {
+    className: "v2-loop-help",
+    textContent: "Pattern playback always repeats. These settings control Song playback only.",
+  });
   const loopControls = createElement("details", { className: "v2-loop-controls" }, [
     loopSummary,
     createElement("div", { className: "v2-loop-panel" }, [
-      createElement("label", { className: "v2-loop-enable" }, [loopEnabled, "Enabled"]),
-      createElement("label", {}, ["Range", loopMode]),
-      createElement("label", {}, ["Start", loopStart]),
-      createElement("label", {}, ["End", loopEnd]),
+      loopHelp,
+      createElement("label", { className: "v2-loop-enable" }, [loopEnabled, "Loop Song playback"]),
+      createElement("label", {}, ["Song range", loopMode]),
+      createElement("label", {}, ["Song start", loopStart]),
+      createElement("label", {}, ["Song end", loopEnd]),
     ]),
   ]);
   const transport = createElement("div", { className: "v2-global-transport", "aria-label": "Transport" }, [
@@ -331,7 +340,15 @@ export function createStudioShell({
     loopEnd.value = String(loop.endTick);
     loopEnd.min = String(Math.min(MAX_SONG_TICKS, loop.startTick + 1));
     loopEnd.disabled = loop.mode === "arrangement";
-    loopSummary.textContent = loop.enabled ? "Loop On" : "Loop";
+    loopSummary.textContent = frame.mode === "pattern"
+      ? "Pattern repeats"
+      : `Song loop: ${loop.enabled ? "On" : "Off"}`;
+    loopSummary.dataset.mobileLabel = frame.mode === "pattern"
+      ? "Repeat"
+      : `Loop ${loop.enabled ? "On" : "Off"}`;
+    loopSummary.title = frame.mode === "pattern"
+      ? `Pattern playback always repeats. Song loop is ${loop.enabled ? "on" : "off"}.`
+      : `Song loop is ${loop.enabled ? "on" : "off"}.`;
     const history = projectState.getHistoryState?.() ?? {};
     globalUndo.disabled = history.canUndo !== true;
     globalRedo.disabled = history.canRedo !== true;
@@ -386,7 +403,9 @@ export function createStudioShell({
       render();
       return;
     }
-    updateLoop({ enabled: loopEnabled.checked });
+    if (updateLoop({ enabled: loopEnabled.checked }) !== false) {
+      announcer.textContent = `Song loop ${loopEnabled.checked ? "on" : "off"}. Pattern playback always repeats.`;
+    }
   }, { signal: lifecycle.signal });
   loopMode.addEventListener("change", () => {
     const enablingEmptyArrangement = loopMode.value === "arrangement"

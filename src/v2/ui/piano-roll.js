@@ -16,6 +16,12 @@ function isMod(event) {
   return event.ctrlKey || event.metaKey;
 }
 
+function isPlainSpace(event) {
+  return !event.altKey
+    && !isMod(event)
+    && (event.code === "Space" || event.key === " " || event.key === "Spacebar");
+}
+
 function noteLabel(note) {
   return `${formatMidiPitch(note.pitch)}, ${formatTickPosition(note.startTick)}, ${formatDurationTicks(note.durationTicks)}, velocity ${formatPercent(note.velocity)}`;
 }
@@ -106,6 +112,7 @@ export function createPianoRollSurface({
   const mobileEditorQuery = globalThis.matchMedia?.("(max-width: 700px), (max-height: 640px)");
   let tool = mobileEditorQuery?.matches ? "pan" : "draw";
   const noteElements = new Map();
+  const noteLabelElements = new Map();
 
   const title = createElement("h2", { className: "v2-surface-title", tabIndex: -1 });
   const header = createElement("div", { className: "v2-surface-header v2-piano-header" });
@@ -122,7 +129,7 @@ export function createPianoRollSurface({
   const status = createElement("p", {
     className: "v2-editor-help",
     id: "v2-piano-help",
-    textContent: "Arrow keys move the cursor. Enter creates or selects a note. Control or Command with arrows edits the selected note.",
+    textContent: "Arrow keys move the cursor. Enter creates or selects a note. Control or Command with arrows edits the selected note. Space toggles playback. Letter and number note keys audition the selected Track.",
   });
   const node = createElement("section", {
     className: "v2-primary-surface v2-piano-roll",
@@ -381,9 +388,9 @@ export function createPianoRollSurface({
     const pattern = activePattern();
     const selected = selectedNoteIds.size > 0;
     try {
-      if (event.key === " " && !isMod(event)) {
+      if (isPlainSpace(event)) {
         event.preventDefault();
-        onTransportToggle();
+        if (!event.repeat) onTransportToggle();
       } else if (event.key === "Enter" && !selected) {
         event.preventDefault();
         const existing = pattern.notes.find((note) => note.pitch === cursorPitch && note.startTick === cursorTick);
@@ -519,6 +526,39 @@ export function createPianoRollSurface({
     }
   }
 
+  function paintNoteMovePreview(notes, deltaTick, deltaPitch) {
+    for (const note of notes) {
+      const element = noteElements.get(note.id);
+      if (!element) continue;
+      const preview = {
+        ...note,
+        pitch: note.pitch + deltaPitch,
+        startTick: note.startTick + deltaTick,
+      };
+      element.style.translate = `${deltaTick * pixelsPerTick}px ${-deltaPitch * ROW_HEIGHT}px`;
+      element.setAttribute(
+        "aria-label",
+        `${noteLabel(preview)}${selectedNoteIds.has(note.id) ? ", selected" : ""}`,
+      );
+      const label = noteLabelElements.get(note.id);
+      if (label) label.textContent = formatMidiPitch(preview.pitch);
+    }
+  }
+
+  function resetNoteMovePreview(notes) {
+    for (const note of notes) {
+      const element = noteElements.get(note.id);
+      if (!element) continue;
+      element.style.translate = "";
+      element.setAttribute(
+        "aria-label",
+        `${noteLabel(note)}${selectedNoteIds.has(note.id) ? ", selected" : ""}`,
+      );
+      const label = noteLabelElements.get(note.id);
+      if (label) label.textContent = formatMidiPitch(note.pitch);
+    }
+  }
+
   function startNoteMove(event, note) {
     const pattern = activePattern();
     const dragSelection = selectionForDrag(note.id, event.shiftKey);
@@ -528,7 +568,7 @@ export function createPianoRollSurface({
     const originY = event.clientY;
     let deltaTick = 0;
     let deltaPitch = 0;
-    const reset = () => resetNotePreview(dragSelection, "translate");
+    const reset = () => resetNoteMovePreview(notes);
     beginPointerGesture(event, {
       move(moveEvent) {
         const requestedTick = Math.round(
@@ -541,12 +581,7 @@ export function createPianoRollSurface({
           requestedPitch,
           pattern.lengthTicks,
         ));
-        for (const id of dragSelection) {
-          const element = noteElements.get(id);
-          if (element) {
-            element.style.translate = `${deltaTick * pixelsPerTick}px ${-deltaPitch * ROW_HEIGHT}px`;
-          }
-        }
+        paintNoteMovePreview(notes, deltaTick, deltaPitch);
       },
       commit() {
         reset();
@@ -705,6 +740,7 @@ export function createPianoRollSurface({
     if (event.button !== 0 || event.isPrimary === false) return;
     event.preventDefault();
     event.stopPropagation();
+    canvas.focus({ preventScroll: true });
     const noteButton = event.target.closest?.(".v2-piano-note");
     const note = noteButton
       ? activePattern().notes.find(({ id }) => id === noteButton.dataset.noteId)
@@ -723,6 +759,30 @@ export function createPianoRollSurface({
     }
     if (tool === "draw") startDraw(event);
     else startMarquee(event);
+  }
+
+  function handleContextMenu(event) {
+    const noteButton = event.target.closest?.(".v2-piano-note");
+    if (!noteButton) return;
+    const pattern = activePattern();
+    const note = pattern.notes.find(({ id }) => id === noteButton.dataset.noteId);
+    if (!note) return;
+    event.preventDefault();
+    event.stopPropagation();
+    activePointerCancel?.();
+    canvas.focus({ preventScroll: true });
+    mutateProject(() => projectState.removeNotes(pattern.id, [note.id]));
+    selectedNoteIds.delete(note.id);
+    cursorTick = note.startTick;
+    cursorPitch = note.pitch;
+    updatePatternSession({
+      cursorPitch,
+      cursorTick,
+      selectedNoteIds: [...selectedNoteIds],
+    });
+    renderEditor();
+    renderHeader();
+    announce(`Deleted ${noteLabel(note)} from ${pattern.name}.`);
   }
 
   function renderInspector() {
@@ -778,10 +838,12 @@ export function createPianoRollSurface({
     repairSelection();
     const pattern = activePattern();
     canvas.style.setProperty("--v2-pixels-per-tick", String(pixelsPerTick));
+    canvas.style.setProperty("--v2-piano-label-width", `${LABEL_WIDTH}px`);
     canvas.style.width = `${Math.max(640, pattern.lengthTicks * pixelsPerTick + LABEL_WIDTH)}px`;
     canvas.style.height = `${(MAX_PITCH - MIN_PITCH + 1) * ROW_HEIGHT}px`;
     canvas.setAttribute("aria-label", `${pattern.name}, Piano Roll`);
     noteElements.clear();
+    noteLabelElements.clear();
     playheadElement = null;
     clearElement(canvas);
 
@@ -819,6 +881,10 @@ export function createPianoRollSurface({
 
     for (const note of pattern.notes) {
       const selected = selectedNoteIds.has(note.id);
+      const pitchLabel = createElement("span", {
+        className: "v2-piano-note-label",
+        textContent: formatMidiPitch(note.pitch),
+      });
       const button = createElement("button", {
         className: `v2-piano-note${selected ? " is-selected" : ""}`,
         dataset: { noteId: note.id },
@@ -835,7 +901,7 @@ export function createPianoRollSurface({
           width: `${Math.max(10, note.durationTicks * pixelsPerTick)}px`,
         },
       }, [
-        createElement("span", { textContent: formatMidiPitch(note.pitch) }),
+        pitchLabel,
         createElement("span", { className: "v2-note-resize", "aria-hidden": "true" }),
       ]);
       button.addEventListener("click", (event) => {
@@ -844,6 +910,7 @@ export function createPianoRollSurface({
         selectNotes(selectionForClick(note.id, event.shiftKey));
       });
       noteElements.set(note.id, button);
+      noteLabelElements.set(note.id, pitchLabel);
       canvas.append(button);
     }
     const activeNoteId = pattern.notes.find(({ id }) => selectedNoteIds.has(id))?.id;
@@ -999,6 +1066,7 @@ export function createPianoRollSurface({
 
   canvas.addEventListener("keydown", handleEditorKeyDown, { signal: lifecycle.signal });
   canvas.addEventListener("pointerdown", handlePointerDown, { signal: lifecycle.signal });
+  canvas.addEventListener("contextmenu", handleContextMenu, { signal: lifecycle.signal });
   mobileEditorQuery?.addEventListener?.("change", (event) => {
     if (!event.matches || tool !== "draw") return;
     tool = "pan";

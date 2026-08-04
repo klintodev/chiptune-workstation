@@ -19,9 +19,12 @@ export function createV2ThemeController({
     documentLike.documentElement.dataset.theme = theme;
     const button = documentLike.querySelector("#theme-toggle");
     if (button) {
+      const nextTheme = theme === "light" ? "dark" : "light";
+      button.dataset.theme = theme;
       button.setAttribute("aria-pressed", String(theme === "light"));
-      button.setAttribute("aria-label", `Use ${theme === "light" ? "dark" : "light"} theme`);
-      button.textContent = `${theme === "light" ? "Dark" : "Light"} theme`;
+      button.setAttribute("aria-label", `Use ${nextTheme} theme`);
+      button.title = `Use ${nextTheme} theme`;
+      button.textContent = `Theme: ${theme === "light" ? "Light" : "Dark"}`;
     }
   }
 

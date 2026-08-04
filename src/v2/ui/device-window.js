@@ -102,13 +102,17 @@ export function createDeviceWindow({
     type: "button",
     onClick: onClose,
   });
-  const reset = createElement("button", {
-    dataset: { deviceAction: "reset" },
-    textContent: "Reset",
-    type: "button",
-  });
+  const reset = device.kind === "effect"
+    ? createElement("button", {
+        dataset: { deviceAction: "reset" },
+        textContent: "Reset",
+        type: "button",
+      })
+    : null;
   const body = createElement("div", { className: "v2-device-body" });
-  const header = createElement("header", { className: "v2-device-header" }, [title, reset, close]);
+  const header = createElement("header", {
+    className: `v2-device-header${reset ? " has-device-reset" : ""}`,
+  }, reset ? [title, reset, close] : [title, close]);
   node.append(header, body);
 
   function project() {
@@ -295,14 +299,9 @@ export function createDeviceWindow({
     for (const [key, control] of controls) control.setValue(params[key]);
   }
 
-  reset.addEventListener("click", () => {
-    if (device.kind === "instrument") {
-      const record = instrumentRecord();
-      if (record) projectState.resetInstrument(record.track.id);
-    } else {
-      const record = effectRecord();
-      if (record) projectState.resetEffect(record.effect.instanceId);
-    }
+  reset?.addEventListener("click", () => {
+    const record = effectRecord();
+    if (record) projectState.resetEffect(record.effect.instanceId);
   }, { signal: lifecycle.signal });
 
   const handleProjectChange = (event) => {

@@ -1,0 +1,438 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { midiNoteToFrequency } from "../src/audio/pitch-policy.js";
+import {
+  createV2KeyboardAudition,
+  V2_KEYBOARD_AUDITION_HEARTBEAT_SECONDS,
+  V2_KEYBOARD_AUDITION_HOLD_SECONDS,
+} from "../src/v2/audio/keyboard-audition.js";
+import { VOICE_RETIRE_RAMP_SECONDS } from "../src/v2/audio/klinto-chip-synth.js";
+
+function keyEvent(type, code, values = {}) {
+  const event = new Event(type, { cancelable: true });
+  for (const [key, value] of Object.entries({
+    altKey: false,
+    code,
+    ctrlKey: false,
+    metaKey: false,
+    repeat: false,
+    ...values,
+  })) {
+    Object.defineProperty(event, key, { value });
+  }
+  return event;
+}
+
+test("V2 computer keys audition the selected Track through the production synth route", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  let audioTime = 4;
+  let graphSyncs = 0;
+  const renderEvents = [];
+  const inputEvents = [];
+  const stops = [];
+  const project = {
+    id: "project-audition",
+    tracks: [{
+      id: "track-2",
+      instrument: {
+        params: {
+          attackSeconds: 0.012,
+          octave: 1,
+          releaseSeconds: 0.2,
+          waveform: "pulse25",
+        },
+      },
+    }],
+  };
+  const audition = createV2KeyboardAudition({
+    audioEngine: {
+      getCurrentTime: () => audioTime,
+      isReady: () => true,
+    },
+    documentLike,
+    ensureAudioGraph: () => { graphSyncs += 1; },
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger(event) {
+        renderEvents.push(event);
+        let ended = false;
+        const listeners = new Set();
+        return {
+          addEndedListener(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          get ended() { return ended; },
+          retire(time) {
+            if (ended) return false;
+            ended = true;
+            stops.push({ kind: "retire", time });
+            for (const listener of listeners) listener();
+            return true;
+          },
+          stop(time) {
+            if (ended) return false;
+            ended = true;
+            stops.push({ kind: "stop", time });
+            for (const listener of listeners) listener();
+            return true;
+          },
+        };
+      },
+    }),
+    getTrackId: () => "track-2",
+    keyupTarget: documentLike,
+    onTrackInput: (trackId, event) => inputEvents.push({ ...event, trackId }),
+  });
+
+  const down = keyEvent("keydown", "KeyZ");
+  documentLike.dispatchEvent(down);
+  assert.equal(down.defaultPrevented, true);
+  assert.equal(graphSyncs, 1);
+  assert.equal(renderEvents.length, 1);
+  assert.equal(renderEvents[0].trackId, "track-2");
+  assert.equal(renderEvents[0].waveform, "pulse25");
+  assert.equal(renderEvents[0].frequencyHz, midiNoteToFrequency(72));
+  assert.equal(renderEvents[0].startTime, 4);
+  assert.equal(renderEvents[0].durationSeconds, V2_KEYBOARD_AUDITION_HOLD_SECONDS);
+  assert.equal(renderEvents[0].attackSeconds, 0.012);
+  assert.equal(renderEvents[0].releaseSeconds, 0.2);
+  assert.equal(audition.getActiveVoiceCount(), 1);
+  assert.deepEqual(inputEvents, [{
+    trackId: "track-2",
+    releaseEndTime: 4,
+  }], "keydown marks only the observed start, never the provisional 30-second gate");
+
+  documentLike.dispatchEvent(keyEvent("keydown", "KeyZ", { repeat: true }));
+  assert.equal(renderEvents.length, 1);
+
+  audioTime = 5;
+  const up = keyEvent("keyup", "KeyZ");
+  documentLike.dispatchEvent(up);
+  assert.equal(up.defaultPrevented, true);
+  assert.deepEqual(stops, [{ kind: "stop", time: 5 }]);
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  assert.deepEqual(inputEvents, [
+    { trackId: "track-2", releaseEndTime: 4 },
+    { trackId: "track-2", releaseEndTime: 5.21 },
+  ]);
+  assert.equal(audition.dispose(), true);
+  assert.equal(audition.dispose(), false);
+});
+
+test("V2 keyboard audition enforces the shared sixteen-voice limit", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  const retired = [];
+  const inputEvents = [];
+  const project = {
+    tracks: [{
+      id: "track-1",
+      instrument: {
+        params: {
+          attackSeconds: 0.008,
+          octave: 0,
+          releaseSeconds: 0.03,
+          waveform: "square",
+        },
+      },
+    }],
+  };
+  const audition = createV2KeyboardAudition({
+    audioEngine: { getCurrentTime: () => 2, isReady: () => true },
+    documentLike,
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger() {
+        return {
+          addEndedListener: () => () => {},
+          retire: () => { retired.push(true); return true; },
+          stop: () => true,
+        };
+      },
+    }),
+    getTrackId: () => "track-1",
+    keyupTarget: documentLike,
+    onTrackInput: (trackId, event) => inputEvents.push({ ...event, trackId }),
+  });
+  const codes = [
+    "KeyZ", "KeyS", "KeyX", "KeyD", "KeyC", "KeyV", "KeyG", "KeyB", "KeyH",
+    "KeyN", "KeyJ", "KeyM", "KeyQ", "Digit2", "KeyW", "Digit3", "KeyE",
+  ];
+  for (const code of codes) documentLike.dispatchEvent(keyEvent("keydown", code));
+  assert.equal(retired.length, 1);
+  assert.equal(inputEvents.filter(({ releaseEndTime }) => (
+    releaseEndTime === 2
+  )).length, codes.length);
+  assert.equal(inputEvents.filter(({ releaseEndTime }) => (
+    releaseEndTime === 2 + VOICE_RETIRE_RAMP_SECONDS
+  )).length, 1);
+  assert.equal(audition.getActiveVoiceCount(), 16);
+  audition.dispose();
+});
+
+test("V2 keyboard audition marks the planned input end when a held voice expires naturally", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  let finishVoice;
+  const inputEvents = [];
+  const project = {
+    id: "project-natural-audition",
+    tracks: [{
+      id: "track-1",
+      instrument: {
+        params: {
+          attackSeconds: 0.008,
+          octave: 0,
+          releaseSeconds: 0.03,
+          waveform: "square",
+        },
+      },
+    }],
+  };
+  const audition = createV2KeyboardAudition({
+    audioEngine: { getCurrentTime: () => 7, isReady: () => true },
+    documentLike,
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger() {
+        const listeners = new Set();
+        let ended = false;
+        finishVoice = () => {
+          if (ended) return;
+          ended = true;
+          for (const listener of listeners) listener();
+        };
+        return {
+          addEndedListener(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          get ended() { return ended; },
+          retire: () => false,
+          stop: () => false,
+        };
+      },
+    }),
+    getTrackId: () => "track-1",
+    keyupTarget: documentLike,
+    onTrackInput: (trackId, event) => inputEvents.push({ ...event, trackId }),
+  });
+
+  documentLike.dispatchEvent(keyEvent("keydown", "KeyZ"));
+  assert.deepEqual(inputEvents, [{
+    trackId: "track-1",
+    releaseEndTime: 7,
+  }]);
+  assert.equal(audition.getActiveVoiceCount(), 1);
+
+  finishVoice();
+  assert.deepEqual(inputEvents, [
+    { trackId: "track-1", releaseEndTime: 7 },
+    {
+      trackId: "track-1",
+      releaseEndTime: 7
+        + V2_KEYBOARD_AUDITION_HOLD_SECONDS
+        + 0.03
+        + 0.01,
+    },
+  ]);
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  finishVoice();
+  assert.equal(inputEvents.length, 2);
+  audition.dispose();
+});
+
+test("V2 keyboard audition keeps held Track and shared Master routes alive with observed-time heartbeats", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  let audioTime = 0;
+  let selectedTrackId = "track-1";
+  let heartbeatCallback;
+  let heartbeatClears = 0;
+  const inputEvents = [];
+  const renderEvents = [];
+  const trackDeadlines = new Map();
+  let masterDeadline = -Infinity;
+  const project = {
+    id: "project-overlapping-audition",
+    tracks: [
+      {
+        id: "track-1",
+        instrument: {
+          params: {
+            attackSeconds: 0.008,
+            octave: 0,
+            releaseSeconds: 0.2,
+            waveform: "square",
+          },
+        },
+      },
+      {
+        id: "track-2",
+        instrument: {
+          params: {
+            attackSeconds: 0.02,
+            octave: 1,
+            releaseSeconds: 0.4,
+            waveform: "pulse25",
+          },
+        },
+      },
+    ],
+  };
+  const audition = createV2KeyboardAudition({
+    audioEngine: { getCurrentTime: () => audioTime, isReady: () => true },
+    clearIntervalLike: () => { heartbeatClears += 1; },
+    documentLike,
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger(event) {
+        renderEvents.push(event);
+        const listeners = new Set();
+        let ended = false;
+        return {
+          addEndedListener(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          get ended() { return ended; },
+          retire: () => false,
+          stop() {
+            if (ended) return false;
+            ended = true;
+            for (const listener of listeners) listener();
+            return true;
+          },
+        };
+      },
+    }),
+    getTrackId: () => selectedTrackId,
+    keyupTarget: documentLike,
+    onTrackInput(trackId, event) {
+      inputEvents.push({ ...event, trackId });
+      trackDeadlines.set(
+        trackId,
+        Math.max(trackDeadlines.get(trackId) ?? -Infinity, event.releaseEndTime),
+      );
+      masterDeadline = Math.max(masterDeadline, event.releaseEndTime);
+    },
+    setIntervalLike(callback, milliseconds) {
+      assert.equal(milliseconds, V2_KEYBOARD_AUDITION_HEARTBEAT_SECONDS * 1000);
+      heartbeatCallback = callback;
+      return 1;
+    },
+  });
+
+  documentLike.dispatchEvent(keyEvent("keydown", "KeyZ"));
+  selectedTrackId = "track-2";
+  documentLike.dispatchEvent(keyEvent("keydown", "KeyX"));
+  assert.equal(renderEvents[0].trackId, "track-1");
+  assert.equal(renderEvents[0].waveform, "square");
+  assert.equal(renderEvents[0].frequencyHz, midiNoteToFrequency(60));
+  assert.equal(renderEvents[1].trackId, "track-2");
+  assert.equal(renderEvents[1].waveform, "pulse25");
+  assert.equal(renderEvents[1].frequencyHz, midiNoteToFrequency(74));
+  assert.deepEqual(inputEvents, [
+    { trackId: "track-1", releaseEndTime: 0 },
+    { trackId: "track-2", releaseEndTime: 0 },
+  ]);
+
+  audioTime = 1;
+  documentLike.dispatchEvent(keyEvent("keyup", "KeyZ"));
+  assert.equal(trackDeadlines.get("track-1"), 1.21);
+  assert.equal(masterDeadline, 1.21);
+
+  audioTime = 5;
+  heartbeatCallback();
+  audioTime = 10;
+  heartbeatCallback();
+  assert.equal(trackDeadlines.get("track-1"), 1.21, "a released Track is not overextended");
+  assert.equal(trackDeadlines.get("track-2"), 10);
+  assert.equal(masterDeadline, 10, "the still-held voice refreshes the shared Master route");
+
+  audioTime = 12;
+  documentLike.dispatchEvent(keyEvent("keyup", "KeyX"));
+  assert.equal(trackDeadlines.get("track-2"), 12.41);
+  assert.equal(masterDeadline, 12.41);
+  assert.equal(heartbeatClears, 1);
+  audition.dispose();
+});
+
+test("V2 keyboard audition ownership drains before a held Track route is removed", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  const instrument = {
+    params: {
+      attackSeconds: 0.008,
+      octave: 0,
+      releaseSeconds: 0.2,
+      waveform: "square",
+    },
+  };
+  let project = {
+    id: "project-track-removal",
+    tracks: [
+      { id: "track-held", instrument },
+      { id: "track-retained", instrument },
+    ],
+  };
+  const inputEvents = [];
+  let stopCalls = 0;
+  const audition = createV2KeyboardAudition({
+    audioEngine: { getCurrentTime: () => 3, isReady: () => true },
+    documentLike,
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger() {
+        const listeners = new Set();
+        let ended = false;
+        return {
+          addEndedListener(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          get ended() { return ended; },
+          retire: () => false,
+          stop() {
+            if (ended) return false;
+            stopCalls += 1;
+            ended = true;
+            for (const listener of listeners) listener();
+            return true;
+          },
+        };
+      },
+    }),
+    getTrackId: () => "track-held",
+    keyupTarget: documentLike,
+    onTrackInput(trackId, event) {
+      if (!project.tracks.some(({ id }) => id === trackId)) {
+        throw new RangeError(`Unknown Track: ${trackId}`);
+      }
+      inputEvents.push({ ...event, trackId });
+    },
+  });
+
+  documentLike.dispatchEvent(keyEvent("keydown", "KeyZ"));
+  assert.equal(audition.getActiveVoiceCount(), 1);
+  assert.equal(audition.stopAll(), undefined);
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  assert.equal(stopCalls, 1);
+
+  project = {
+    ...project,
+    tracks: project.tracks.filter(({ id }) => id !== "track-held"),
+  };
+  const keyup = keyEvent("keyup", "KeyZ");
+  assert.doesNotThrow(() => documentLike.dispatchEvent(keyup));
+  assert.equal(keyup.defaultPrevented, false);
+  assert.equal(stopCalls, 1, "the removed Track no longer owns the key");
+  assert.deepEqual(inputEvents, [
+    { trackId: "track-held", releaseEndTime: 3 },
+    { trackId: "track-held", releaseEndTime: 3.21 },
+  ]);
+  audition.dispose();
+});

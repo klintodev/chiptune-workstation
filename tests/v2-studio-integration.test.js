@@ -303,6 +303,8 @@ test("shell owns one direct transport frame stream plus retained loop and histor
   assert.equal(frames.at(-1).songTick, 96);
   assert.equal(frames.at(-1).patternTick, 24);
 
+  const loopSummary = harness.root.querySelector("#loop-summary");
+  assert.equal(loopSummary.textContent, "Song loop: Off");
   const loopEnabled = harness.root.querySelector("#loop-enabled");
   const loopStart = harness.root.querySelector("#loop-start");
   const loopEnd = harness.root.querySelector("#loop-end");
@@ -322,6 +324,12 @@ test("shell owns one direct transport frame stream plus retained loop and histor
   loopEnabled.checked = true;
   loopEnabled.dispatchEvent(new Event("change"));
   assert.deepEqual(harness.loopCalls.at(-1), { enabled: true });
+  assert.equal(loopSummary.textContent, "Song loop: On");
+
+  harness.workspace.setPlayback({ mode: "pattern" });
+  assert.equal(loopSummary.textContent, "Pattern repeats");
+  harness.workspace.setPlayback({ mode: "song" });
+  assert.equal(loopSummary.textContent, "Song loop: On");
 
   loopStart.value = "24";
   loopEnd.value = "96";
@@ -452,16 +460,24 @@ test("Studio integration orders workspace and graph repair before scheduler resc
     handler.indexOf("workspaceState.replaceProject"),
     handler.indexOf("workspaceState.repairProject"),
   );
+  const removedTrackDetection = handler.indexOf("const removedTrack");
+  const auditionStop = handler.indexOf("if (removedTrack) keyboardAudition.stopAll()");
   const graphSync = handler.indexOf("ensureAudioGraph()");
   const modeSync = handler.indexOf("scheduler.setMode");
   const projectSync = handler.indexOf("scheduler.syncProject");
   const bpmSync = handler.indexOf("scheduler.setBpm");
+  const trackSnapshotSync = handler.indexOf("synchronizedTrackIds = nextTrackIds");
 
-  assert.ok(workspaceRepair >= 0);
+  assert.ok(removedTrackDetection >= 0);
+  assert.ok(auditionStop > removedTrackDetection);
+  assert.ok(workspaceRepair > auditionStop);
   assert.ok(graphSync > workspaceRepair);
   assert.ok(modeSync > graphSync);
   assert.ok(bpmSync > graphSync);
   assert.ok(projectSync > bpmSync);
+  assert.ok(trackSnapshotSync > projectSync);
+  assert.match(source, /let synchronizedTrackIds = new Set/);
+  assert.match(handler, /\[\.\.\.synchronizedTrackIds\].*!nextTrackIds\.has\(trackId\)/s);
   assert.match(source, /songPlayheadTick: result\.startTick/);
   assert.match(source, /synchronizeTransportSession/);
   assert.match(source, /synchronizePatternPlaybackContext/);

@@ -120,6 +120,13 @@
   }
 }
 
+@media (max-width: 700px) {
+  .v2-workspace {
+    --v2-shell-height: 96px;
+    grid-template-rows: var(--v2-shell-height) minmax(0, 1fr);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .v2-workspace *,
   .v2-workspace *::before,

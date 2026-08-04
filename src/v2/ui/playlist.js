@@ -4,7 +4,7 @@ import { formatDurationTicks, formatTickPosition } from "./music-format.js";
 const MAX_SONG_TICKS = 6144;
 const SNAP_OPTIONS = Object.freeze({ "1/8": 48, "1/16": 24, "1/32": 12 });
 const LANE_HEIGHT = 66;
-const TRACK_HEADER_WIDTH = 210;
+const TRACK_HEADER_WIDTH = 320;
 const TRACK_ACTION_ORDER = Object.freeze(["select", "instrument", "move-up", "move-down", "remove"]);
 
 function findClip(project, clipId) {
@@ -53,6 +53,7 @@ export function resolvePlaylistFocusTarget(project, preference = {}) {
 export function createPlaylistSurface({
   announce = () => {},
   confirmTrackRemoval = async () => true,
+  onAddPattern = null,
   onOpenInstrument = () => {},
   onOpenPattern = () => {},
   onSeek = (tick) => tick,
@@ -86,7 +87,7 @@ export function createPlaylistSurface({
   const help = createElement("p", {
     className: "v2-editor-help",
     id: "v2-playlist-help",
-    textContent: "Arrow keys move the insertion cursor. S or an empty-timeline click seeks the Song. Enter selects or opens a clip. Alt with arrows moves a selected clip. Home enters Track actions; Escape returns to the timeline.",
+    textContent: "Arrow keys move the insertion cursor. Press S or click an empty timeline position to move the Song playhead. Enter selects or opens a clip. Alt with arrows moves a selected clip. Home enters Track actions; Escape returns to the timeline.",
   });
   const node = createElement("section", {
     className: "v2-primary-surface v2-playlist",
@@ -193,6 +194,12 @@ export function createPlaylistSurface({
     return state.tracks.some(({ id }) => id === candidate) ? candidate : state.tracks[0].id;
   }
 
+  function patternToAddId() {
+    const state = project();
+    const candidate = workspaceState.getState().activePatternId;
+    return state.patterns.some(({ id }) => id === candidate) ? candidate : state.patterns[0].id;
+  }
+
   function trackActions(trackId) {
     return [...node.querySelectorAll(
       `[data-track-id="${selectorId(trackId)}"][data-playlist-track-action]`,
@@ -207,6 +214,34 @@ export function createPlaylistSurface({
       ?? actions[0];
     target?.focus({ preventScroll: true });
     return Boolean(target);
+  }
+
+  function addPatternAtCursor(patternId = patternToAddId()) {
+    const state = project();
+    const pattern = state.patterns.find(({ id }) => id === patternId);
+    const track = state.tracks.find(({ id }) => id === destinationTrackId()) ?? state.tracks[0];
+    if (!pattern || !track) return false;
+    try {
+      const result = mutateProject(() => (
+        typeof onAddPattern === "function"
+          ? onAddPattern(pattern.id, track.id, cursorTick(), snapTicks)
+          : projectState.addPatternToPlaylist(pattern.id, track.id, cursorTick(), { snapTicks })
+      ));
+      if (!result) return false;
+      rememberFocus({ clipId: result.clipId, tick: result.startTick, trackId: result.trackId });
+      setSession({
+        cursorTick: result.playlistCursorTick,
+        destinationTrackId: result.trackId,
+        selectedClipId: result.clipId,
+      });
+      announce(`Added ${pattern.name} to ${track.name} at ${formatTickPosition(result.startTick)}.`);
+      render();
+      return true;
+    } catch (error) {
+      announce(error.message);
+      renderInspector();
+      return false;
+    }
   }
 
   function returnToTimelineNavigation({
@@ -537,11 +572,45 @@ export function createPlaylistSurface({
     clearElement(inspector);
     const state = project();
     const found = findClip(state, selectedClipId());
+    const destination = state.tracks.find(({ id }) => id === destinationTrackId()) ?? state.tracks[0];
+    const patternSelect = createElement("select", { "aria-label": "Pattern to add" });
+    for (const candidate of state.patterns) {
+      patternSelect.append(createElement("option", { textContent: candidate.name, value: candidate.id }));
+    }
+    patternSelect.value = patternToAddId();
+    const addPattern = createElement("button", {
+      className: "v2-primary-action",
+      type: "button",
+    });
+    const synchronizePatternAdd = () => {
+      const pattern = state.patterns.find(({ id }) => id === patternSelect.value) ?? state.patterns[0];
+      const audible = pattern.notes.some(({ velocity }) => velocity > 0);
+      addPattern.disabled = !audible;
+      addPattern.textContent = `Add to ${destination.name}`;
+      addPattern.title = audible
+        ? `Add ${pattern.name} to ${destination.name} at or after ${formatTickPosition(cursorTick())}`
+        : `${pattern.name} needs an audible note before it can be added`;
+      addPattern.setAttribute(
+        "aria-label",
+        audible
+          ? `Add ${pattern.name} to ${destination.name} at or after ${formatTickPosition(cursorTick())}`
+          : `Cannot add ${pattern.name}: add an audible note first`,
+      );
+    };
+    patternSelect.addEventListener("change", () => {
+      workspaceState.setActivePattern?.(patternSelect.value);
+      synchronizePatternAdd();
+    });
+    addPattern.addEventListener("click", () => addPatternAtCursor(patternSelect.value));
+    synchronizePatternAdd();
+    inspector.append(createElement("label", {}, ["Pattern", patternSelect]), addPattern);
     if (!found) {
-      const track = state.tracks.find(({ id }) => id === destinationTrackId()) ?? state.tracks[0];
+      const track = destination;
       inspector.append(createElement("p", { textContent: `${track.name} · insertion cursor ${formatTickPosition(cursorTick())}` }));
       inspector.append(createElement("button", {
-        textContent: "Seek Song here",
+        "aria-label": `Move Song playhead to the Playlist cursor at ${formatTickPosition(cursorTick())}`,
+        textContent: "Move playhead here",
+        title: "Move the Song playhead to the Playlist cursor",
         type: "button",
         onClick: () => seekSong(cursorTick(), track.id),
       }));
@@ -550,7 +619,7 @@ export function createPlaylistSurface({
           className: "v2-primary-action",
           textContent: "Open Piano Roll",
           type: "button",
-          onClick: () => onOpenPattern(state.patterns[0].id, track.id),
+          onClick: () => onOpenPattern(patternSelect.value, track.id),
         }));
       }
       return;
@@ -577,7 +646,13 @@ export function createPlaylistSurface({
       render();
     });
     inspector.append(createElement("label", {}, ["Track", trackSelect]));
-    inspector.append(createElement("button", { textContent: "Seek to clip", type: "button", onClick: () => seekSong(found.clip.startTick, found.track.id) }));
+    inspector.append(createElement("button", {
+      "aria-label": `Move Song playhead to the selected clip at ${formatTickPosition(found.clip.startTick)}`,
+      textContent: "Move playhead to clip",
+      title: "Move the Song playhead to the selected clip",
+      type: "button",
+      onClick: () => seekSong(found.clip.startTick, found.track.id),
+    }));
     inspector.append(
       createElement("button", { textContent: "Open Pattern", type: "button", onClick: openSelected }),
       createElement("button", { textContent: "Move earlier", type: "button", onClick: () => moveSelected(-snapTicks, 0) }),
@@ -633,26 +708,37 @@ export function createPlaylistSurface({
         role: "rowheader",
       });
       const trackFocus = createElement("button", {
+        "aria-label": `Use ${track.name} as the Playlist destination`,
+        "aria-pressed": String(track.id === destinationTrackId()),
         className: "v2-playlist-track-focus",
         dataset: { playlistTrackAction: "select", trackId: track.id },
         tabIndex: -1,
-        textContent: track.name,
+        title: `Use ${track.name} as the destination for new Playlist clips`,
         type: "button",
-      });
+      }, [
+        createElement("span", { textContent: track.name, title: track.name }),
+        createElement("small", {
+          textContent: track.id === destinationTrackId() ? "Destination" : "Choose track",
+        }),
+      ]);
       trackFocus.addEventListener("click", () => {
         rememberFocus({ clipId: null, trackAction: "select", trackId: track.id, trackIndex });
         setSession({ destinationTrackId: track.id, selectedClipId: null });
+        announce(`${track.name} is the destination for new Playlist clips.`);
         render();
       });
       const instrument = createElement("button", {
-        "aria-label": `Open ${track.name} Klinto Chip`,
+        "aria-label": `Open ${track.name} Klinto Chip instrument`,
         className: "v2-device-launcher v2-playlist-instrument",
         dataset: { playlistTrackAction: "instrument", trackId: track.id },
         tabIndex: -1,
-        textContent: "Chip",
+        title: `Open ${track.name} Klinto Chip instrument`,
         type: "button",
         onClick: (event) => onOpenInstrument(track.id, event.currentTarget),
-      });
+      }, [
+        createElement("span", { textContent: "Klinto Chip" }),
+        createElement("small", { textContent: "Instrument" }),
+      ]);
       const reorderTrack = (delta, trackAction) => {
         rememberFocus({
           clipId: null,

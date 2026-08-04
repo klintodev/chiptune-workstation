@@ -9,6 +9,7 @@ import { createLocalRemixProvenanceRepository } from "../persistence/remix-prove
 import { createSessionState } from "../state/session-state.js";
 import { createDeviceRuntimeRegistry } from "./audio/runtime-registry.js";
 import { createKlintoChipSynthRuntime } from "./audio/klinto-chip-synth.js";
+import { createV2KeyboardAudition } from "./audio/keyboard-audition.js";
 import { createV2Scheduler } from "./audio/occurrence-scheduler.js";
 import { createV2ProjectState } from "./domain/project-state.js";
 import { normalizeV2Project } from "./domain/schema.js";
@@ -216,6 +217,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
   let disposed = false;
   let synchronizingPatternContext = false;
   let synchronizingProject = false;
+  let synchronizedTrackIds = new Set(projectState.getState().tracks.map(({ id }) => id));
 
   function disposeAudioGraph() {
     synthRuntime?.dispose();
@@ -255,6 +257,39 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     getTrackId: () => workspaceState.getState().patternSurfaces[
       workspaceState.getState().activePatternId
     ]?.auditionTrackId ?? projectState.getState().tracks[0].id,
+    onTrackInput: (trackId, event) => (
+      runtimeRegistry?.markTrackInput(trackId, event.releaseEndTime)
+    ),
+  });
+
+  function keyboardAuditionTrackId() {
+    const project = projectState.getState();
+    const workspace = workspaceState.getState();
+    const validTrackIds = new Set(project.tracks.map(({ id }) => id));
+    const deviceTrackId = workspace.device?.owner?.kind === "track"
+      ? workspace.device.owner.trackId
+      : null;
+    if (validTrackIds.has(deviceTrackId)) return deviceTrackId;
+    if (workspace.activePrimary === "mixer" && validTrackIds.has(workspace.mixer.channelId)) {
+      return workspace.mixer.channelId;
+    }
+    if (workspace.activePrimary === "playlist"
+      && validTrackIds.has(workspace.playlist.destinationTrackId)) {
+      return workspace.playlist.destinationTrackId;
+    }
+    const patternTrackId = workspace.patternSurfaces[
+      workspace.activePatternId
+    ]?.auditionTrackId;
+    return validTrackIds.has(patternTrackId) ? patternTrackId : project.tracks[0].id;
+  }
+
+  const keyboardAudition = createV2KeyboardAudition({
+    audioEngine,
+    documentLike,
+    ensureAudioGraph,
+    getProject: projectState.getState,
+    getSynthRuntime: () => synthRuntime,
+    getTrackId: keyboardAuditionTrackId,
     onTrackInput: (trackId, event) => (
       runtimeRegistry?.markTrackInput(trackId, event.releaseEndTime)
     ),
@@ -421,6 +456,18 @@ export async function createV2StudioApp({ document: documentLike = document } = 
         confirmTrackRemoval: async (track) => track.clips.length === 0 || (globalThis.confirm?.(
           `Remove ${track.name} and its ${track.clips.length} clip${track.clips.length === 1 ? "" : "s"}?`,
         ) ?? false),
+        onAddPattern(patternId, trackId, cursorTick, snapTicks) {
+          const result = projectState.addPatternToPlaylist(
+            patternId,
+            trackId,
+            cursorTick,
+            { snapTicks },
+          );
+          if (scheduler.getState().status !== "stopped") scheduler.stop();
+          scheduler.setMode("song");
+          workspaceState.setPlayback({ mode: "song", songPlayheadTick: result.startTick });
+          return result;
+        },
         onOpenInstrument(trackId, opener) {
           const track = projectState.getTrack(trackId);
           openDevice("instrument", track.instrument.instanceId, opener);
@@ -577,8 +624,11 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     const project = projectState.getState();
     const operation = event.detail?.operation;
     const replacingProject = ["open-project", "replace", "create-project-from-template"].includes(operation);
+    const nextTrackIds = new Set(project.tracks.map(({ id }) => id));
+    const removedTrack = [...synchronizedTrackIds].some((trackId) => !nextTrackIds.has(trackId));
     synchronizingProject = true;
     try {
+      if (removedTrack) keyboardAudition.stopAll();
       if (replacingProject) {
         workspaceState.replaceProject(projectState, {
           projectId: event.detail?.projectId ?? projectPersistence.getActiveDocument().id,
@@ -588,6 +638,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
       }
       if (replacingProject) {
         scheduler.stop();
+        if (!removedTrack) keyboardAudition.stopAll();
         disposeAudioGraph();
       }
       if (audioEngine.isReady()) {
@@ -602,12 +653,16 @@ export async function createV2StudioApp({ document: documentLike = document } = 
       scheduler.setBpm(project.transport.bpm);
       scheduler.syncProject(project);
     } finally {
+      synchronizedTrackIds = nextTrackIds;
       synchronizingProject = false;
     }
   }
   projectState.addEventListener("change", handleProjectChange);
   audioEngine.addEventListener("statechange", () => {
-    if (!audioEngine.isReady()) return;
+    if (!audioEngine.isReady()) {
+      keyboardAudition.stopAll();
+      return;
+    }
     try {
       ensureAudioGraph();
     } catch (error) {
@@ -637,10 +692,12 @@ export async function createV2StudioApp({ document: documentLike = document } = 
   audioStatusFeature.render();
 
   function stopAllSound() {
+    keyboardAudition.stopAll();
     scheduler.stop();
   }
 
   function pauseForInterruption() {
+    keyboardAudition.stopAll();
     scheduler.pause();
   }
   documentLike.addEventListener("visibilitychange", () => {
@@ -669,6 +726,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     helpDialog.dispose();
     workspaceState.dispose();
     scheduler.dispose();
+    keyboardAudition.dispose();
     disposeAudioGraph();
     try {
       await projectPersistence.dispose();
@@ -693,6 +751,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
   return Object.freeze({
     audioEngine,
     dispose,
+    keyboardAudition,
     projectPersistence,
     projectPreferences,
     projectRepository,
