@@ -67,6 +67,62 @@ test("Piano Roll owns transport, note drag labels, deletion, geometry, and keybo
     backgroundOrigins: ["88px", "88px"], labelWidth: "88px", noteLeft: 88,
   });
 
+  await page.locator(".v2-action-menu").getByText("Pattern actions", { exact: true }).click();
+  await page.getByLabel("Pattern length").selectOption("3072");
+
+  await expect(page.getByRole("button", { name: "Open Instrument" })).toHaveCount(0);
+  await expect(page.locator("#v2-editor-host").getByRole("button", { name: "Zoom in" })).toHaveCount(0);
+  await expect(page.locator("#v2-editor-host").getByRole("button", { name: "Zoom out" })).toHaveCount(0);
+
+  const zoom = await scroller.evaluate((element) => {
+    const canvas = element.querySelector(".v2-piano-canvas");
+    const rect = element.getBoundingClientRect();
+    const anchorClientX = rect.left + element.clientWidth * 0.75;
+    const anchorWithinViewport = anchorClientX - rect.left;
+    const beforePixelsPerTick = Number(
+      canvas.style.getPropertyValue("--v2-pixels-per-tick"),
+    );
+    const beforeScrollLeft = element.scrollLeft;
+    const ordinaryEvent = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: anchorClientX,
+      ctrlKey: false,
+      deltaY: -100,
+    });
+    canvas.dispatchEvent(ordinaryEvent);
+    const ownedEvent = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: anchorClientX,
+      ctrlKey: true,
+      deltaY: -100,
+    });
+    canvas.dispatchEvent(ownedEvent);
+    return {
+      afterPixelsPerTick: Number(canvas.style.getPropertyValue("--v2-pixels-per-tick")),
+      afterScrollLeft: element.scrollLeft,
+      anchorWithinViewport,
+      beforePixelsPerTick,
+      beforeScrollLeft,
+      ordinaryDefaultPrevented: ordinaryEvent.defaultPrevented,
+      ownedDefaultPrevented: ownedEvent.defaultPrevented,
+    };
+  });
+  expect(zoom.ordinaryDefaultPrevented).toBe(false);
+  expect(zoom.ownedDefaultPrevented).toBe(true);
+  expect(zoom.afterPixelsPerTick).toBeGreaterThan(zoom.beforePixelsPerTick);
+  const anchorTickBefore = (
+    zoom.beforeScrollLeft + zoom.anchorWithinViewport - 88
+  ) / zoom.beforePixelsPerTick;
+  const anchorTickAfter = (
+    zoom.afterScrollLeft + zoom.anchorWithinViewport - 88
+  ) / zoom.afterPixelsPerTick;
+  expect(Math.abs(anchorTickAfter - anchorTickBefore)).toBeLessThan(0.5);
+  await editor.focus();
+  await editor.press("Control+-");
+  await expect(editor).toBeFocused();
+
   const scrollTop = await scroller.evaluate((element) => element.scrollTop);
   await editor.press("Space");
   await expect(page.getByRole("button", { name: /Pause pattern/i })).toBeVisible();
@@ -84,11 +140,11 @@ test("Piano Roll owns transport, note drag labels, deletion, geometry, and keybo
   await expect(page.getByRole("button", { name: /Play pattern/i })).toBeVisible();
 
   const originalPitch = await note.locator(".v2-piano-note-label").textContent();
+  await note.scrollIntoViewIfNeeded();
   const noteBox = await note.boundingBox();
   expect(noteBox).not.toBeNull();
   await page.mouse.move(noteBox.x + 6, noteBox.y + noteBox.height / 2);
   await page.mouse.down();
-  await expect(editor).toBeFocused();
   await page.mouse.move(noteBox.x + 6, noteBox.y + noteBox.height / 2 - 26);
   await expect(note.locator(".v2-piano-note-label")).not.toHaveText(originalPitch);
   const draggedPitch = await note.locator(".v2-piano-note-label").textContent();
@@ -98,18 +154,23 @@ test("Piano Roll owns transport, note drag labels, deletion, geometry, and keybo
   await expect(note.locator(".v2-piano-note-label")).toHaveText(draggedPitch);
   await expect(note).toHaveAttribute("aria-label", new RegExp(`^${draggedPitch}`));
 
+  const emptyContextMenuPrevented = await editor.evaluate((canvas) => {
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true, cancelable: true, button: 2,
+    });
+    canvas.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(emptyContextMenuPrevented).toBe(true);
+  await expect(page.locator(".v2-piano-note")).toHaveCount(1);
   await note.click({ button: "right" });
   await expect(page.locator(".v2-piano-note")).toHaveCount(0);
   await expect(editor).toBeFocused();
   await editor.press("Control+z");
   await expect(page.locator(".v2-piano-note")).toHaveCount(1);
 
-  await page.getByRole("button", { name: "Open Instrument" }).click();
-  const attack = page.locator('[data-device-param="attackSeconds"]');
-  await attack.focus();
-  await expect(attack).toBeFocused();
+  await editor.focus();
   await page.keyboard.down("z");
-  await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "Mixer", exact: true }).click();
   const trackMeter = page.locator('[data-channel-id="track-1"] .v2-channel-meter');
   await expect.poll(() => trackMeter.evaluate((meter) => meter.value)).toBeGreaterThan(0);

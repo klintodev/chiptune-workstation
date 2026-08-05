@@ -100,6 +100,10 @@ test("Pattern identities retain independent selection, cursor, viewport, and aud
   assert.equal(workspace.activatePianoRoll("pattern-2"), false);
   assert.equal(workspace.getState().device.instanceId, "instrument-2");
   workspace.activatePlaylist();
+  assert.equal(workspace.getState().device.instanceId, "instrument-2");
+  workspace.activatePianoRoll("pattern-1");
+  assert.equal(workspace.getState().device.instanceId, "instrument-2");
+  workspace.activateMixer();
   assert.equal(workspace.getState().device, null);
   workspace.activatePianoRoll("pattern-1");
 

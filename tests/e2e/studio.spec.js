@@ -61,7 +61,10 @@ async function openCleanStudio(page, options) {
   await dismissAudioSetup(page, options);
   await expect(page.locator(".v2-workspace[data-schema-version='7']")).toBeVisible();
   await expect(page.locator(".v2-beta-badge", { hasText: "V2 Beta" })).toHaveCount(1);
-  await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "piano-roll");
+  await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "playlist");
+  await expect(page.locator("#v2-editor-host")).toBeVisible();
+  await expect(page.locator("#v2-editor-host .v2-piano-window"))
+    .toHaveAttribute("data-surface-kind", "piano-roll");
 }
 
 async function waitForSaved(page) {
@@ -80,7 +83,7 @@ async function createNewPattern(page) {
   const actions = page.locator(".v2-action-menu");
   await actions.getByText("Pattern actions", { exact: true }).click();
   await actions.getByRole("button", { name: "New Pattern", exact: true }).click();
-  await expect(page.locator(".v2-surface-title")).toContainText("Pattern 2");
+  await expect(page.locator("#v2-piano-title")).toContainText("Pattern 2");
 }
 
 async function runGlobalHistory(page, action) {
@@ -137,11 +140,17 @@ test("release suite 1: compose, commit, reload and switch Projects", async ({ pa
   await editor.press("Control+z");
   await expect(page.locator(".v2-piano-note")).toHaveCount(1);
 
-  const instrumentLauncher = page.getByRole("button", { name: "Open Instrument" });
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+  const instrumentLauncher = page.locator(".v2-playlist-instrument").first();
+  await expect(instrumentLauncher).toHaveAccessibleName("Open Pulse 1 Klinto Chip instrument");
   await instrumentLauncher.click();
+  await expect(page.locator("#v2-primary-host")).toBeVisible();
+  await expect(page.locator("#v2-editor-host")).toBeHidden();
+  await expect(page.locator("#v2-device-host")).toHaveAttribute("data-surface-kind", "instrument");
   await page.locator('[data-device-param="waveform"]').selectOption("saw");
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(instrumentLauncher).toBeFocused();
+  await page.getByRole("button", { name: "Piano Roll", exact: true }).click();
 
   const playPattern = page.getByRole("button", { name: /Play pattern/i });
   await playPattern.click();
@@ -163,8 +172,7 @@ test("release suite 1: compose, commit, reload and switch Projects", async ({ pa
   await patternActions.getByText("Pattern actions", { exact: true }).click();
   await patternActions.getByRole("button", { name: "Delete Pattern", exact: true }).click();
   await expect(patternSelect.locator("option")).toHaveCount(1);
-  await expect(page.locator(".v2-piano-canvas")).toBeFocused();
-  await expect(page.locator(".v2-surface-title")).toContainText("Pattern 1");
+  await expect(page.locator("#v2-piano-title")).toContainText("Pattern 1");
   await runGlobalHistory(page, "Undo");
   await expect(patternSelect.locator("option")).toHaveCount(2);
 
@@ -245,16 +253,55 @@ test("release suite 2: arrange, edit, play and restore linked clips", async ({ p
   await expect(page.locator(".v2-playlist-clip")).toHaveCount(2);
 });
 
-test("primary and device hosts enforce one-surface ownership and focus-safe close", async ({ page }) => {
+test("Playlist, Piano and Instrument coexist with draggable, focus-safe windows", async ({ page }) => {
   await openCleanStudio(page);
-  const instrumentLauncher = page.getByRole("button", { name: "Open Instrument" });
+  const primaryHost = page.locator("#v2-primary-host");
+  const editorHost = page.locator("#v2-editor-host");
+  const deviceHost = page.locator("#v2-device-host");
+  const pianoHeader = page.locator(".v2-floating-window-header");
+
+  await expect(primaryHost).toHaveAttribute("data-surface-kind", "playlist");
+  await expect(primaryHost).toBeVisible();
+  await expect(editorHost).toBeVisible();
+  await expect(deviceHost).toBeHidden();
+  await expect(pianoHeader).toHaveAccessibleName("Move window");
+
+  const pianoHeaderBox = await pianoHeader.boundingBox();
+  expect(pianoHeaderBox).not.toBeNull();
+  await page.mouse.move(pianoHeaderBox.x + 80, pianoHeaderBox.y + pianoHeaderBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(pianoHeaderBox.x + 680, pianoHeaderBox.y + pianoHeaderBox.height / 2 + 24);
+  await page.mouse.up();
+  await expect.poll(() => editorHost.evaluate((element) => element.style.transform)).not.toBe("");
+
+  const instrumentLauncher = page.locator(".v2-playlist-instrument").first();
   await instrumentLauncher.click();
-  await expect(page.locator("#v2-device-host")).toHaveAttribute("data-surface-kind", "instrument");
+  await expect(primaryHost).toBeVisible();
+  await expect(editorHost).toBeVisible();
+  await expect(deviceHost).toHaveAttribute("data-surface-kind", "instrument");
+  await expect(deviceHost).toBeVisible();
+  await expect(page.locator(".v2-primary-surface")).toHaveCount(2);
   await expect(page.locator(".v2-device-window-content")).toHaveCount(1);
 
+  const deviceHeader = page.locator(".v2-device-header");
+  await expect(deviceHeader).toHaveAccessibleName("Move window");
+  await deviceHeader.focus();
+  await deviceHeader.press("Alt+ArrowLeft");
+  await expect.poll(() => deviceHost.evaluate((element) => element.style.transform)).not.toBe("");
+  await deviceHeader.press("Escape");
+  await expect(deviceHost).toBeHidden();
+  await expect(editorHost).toBeVisible();
+  await expect(primaryHost).toBeVisible();
+  await expect(page.locator(".v2-piano-canvas")).toBeFocused();
+
+  await pianoHeader.focus();
+  await pianoHeader.press("Escape");
+  await expect(editorHost).toBeHidden();
+  await expect(primaryHost).toHaveAttribute("data-surface-kind", "playlist");
+  await expect(page.getByRole("button", { name: "Playlist", exact: true })).toBeFocused();
+
   await page.getByRole("button", { name: "Mixer", exact: true }).click();
-  await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "mixer");
-  await expect(page.locator("#v2-device-host")).toBeHidden();
+  await expect(primaryHost).toHaveAttribute("data-surface-kind", "mixer");
   await expect(page.locator(".v2-primary-surface")).toHaveCount(1);
 
   await page.getByLabel("Pulse 1 Effects").getByRole("button", { name: "Add Effect in slot 1" }).click();
@@ -262,15 +309,18 @@ test("primary and device hosts enforce one-surface ownership and focus-safe clos
     name: "Open Pulse 1 Klinto Filter in effect slot 1",
   });
   await effectLauncher.click();
-  await expect(page.locator("#v2-device-host")).toHaveAttribute("data-surface-kind", "effect");
+  await expect(deviceHost).toHaveAttribute("data-surface-kind", "effect");
   await page.locator(".v2-device-title").press("Escape");
-  await expect(page.locator("#v2-device-host")).toBeHidden();
-  await expect.poll(() => page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+  await expect(deviceHost).toBeHidden();
+  await expect(primaryHost).toHaveAttribute("data-surface-kind", "playlist");
+  await expect(page.locator(".v2-playlist-timeline")).toBeFocused();
 
+  await page.getByRole("button", { name: "Mixer", exact: true }).click();
   await effectLauncher.click();
-  await page.locator('[data-effect-action="remove"]').click({ force: true });
-  await expect(page.locator("#v2-device-host")).toBeHidden();
-  await expect.poll(() => page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+  await runGlobalHistory(page, "Undo");
+  await expect(deviceHost).toBeHidden();
+  await expect(primaryHost).toHaveAttribute("data-surface-kind", "playlist");
+  await expect(page.locator(".v2-playlist-timeline")).toBeFocused();
 });
 
 test("release suite 3: migrate, recover, download and import without losing V7", async ({ page }) => {
@@ -435,7 +485,9 @@ test.describe("mobile", () => {
     await expect(page.getByRole("button", { name: /Pause pattern/i })).toBeVisible();
     await page.getByRole("button", { name: /Pause pattern/i }).click();
 
-    await page.getByRole("button", { name: "Open Instrument" }).click();
+    await page.getByRole("button", { name: "Playlist", exact: true }).click();
+    const mobileInstrumentLauncher = page.locator(".v2-playlist-instrument").first();
+    await mobileInstrumentLauncher.click();
     await expect(page.locator("#v2-device-host")).toBeVisible();
     await expect(page.locator("#v2-primary-host")).toBeHidden();
     await expect(page.locator(".v2-device-window-content")).toHaveCount(1);
@@ -447,12 +499,14 @@ test.describe("mobile", () => {
     await page.getByRole("button", { name: "Back", exact: true }).click();
     await expect(page.locator("#v2-device-host")).toBeHidden();
     await expect(page.locator("#v2-primary-host")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Open Instrument" })).toBeFocused();
+    await expect(mobileInstrumentLauncher).toBeFocused();
+    await page.getByRole("button", { name: "Piano Roll", exact: true }).click();
 
     await page.getByRole("button", { name: "Add to Playlist" }).click();
     await expect(page.locator(".v2-playlist-clip")).toHaveCount(1);
     await page.getByRole("button", { name: "Open Pattern", exact: true }).click();
-    await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "piano-roll");
+    await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "playlist");
+    await expect(page.locator("#v2-editor-host .v2-piano-window")).toBeVisible();
 
     await page.getByRole("button", { name: "Mixer", exact: true }).click();
     await page.getByLabel("Pulse 1 Effects").getByRole("button", { name: "Add Effect in slot 1" }).click();
@@ -462,7 +516,8 @@ test.describe("mobile", () => {
     await cutoff.press("ArrowDown");
     await expect(cutoff).toHaveValue(String(cutoffBefore - 1));
     await page.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "mixer");
+    await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "playlist");
+    await expect(page.locator(".v2-playlist-timeline")).toBeFocused();
 
     await waitForSaved(page);
     await page.reload();

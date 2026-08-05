@@ -2,6 +2,7 @@ import { clearElement, createElement, setPressed } from "./dom.js";
 import { formatPercent, formatTickPosition } from "./music-format.js";
 
 const MAX_SONG_TICKS = 6_144;
+const RANGE_EDIT_KEYS = new Set(["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Home", "PageDown", "PageUp"]);
 
 function isNativeHistoryTarget(target) {
   if (!target) return false;
@@ -33,21 +34,41 @@ export function createStudioShell({
   const lifecycle = new AbortController();
   let disposed = false;
   let transportFrame = null;
-  const root = createElement("header", { className: "v2-global-shell", "aria-label": "Klinto Studio controls" });
+  const root = createElement("header", {
+    className: "v2-global-shell global-bar",
+    "aria-label": "Klinto Studio controls",
+  });
   const projectTitle = createElement("output", { id: "project-title", textContent: projectState.getState().metadata.title });
   const saveStatus = createElement("output", { id: "project-save-status", textContent: "Saved", dataset: { state: "saved" } });
   const projectButton = createElement("button", {
-    className: "v2-project-summary",
+    className: "v2-project-summary project-summary",
     id: "project-library-open",
     type: "button",
     "aria-haspopup": "dialog",
-  }, [projectTitle, saveStatus]);
-
-  const brand = createElement("div", { className: "v2-brand" }, [
-    createElement("span", { className: "v2-brand-mark", "aria-hidden": "true", textContent: "K" }),
-    createElement("span", { className: "v2-brand-name", textContent: "Klinto Studio" }),
-    createElement("span", { className: "v2-beta-badge", textContent: "V2 Beta" }),
+  }, [
+    createElement("span", {
+      className: "project-summary-icon",
+      "aria-hidden": "true",
+      textContent: "\u25b8",
+    }),
+    createElement("span", { className: "project-summary-copy" }, [
+      createElement("span", { textContent: "Project" }),
+      projectTitle,
+    ]),
+    createElement("span", { className: "project-save-pill" }, [
+      createElement("span", { "aria-hidden": "true" }),
+      saveStatus,
+    ]),
   ]);
+
+  const brand = createElement("div", { className: "v2-brand studio-badge" }, [
+    createElement("span", { className: "v2-brand-mark studio-mark", "aria-hidden": "true" }),
+    createElement("h1", { className: "v2-brand-name", textContent: "Klinto Studio" }),
+    createElement("span", { className: "v2-beta-badge studio-beta", textContent: "V2 Beta" }),
+  ]);
+  const projectCluster = createElement("div", {
+    className: "v2-project-cluster project-cluster",
+  }, [brand, projectButton]);
 
   const start = createElement("button", { id: "transport-start", type: "button", title: "Return to start", "aria-label": "Return to start", textContent: "|◀" });
   const play = createElement("button", { id: "transport-play", className: "v2-transport-play", type: "button", "aria-label": "Play", textContent: "▶" });
@@ -93,17 +114,21 @@ export function createStudioShell({
     step: 1,
     type: "number",
   });
-  const loopSummary = createElement("summary", {
-    dataset: { mobileLabel: "Repeat" },
-    id: "loop-summary",
-    textContent: "Pattern repeats",
+  const loopToggle = createElement("button", {
+    className: "v2-loop-toggle",
+    id: "transport-loop",
+    type: "button",
+    textContent: "\u21bb",
   });
   const loopHelp = createElement("p", {
     className: "v2-loop-help",
     textContent: "Pattern playback always repeats. These settings control Song playback only.",
   });
   const loopControls = createElement("details", { className: "v2-loop-controls" }, [
-    loopSummary,
+    createElement("summary", {
+      id: "loop-summary",
+      textContent: "Song loop range",
+    }),
     createElement("div", { className: "v2-loop-panel" }, [
       loopHelp,
       createElement("label", { className: "v2-loop-enable" }, [loopEnabled, "Loop Song playback"]),
@@ -112,13 +137,46 @@ export function createStudioShell({
       createElement("label", {}, ["Song end", loopEnd]),
     ]),
   ]);
-  const transport = createElement("div", { className: "v2-global-transport", "aria-label": "Transport" }, [
-    start,
-    play,
-    stop,
+  const arrangementTransport = createElement("div", {
+    className: "v2-arrangement-transport arrangement-transport",
+    "aria-label": "Transport controls",
+  }, [start, play, stop, loopToggle]);
+  const modeControl = createElement("label", { className: "v2-mode-control mode-control" }, [
+    createElement("span", { textContent: "Play" }),
     mode,
-    createElement("label", { className: "v2-tempo" }, [tempo, createElement("span", { textContent: "BPM" })]),
-    loopControls,
+  ]);
+  const tempoValue = createElement("output", { id: "tempo-value", textContent: "120" });
+  const tempoControl = createElement("label", { className: "v2-tempo tempo-control" }, [
+    createElement("span", { textContent: "Tempo" }),
+    createElement("span", {}, [tempo, tempoValue, createElement("small", { textContent: "BPM" })]),
+  ]);
+  const masterValue = createElement("output", {
+    id: "master-volume-value",
+    textContent: "35%",
+  });
+  const masterVolume = createElement("input", {
+    "aria-label": "Master output volume",
+    id: "master-volume",
+    max: 100,
+    min: 0,
+    step: 1,
+    type: "range",
+    value: 35,
+  });
+  const masterControl = createElement("label", {
+    className: "v2-master-control master-control",
+  }, [
+    createElement("span", {}, ["Master ", masterValue]),
+    masterVolume,
+  ]);
+  const transport = createElement("div", {
+    className: "v2-global-transport global-transport",
+    "aria-label": "Transport and mix controls",
+  }, [
+    arrangementTransport,
+    modeControl,
+    tempoControl,
+    masterControl,
     transportStatus,
   ]);
 
@@ -142,19 +200,26 @@ export function createStudioShell({
 
   const audioState = createElement("strong", { id: "audio-state", textContent: "Not started" });
   const audioButton = createElement("button", {
-    className: "v2-audio-status",
+    className: "v2-audio-status status-cluster",
     id: "audio-status-open",
     type: "button",
     "aria-haspopup": "dialog",
     title: "Open audio setup",
     onClick: onOpenAudio,
-  }, [createElement("span", { className: "v2-status-light", id: "status-light", "aria-hidden": "true" }), audioState]);
+  }, [createElement("span", { className: "v2-status-light status-light", id: "status-light", "aria-hidden": "true" }), audioState]);
 
-  const masterReadout = createElement("button", { className: "v2-master-readout", type: "button", textContent: "Master 35%" });
-  masterReadout.addEventListener("click", () => workspaceState.activateMixer());
-  const toolsSlot = createElement("div", { id: "global-tools", className: "v2-menu-slot" });
-  const accountSlot = createElement("div", { id: "account-slot", className: "v2-menu-slot" });
+  const toolsSlot = createElement("div", { id: "global-tools", className: "v2-menu-slot global-tools" });
+  const accountSlot = createElement("div", { id: "account-slot", className: "v2-menu-slot account-slot" });
   const shareSlot = createElement("div", { id: "v2-project-share-slot", className: "v2-menu-slot" });
+  const themeToggle = createElement("button", {
+    className: "theme-toggle",
+    id: "theme-toggle",
+    type: "button",
+    onClick: onToggleTheme,
+  }, [
+    createElement("span", { dataset: { themeIcon: "" }, "aria-hidden": "true", textContent: "\u263e" }),
+    createElement("span", { dataset: { themeLabel: "" }, textContent: "Dark" }),
+  ]);
   const globalUndo = createElement("button", { id: "global-undo", textContent: "Undo", type: "button", onClick: () => projectState.undo() });
   const globalRedo = createElement("button", { id: "global-redo", textContent: "Redo", type: "button", onClick: () => projectState.redo() });
   const globalHistory = createElement("div", {
@@ -174,11 +239,9 @@ export function createStudioShell({
         },
       }),
       createElement("button", { textContent: "Help", type: "button", onClick: onOpenHelp }),
-      createElement("button", { id: "theme-toggle", textContent: "Toggle theme", type: "button", onClick: onToggleTheme }),
+      loopControls,
       globalHistory,
       shareSlot,
-      toolsSlot,
-      accountSlot,
     ]),
   ]);
   menu.addEventListener("click", (event) => {
@@ -186,7 +249,9 @@ export function createStudioShell({
     menu.open = false;
   }, { signal: lifecycle.signal });
 
-  const statusCluster = createElement("div", { className: "v2-global-status" }, [masterReadout, audioButton, menu]);
+  const statusCluster = createElement("div", {
+    className: "v2-global-status global-status",
+  }, [switcher, audioButton, toolsSlot, themeToggle, accountSlot, menu]);
   const announcer = createElement("p", {
     className: "visually-hidden",
     id: "workstation-status",
@@ -194,7 +259,7 @@ export function createStudioShell({
     "aria-live": "polite",
     "aria-atomic": "true",
   });
-  root.append(brand, projectButton, transport, switcher, statusCluster, announcer);
+  root.append(projectCluster, transport, statusCluster, announcer);
 
   function reportTransportError(error) {
     announcer.textContent = error?.message ?? "Transport action failed.";
@@ -320,6 +385,7 @@ export function createStudioShell({
             : "Saved";
     saveStatus.dataset.state = persistenceState.status;
     tempo.value = String(project.transport.bpm);
+    tempoValue.value = String(project.transport.bpm);
     mode.value = frame.mode;
     play.textContent = frame.status === "playing" ? "Ⅱ" : "▶";
     play.setAttribute("aria-label", frame.status === "playing" ? `Pause ${mode.value}` : `Play ${mode.value}`);
@@ -340,15 +406,12 @@ export function createStudioShell({
     loopEnd.value = String(loop.endTick);
     loopEnd.min = String(Math.min(MAX_SONG_TICKS, loop.startTick + 1));
     loopEnd.disabled = loop.mode === "arrangement";
-    loopSummary.textContent = frame.mode === "pattern"
-      ? "Pattern repeats"
-      : `Song loop: ${loop.enabled ? "On" : "Off"}`;
-    loopSummary.dataset.mobileLabel = frame.mode === "pattern"
-      ? "Repeat"
-      : `Loop ${loop.enabled ? "On" : "Off"}`;
-    loopSummary.title = frame.mode === "pattern"
-      ? `Pattern playback always repeats. Song loop is ${loop.enabled ? "on" : "off"}.`
-      : `Song loop is ${loop.enabled ? "on" : "off"}.`;
+    setPressed(loopToggle, loop.enabled);
+    loopToggle.disabled = songEnd <= 0 && !loop.enabled;
+    loopToggle.setAttribute("aria-label", `Song loop ${loop.enabled ? "on" : "off"}`);
+    loopToggle.title = loopToggle.disabled
+      ? "Add a Playlist clip to use Song loop. Pattern playback repeats automatically."
+      : `Song loop ${loop.enabled ? "on" : "off"}. Pattern playback repeats automatically.`;
     const history = projectState.getHistoryState?.() ?? {};
     globalUndo.disabled = history.canUndo !== true;
     globalRedo.disabled = history.canRedo !== true;
@@ -358,8 +421,9 @@ export function createStudioShell({
       if (workspace.activePrimary === kind) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     }
-    masterReadout.textContent = `Master ${formatPercent(project.mixer.master.volume)}`;
-    masterReadout.hidden = workspace.activePrimary === "mixer";
+    masterVolume.value = String(Math.round(project.mixer.master.volume * 100));
+    masterValue.value = formatPercent(project.mixer.master.volume);
+    projectButton.dataset.saveState = persistenceState.status;
     const audio = audioEngine?.getState?.() ?? "idle";
     audioState.textContent = audio === "running" ? "Ready" : audio === "suspended" ? "Paused" : audio === "closed" ? "Closed" : "Not started";
     root.dataset.audioState = audio;
@@ -397,15 +461,24 @@ export function createStudioShell({
       render();
     }
   }, { signal: lifecycle.signal });
-  loopEnabled.addEventListener("change", () => {
-    if (loopEnabled.checked && arrangementEndTick() <= 0) {
+  function setLoopEnabled(enabled) {
+    if (enabled && arrangementEndTick() <= 0) {
       announcer.textContent = "Add a Playlist clip before enabling a Song loop.";
       render();
-      return;
+      return false;
     }
-    if (updateLoop({ enabled: loopEnabled.checked }) !== false) {
-      announcer.textContent = `Song loop ${loopEnabled.checked ? "on" : "off"}. Pattern playback always repeats.`;
+    if (updateLoop({ enabled }) !== false) {
+      announcer.textContent = `Song loop ${enabled ? "on" : "off"}. Pattern playback always repeats.`;
+      return true;
     }
+    return false;
+  }
+  loopToggle.addEventListener("click", () => {
+    const enabled = projectState.getState().transport.loop?.enabled === true;
+    setLoopEnabled(!enabled);
+  }, { signal: lifecycle.signal });
+  loopEnabled.addEventListener("change", () => {
+    setLoopEnabled(loopEnabled.checked);
   }, { signal: lifecycle.signal });
   loopMode.addEventListener("change", () => {
     const enablingEmptyArrangement = loopMode.value === "arrangement"
@@ -420,6 +493,39 @@ export function createStudioShell({
   loopEnd.addEventListener("change", commitCustomLoopBounds, { signal: lifecycle.signal });
 
   const historyTarget = root.ownerDocument ?? globalThis.document;
+  let masterHistoryActive = false;
+  function beginMasterHistory() {
+    if (masterHistoryActive) return;
+    masterHistoryActive = true;
+    projectState.beginHistoryGroup?.();
+  }
+  function endMasterHistory() {
+    if (!masterHistoryActive) return;
+    masterHistoryActive = false;
+    projectState.endHistoryGroup?.();
+  }
+  masterVolume.addEventListener("pointerdown", beginMasterHistory, { signal: lifecycle.signal });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture", "change", "blur"]) {
+    masterVolume.addEventListener(type, endMasterHistory, { signal: lifecycle.signal });
+  }
+  masterVolume.addEventListener("keydown", (event) => {
+    if (RANGE_EDIT_KEYS.has(event.key)) beginMasterHistory();
+  }, { signal: lifecycle.signal });
+  masterVolume.addEventListener("keyup", (event) => {
+    if (RANGE_EDIT_KEYS.has(event.key)) endMasterHistory();
+  }, { signal: lifecycle.signal });
+  masterVolume.addEventListener("input", () => {
+    const volume = Number(masterVolume.value) / 100;
+    masterValue.value = formatPercent(volume);
+    try {
+      projectState.setMasterVolume(volume);
+    } catch (error) {
+      announcer.textContent = error.message;
+      endMasterHistory();
+      render();
+    }
+  }, { signal: lifecycle.signal });
+
   historyTarget?.addEventListener?.("keydown", (event) => {
     const action = getGlobalHistoryAction(event);
     if (!action) return;
@@ -459,6 +565,7 @@ export function createStudioShell({
     dispose() {
       if (disposed) return;
       disposed = true;
+      endMasterHistory();
       lifecycle.abort();
       if (transportFrame !== null) globalThis.cancelAnimationFrame?.(transportFrame);
       transportFrame = null;

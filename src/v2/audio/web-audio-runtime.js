@@ -384,6 +384,7 @@ export function createKlintoDelayRuntime({
   const output = context.createGain();
   const external = createExternalConnector(output);
   const retiringCores = new Map();
+  const activeInputIds = new Set();
   let currentCore = null;
   let disposed = false;
   let retireCancellation = null;
@@ -445,10 +446,12 @@ export function createKlintoDelayRuntime({
     if (wetTarget === 0) return false;
     const now = currentTime(context);
     const resolvedInputEndTime = Math.max(now, inputEndTime, lastNonSilentInputEndTime ?? 0);
-    const fadeEndTime = resolvedInputEndTime + MAX_DELAY_TAIL_SECONDS;
-    const fadeStartTime = fadeEndTime - DELAY_TAIL_FADE_SECONDS;
     lastNonSilentInputEndTime = resolvedInputEndTime;
     cancelTailLimit({ restoreWet: true });
+    if (activeInputIds.size > 0) return true;
+
+    const fadeEndTime = resolvedInputEndTime + MAX_DELAY_TAIL_SECONDS;
+    const fadeStartTime = fadeEndTime - DELAY_TAIL_FADE_SECONDS;
     const observedCore = currentCore;
     const wetParam = observedCore.wetGain.gain;
     const heldValue = Number.isFinite(wetParam.value) ? wetParam.value : wetTarget;
@@ -601,12 +604,74 @@ export function createKlintoDelayRuntime({
    * input. The cap starts at the actual end of Instrument output, rather than
    * at look-ahead submission time, and AudioParam automation also works in an
    * OfflineAudioContext where wall-clock callbacks deliberately do not run.
+   * Lifecycle-aware callers keep the wet core uncapped until the final routed
+   * input owner ends; scalar callers retain the planned-end compatibility API.
    */
-  function markNonSilentInput(inputEndTime = currentTime(context)) {
-    if (disposed || isBypassed || !currentCore || getEqualPowerGains(state.mix).wetGain === 0) {
-      return false;
+  function markNonSilentInput(inputEndTime = currentTime(context), lifecycle) {
+    if (!Number.isFinite(inputEndTime) || inputEndTime < 0) {
+      throw new RangeError("Delay input end time must be a non-negative finite number.");
+    }
+    const phase = lifecycle?.phase;
+    if (phase !== undefined && !["start", "active", "end"].includes(phase)) {
+      throw new RangeError(`Unknown Delay input lifecycle phase: ${phase}.`);
+    }
+    if (phase !== undefined && (
+      typeof lifecycle?.inputId !== "string" || lifecycle.inputId.length === 0
+    )) {
+      throw new TypeError("Delay input lifecycle requires a non-empty inputId.");
+    }
+    if (disposed) return false;
+
+    let ownershipChanged = false;
+    if (phase === "start" || phase === "active") {
+      ownershipChanged = !activeInputIds.has(lifecycle.inputId);
+      activeInputIds.add(lifecycle.inputId);
+    } else if (phase === "end") {
+      ownershipChanged = activeInputIds.delete(lifecycle.inputId);
+      if (!ownershipChanged) return false;
+    }
+
+    if (isBypassed || !currentCore || getEqualPowerGains(state.mix).wetGain === 0) {
+      return ownershipChanged;
     }
     return scheduleTailLimit(inputEndTime);
+  }
+
+  /** Replace routed active ownership after a graph change. */
+  function reconcileNonSilentInputs(inputs = []) {
+    if (!Array.isArray(inputs)) throw new TypeError("Delay active inputs must be an array.");
+    const nextInputIds = new Set();
+    let latestInputEndTime = currentTime(context);
+    for (const input of inputs) {
+      if (!input || typeof input !== "object") {
+        throw new TypeError("Delay active input records must be objects.");
+      }
+      if (typeof input.inputId !== "string" || input.inputId.length === 0) {
+        throw new TypeError("Delay active input records require a non-empty inputId.");
+      }
+      if (!Number.isFinite(input.inputEndTime) || input.inputEndTime < 0) {
+        throw new RangeError("Delay active input end time must be a non-negative finite number.");
+      }
+      if (nextInputIds.has(input.inputId)) {
+        throw new RangeError(`Duplicate Delay active input: ${input.inputId}.`);
+      }
+      nextInputIds.add(input.inputId);
+      latestInputEndTime = Math.max(latestInputEndTime, input.inputEndTime);
+    }
+    if (disposed) return false;
+
+    const changed = activeInputIds.size !== nextInputIds.size
+      || [...activeInputIds].some((inputId) => !nextInputIds.has(inputId));
+    activeInputIds.clear();
+    for (const inputId of nextInputIds) activeInputIds.add(inputId);
+
+    if (activeInputIds.size > 0) {
+      if (isBypassed || !currentCore || getEqualPowerGains(state.mix).wetGain === 0) return changed;
+      return scheduleTailLimit(latestInputEndTime);
+    }
+    if (!changed) return false;
+    if (isBypassed || !currentCore || getEqualPowerGains(state.mix).wetGain === 0) return true;
+    return scheduleTailLimit(latestInputEndTime);
   }
 
   function dispose() {
@@ -616,6 +681,7 @@ export function createKlintoDelayRuntime({
     retireCancellation = null;
     cancelTailLimit();
     lastNonSilentInputEndTime = null;
+    activeInputIds.clear();
     if (currentCore) destroyCore(currentCore);
     currentCore = null;
     for (const [core, cancel] of retiringCores) {
@@ -652,7 +718,9 @@ export function createKlintoDelayRuntime({
       bypassed: isBypassed,
       params: Object.freeze({ ...state }),
     }),
+    getActiveInputCount: () => activeInputIds.size,
     markNonSilentInput,
+    reconcileNonSilentInputs,
     resetBufferedState,
     retire,
     setBypassed,

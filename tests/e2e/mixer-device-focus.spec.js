@@ -14,6 +14,27 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const transportFrameListeners = new Set();
+    const addEventListener = EventTarget.prototype.addEventListener;
+    const removeEventListener = EventTarget.prototype.removeEventListener;
+    EventTarget.prototype.addEventListener = function addTrackedEventListener(type, listener, options) {
+      if (type === "transportframe" && listener) {
+        transportFrameListeners.add(listener);
+        options?.signal?.addEventListener("abort", () => {
+          transportFrameListeners.delete(listener);
+        }, { once: true });
+      }
+      return addEventListener.call(this, type, listener, options);
+    };
+    EventTarget.prototype.removeEventListener = function removeTrackedEventListener(type, listener, options) {
+      if (type === "transportframe") transportFrameListeners.delete(listener);
+      return removeEventListener.call(this, type, listener, options);
+    };
+    Object.defineProperty(globalThis, "__v2TransportFrameListenerCount", {
+      value: () => transportFrameListeners.size,
+    });
+  });
   const errors = [];
   browserErrors.set(page, errors);
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
@@ -50,6 +71,20 @@ test.afterEach(async ({ page }) => {
 async function expectFocused(locator) {
   await expect(locator).toBeFocused();
   await expect.poll(() => locator.evaluate((element) => element === document.activeElement)).toBe(true);
+}
+
+async function expectMobileOwner(page, expected) {
+  await expect.poll(() => page.evaluate(() => ({
+    device: document.querySelector("#v2-device-host").childElementCount > 0,
+    editor: document.querySelector("#v2-editor-host").childElementCount > 0,
+    listeners: globalThis.__v2TransportFrameListenerCount(),
+    primary: document.querySelector("#v2-primary-host").childElementCount > 0,
+  }))).toEqual({
+    device: expected === "device",
+    editor: expected === "piano",
+    listeners: expected === "playlist" || expected === "piano" ? 1 : 0,
+    primary: expected === "playlist" || expected === "mixer",
+  });
 }
 
 test("Mixer preserves live controls and stable effect focus through every insert mutation", async ({ page }) => {
@@ -131,10 +166,13 @@ test("Mixer preserves live controls and stable effect focus through every insert
   await expect(page.locator(`[data-effect-id="${delayId}"][data-effect-action="open"]`)).toBeVisible();
   await expect(page.locator("#v2-device-host")).toBeHidden();
   await page.locator(`[data-effect-id="${delayId}"][data-effect-action="open"]`).click();
+  await expect(page.getByRole("button", { name: "Playlist", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "playlist");
   await page.locator('[data-device-param="timeDivision"]').selectOption("1/4");
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await expectFocused(page.locator(`[data-effect-id="${delayId}"][data-effect-action="open"]`));
+  await expectFocused(page.locator(".v2-playlist-timeline"));
 
+  await page.getByRole("button", { name: "Mixer", exact: true }).click();
   await page.locator('[data-mixer-control="add-track"]').click();
   const selectedTrack = page.locator('[data-mixer-control="heading"]:focus');
   await expect(selectedTrack).toHaveText("Track 2");
@@ -153,12 +191,16 @@ test("Mixer preserves live controls and stable effect focus through every insert
   await expect(page.locator('[data-effect-action="open"]')).toHaveCount(2);
   await expect(page.locator(`[data-effect-id="${filterId}"][data-effect-action="open"]`)).toBeVisible();
   await page.locator(`[data-effect-id="${delayId}"][data-effect-action="open"]`).click();
+  await expect(page.getByRole("button", { name: "Playlist", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "playlist");
   await expect(page.locator('[data-device-param="timeDivision"]')).toHaveValue("1/4");
 });
 
 test("Device range cancellation closes only its owned history group and live state stays focused", async ({ page }) => {
   await page.getByLabel("Pulse 1 Effects").getByRole("button", { name: "Add Effect in slot 1" }).click();
   await page.locator('[data-channel-id="track-1"][data-effect-action="open"]').click();
+  await expect(page.getByRole("button", { name: "Playlist", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "playlist");
   await expect(page.locator("#v2-device-host")).toHaveAttribute("data-surface-kind", "effect");
 
   const cutoff = page.locator('[data-device-param="cutoffHz"]');
@@ -210,12 +252,49 @@ test("Mixer Open and Bypass keep separate mobile hit targets", async ({ page }) 
 
   await open.click();
   await expect(page.locator("#v2-device-host")).toHaveAttribute("data-surface-kind", "effect");
+  await expect(page.getByRole("button", { name: "Playlist", exact: true })).toHaveAttribute("aria-current", "page");
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expectFocused(open);
+  await expectFocused(page.locator(".v2-playlist-timeline"));
 
+  await page.getByRole("button", { name: "Mixer", exact: true }).click();
   await bypass.click();
   await expect(bypass).toHaveText("Enable");
   await expectFocused(bypass);
+});
+
+test("mobile keeps exactly one mounted surface owner and releases inactive transport work", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectMobileOwner(page, "mixer");
+
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+  await expectMobileOwner(page, "playlist");
+
+  await page.getByRole("button", { name: "Piano Roll", exact: true }).click();
+  await expectMobileOwner(page, "piano");
+
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+  await expectMobileOwner(page, "playlist");
+  await page.getByRole("button", { name: "Open Pulse 1 Klinto Chip instrument" }).click();
+  await expectMobileOwner(page, "device");
+
+  await page.getByRole("button", { name: "Piano Roll", exact: true }).click();
+  await expectMobileOwner(page, "device");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expectMobileOwner(page, "piano");
+  await expectFocused(page.locator(".v2-piano-canvas"));
+
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+  await expectMobileOwner(page, "playlist");
+  await page.getByRole("button", { name: "Mixer", exact: true }).click();
+  await expectMobileOwner(page, "mixer");
+
+  await page.getByLabel("Pulse 1 Effects").getByRole("button", { name: "Add Effect in slot 1" }).click();
+  await page.locator('[data-channel-id="track-1"][data-effect-action="open"]').click();
+  await expect(page.getByRole("button", { name: "Playlist", exact: true })).toHaveAttribute("aria-current", "page");
+  await expectMobileOwner(page, "device");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expectMobileOwner(page, "playlist");
+  await expectFocused(page.locator(".v2-playlist-timeline"));
 });
 
 test("theme changes the rendered workspace palette and the responsive header stays contained", async ({ page }) => {
@@ -225,11 +304,38 @@ test("theme changes the rendered workspace palette and the responsive header sta
     { width: 1280, height: 720 },
     { width: 800, height: 700 },
     { width: 390, height: 844 },
+    { width: 375, height: 812 },
+    { width: 320, height: 700 },
   ]) {
     await page.setViewportSize(viewport);
     await expect.poll(() => shell.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await expect(page.getByLabel("Open Studio menu")).toBeVisible();
     await expect(page.getByRole("button", { name: "Piano Roll", exact: true })).toBeVisible();
+    const overlappingGroups = await page.locator(".v2-global-shell").evaluate((header) => {
+      const visibleGroups = [...header.children].filter((element) => {
+        if (element.classList.contains("visually-hidden")) return false;
+        const style = getComputedStyle(element);
+        const bounds = element.getBoundingClientRect();
+        return style.display !== "none"
+          && style.visibility !== "hidden"
+          && bounds.width > 0
+          && bounds.height > 0;
+      });
+      const overlaps = [];
+      for (let index = 0; index < visibleGroups.length; index += 1) {
+        const left = visibleGroups[index].getBoundingClientRect();
+        for (let compared = index + 1; compared < visibleGroups.length; compared += 1) {
+          const right = visibleGroups[compared].getBoundingClientRect();
+          const horizontal = Math.min(left.right, right.right) - Math.max(left.left, right.left);
+          const vertical = Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top);
+          if (horizontal > 0.5 && vertical > 0.5) {
+            overlaps.push([visibleGroups[index].className, visibleGroups[compared].className]);
+          }
+        }
+      }
+      return overlaps;
+    });
+    expect(overlappingGroups).toEqual([]);
   }
   await page.setViewportSize({ width: 1280, height: 720 });
   const darkPalette = await workspace.evaluate((element) => {
@@ -239,9 +345,11 @@ test("theme changes the rendered workspace palette and the responsive header sta
 
   await page.getByLabel("Open Studio menu").click();
   const themeToggle = page.locator("#theme-toggle");
-  await expect(themeToggle).toHaveText("Theme: Dark");
+  await expect(themeToggle).toHaveAttribute("data-theme", "dark");
+  await expect(themeToggle).toHaveAccessibleName("Use light theme");
   await themeToggle.click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(themeToggle).toHaveAccessibleName("Use dark theme");
   await expect.poll(() => workspace.evaluate((element) => {
     const style = getComputedStyle(element);
     return { background: style.backgroundColor, color: style.color };
@@ -253,4 +361,83 @@ test("theme changes the rendered workspace palette and the responsive header sta
   });
   expect(lightPalette.background).not.toBe(darkPalette.background);
   expect(lightPalette.color).not.toBe(darkPalette.color);
+});
+
+test("mobile chrome keeps project save and audio setup beside non-overlapping controls", async ({ page }) => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 375, height: 812 },
+    { width: 320, height: 700 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const shell = page.locator(".v2-workspace-shell");
+    const project = page.locator("#project-library-open");
+    const saveStatus = page.locator("#project-save-status");
+    const audio = page.locator("#audio-status-open");
+
+    await expect(project).toBeVisible();
+    await expect(saveStatus).toBeVisible();
+    await expect(audio).toBeVisible();
+    await expect(audio).toHaveAttribute("title", "Open audio setup");
+    await expect(page.locator("#audio-state")).toBeVisible();
+    await expect(page.locator("#theme-toggle")).toBeVisible();
+    await expect(page.getByLabel("Open Studio menu")).toBeVisible();
+    for (const label of ["Piano Roll", "Playlist", "Mixer"]) {
+      await expect(page.getByRole("button", { name: label, exact: true })).toBeVisible();
+    }
+
+    const geometry = await shell.evaluate((header) => {
+      const shellBounds = header.getBoundingClientRect();
+      const controls = [...header.querySelectorAll(
+        "#project-library-open, .v2-arrangement-transport > button, .v2-surface-switcher > button, #audio-status-open, #theme-toggle, .v2-secondary-menu > summary",
+      )].filter((element) => {
+        const style = getComputedStyle(element);
+        const bounds = element.getBoundingClientRect();
+        return style.display !== "none"
+          && style.visibility !== "hidden"
+          && bounds.width > 0
+          && bounds.height > 0;
+      });
+      const boxes = controls.map((element) => ({
+        label: element.getAttribute("aria-label") ?? element.id ?? element.textContent.trim(),
+        bounds: element.getBoundingClientRect(),
+      }));
+      const outside = boxes.filter(({ bounds }) => (
+        bounds.left < shellBounds.left - 0.5
+        || bounds.right > shellBounds.right + 0.5
+        || bounds.top < shellBounds.top - 0.5
+        || bounds.bottom > shellBounds.bottom + 0.5
+      )).map(({ label }) => label);
+      const overlaps = [];
+      for (let index = 0; index < boxes.length; index += 1) {
+        for (let compared = index + 1; compared < boxes.length; compared += 1) {
+          const left = boxes[index];
+          const right = boxes[compared];
+          const horizontal = Math.min(left.bounds.right, right.bounds.right)
+            - Math.max(left.bounds.left, right.bounds.left);
+          const vertical = Math.min(left.bounds.bottom, right.bounds.bottom)
+            - Math.max(left.bounds.top, right.bounds.top);
+          if (horizontal > 0.5 && vertical > 0.5) overlaps.push([left.label, right.label]);
+        }
+      }
+      return { outside, overlaps };
+    });
+    expect(geometry.outside).toEqual([]);
+    expect(geometry.overlaps).toEqual([]);
+
+    const [projectBox, saveBox] = await Promise.all([
+      project.boundingBox(),
+      saveStatus.boundingBox(),
+    ]);
+    expect(projectBox).not.toBeNull();
+    expect(saveBox).not.toBeNull();
+    expect(saveBox.x).toBeGreaterThanOrEqual(projectBox.x);
+    expect(saveBox.x + saveBox.width).toBeLessThanOrEqual(projectBox.x + projectBox.width + 0.5);
+  }
+
+  await page.locator("#audio-status-open").click();
+  const setup = page.getByRole("dialog", { name: "Klinto Studio" });
+  await expect(setup).toBeVisible();
+  await setup.getByRole("button", { name: "Continue without sound" }).click();
+  await expect(setup).toBeHidden();
 });

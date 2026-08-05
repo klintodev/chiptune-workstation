@@ -28,6 +28,7 @@ import {
 } from "./persistence/upgrade-disclosure.js";
 import { createWorkspaceState } from "./state/workspace-state.js";
 import { createDeviceWindow } from "./ui/device-window.js";
+import { createDraggableWindow } from "./ui/draggable-window.js";
 import { createV2HelpDialog } from "./ui/help-dialog.js";
 import { createMixerSurface } from "./ui/mixer.js";
 import { createPianoRollSurface } from "./ui/piano-roll.js";
@@ -61,14 +62,18 @@ function prepareDocument(documentLike) {
   primaryHost.className = "v2-primary-host";
   primaryHost.id = "v2-primary-host";
   const deviceHost = documentLike.createElement("div");
+  const editorHost = documentLike.createElement("div");
+  editorHost.className = "v2-editor-host";
+  editorHost.id = "v2-editor-host";
+  editorHost.hidden = true;
   deviceHost.className = "v2-device-host";
   deviceHost.id = "v2-device-host";
   deviceHost.hidden = true;
-  content.append(primaryHost, deviceHost);
+  content.append(primaryHost, editorHost, deviceHost);
   root.append(shellContainer, content);
   const firstDialog = documentLike.querySelector("dialog");
   documentLike.body.insertBefore(root, firstDialog ?? null);
-  return Object.freeze({ content, deviceHost, primaryHost, root, shellContainer });
+  return Object.freeze({ content, deviceHost, editorHost, primaryHost, root, shellContainer });
 }
 
 function createSilentSynthRuntime() {
@@ -118,20 +123,23 @@ function createMeterReader(getRuntimeRegistry) {
   };
 }
 
-function surfaceDescriptor(workspace, project) {
-  if (workspace.activePrimary === "piano-roll") {
-    const pattern = project.patterns.find(({ id }) => id === workspace.activePatternId)
-      ?? project.patterns[0];
-    return {
-      kind: "piano-roll",
-      patternId: pattern.id,
-      name: `${pattern.name}, Piano Roll`,
-    };
-  }
+function primarySurfaceDescriptor(workspace) {
+  const kind = workspace.activePrimary === "mixer" ? "mixer" : "playlist";
   return {
-    kind: workspace.activePrimary,
+    kind,
     projectId: workspace.projectId,
-    name: workspace.activePrimary === "playlist" ? "Playlist" : "Mixer",
+    name: kind === "playlist" ? "Playlist" : "Mixer",
+  };
+}
+
+function pianoSurfaceDescriptor(workspace, project) {
+  if (workspace.activePrimary !== "piano-roll") return null;
+  const pattern = project.patterns.find(({ id }) => id === workspace.activePatternId)
+    ?? project.patterns[0];
+  return {
+    kind: "piano-roll",
+    patternId: pattern.id,
+    name: `${pattern.name}, Piano Roll`,
   };
 }
 
@@ -214,6 +222,9 @@ export async function createV2StudioApp({ document: documentLike = document } = 
   let audioStatusFeature = null;
   let surfaceHost = null;
   let pendingDeviceOpener = null;
+  let activeDeviceWindow = null;
+  let pianoOverlay = null;
+  let primaryOwnerSuspended = false;
   let disposed = false;
   let synchronizingPatternContext = false;
   let synchronizingProject = false;
@@ -290,8 +301,8 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     getProject: projectState.getState,
     getSynthRuntime: () => synthRuntime,
     getTrackId: keyboardAuditionTrackId,
-    onTrackInput: (trackId, event) => (
-      runtimeRegistry?.markTrackInput(trackId, event.releaseEndTime)
+    onTrackInput: (trackId, event, inputLifecycle) => (
+      runtimeRegistry?.markTrackInput(trackId, event.releaseEndTime, inputLifecycle)
     ),
   });
 
@@ -370,7 +381,30 @@ export async function createV2StudioApp({ document: documentLike = document } = 
 
   function openDevice(kind, instanceId, opener) {
     pendingDeviceOpener = opener ?? null;
-    workspaceState.openDevice(kind, instanceId);
+    const changed = workspaceState.openDevice(kind, instanceId);
+    if (changed) return true;
+    const descriptor = deviceDescriptor(workspaceState.getState().device, projectState.getState());
+    const rememberedOpener = pendingDeviceOpener;
+    pendingDeviceOpener = null;
+    if (!descriptor || !surfaceHost) return false;
+    surfaceHost.openDevice(descriptor, {
+      focusEntry: true,
+      opener: rememberedOpener,
+    });
+    raiseFloatingLayer("device");
+    synchronizeLayerExposure();
+    return false;
+  }
+
+  function openTrackInstrument(trackId, opener) {
+    if (workspaceState.getState().activePrimary === "mixer") workspaceState.activatePlaylist();
+    const track = projectState.getTrack(trackId);
+    return openDevice("instrument", track.instrument.instanceId, opener);
+  }
+
+  function openEffect(instanceId, opener) {
+    if (workspaceState.getState().activePrimary === "mixer") workspaceState.activatePlaylist();
+    return openDevice("effect", instanceId, opener);
   }
 
   function selectorId(value) {
@@ -433,10 +467,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
             announce(error.message);
           }
         },
-        onOpenInstrument(trackId, opener) {
-          const track = projectState.getTrack(trackId);
-          openDevice("instrument", track.instrument.instanceId, opener);
-        },
+        onOpenInstrument: openTrackInstrument,
         onTransportToggle: toggleTransport,
         projectState,
         getTransportFrame: studioShell.getTransportFrame,
@@ -468,10 +499,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
           workspaceState.setPlayback({ mode: "song", songPlayheadTick: result.startTick });
           return result;
         },
-        onOpenInstrument(trackId, opener) {
-          const track = projectState.getTrack(trackId);
-          openDevice("instrument", track.instrument.instanceId, opener);
-        },
+        onOpenInstrument: openTrackInstrument,
         onOpenPattern(patternId, trackId) {
           workspaceState.activatePianoRoll(patternId, { auditionTrackId: trackId });
           workspaceState.setAuditionTrack(patternId, trackId);
@@ -503,11 +531,8 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     owner = createMixerSurface({
       announce,
       getMeterLevel: createMeterReader(() => runtimeRegistry),
-      onOpenEffect: (_owner, instanceId, opener) => openDevice("effect", instanceId, opener),
-      onOpenInstrument: (trackId, opener) => {
-        const track = projectState.getTrack(trackId);
-        openDevice("instrument", track.instrument.instanceId, opener);
-      },
+      onOpenEffect: (_owner, instanceId, opener) => openEffect(instanceId, opener),
+      onOpenInstrument: openTrackInstrument,
       projectState,
       workspaceState,
     });
@@ -522,23 +547,220 @@ export async function createV2StudioApp({ document: documentLike = document } = 
   function renderDevice(surface) {
     const owner = createDeviceWindow({
       device: surface,
+      dragTarget: dom.deviceHost,
       mobile: mobileQuery?.matches ?? false,
+      onActivate: () => raiseFloatingLayer("device"),
       onClose: () => workspaceState.closeDevice(),
       onInvalid: () => workspaceState.closeDevice(),
       projectState,
     });
+    activeDeviceWindow = owner;
     return {
       element: owner.node,
       focusEntry: owner.node.querySelector(".v2-device-title"),
-      dispose: owner.dispose,
+      dispose() {
+        if (activeDeviceWindow === owner) activeDeviceWindow = null;
+        return owner.dispose();
+      },
     };
   }
 
-  const mobileQuery = globalThis.matchMedia?.("(max-width: 700px), (max-height: 640px)");
+  const mobileQuery = globalThis.matchMedia?.("(max-width: 700px)");
+
+  function setLayerExposed(host, exposed) {
+    host.hidden = !exposed;
+    host.inert = !exposed;
+    if (exposed) host.removeAttribute("aria-hidden");
+    else host.setAttribute("aria-hidden", "true");
+  }
+
+  function suspendPrimaryOwner() {
+    if (!surfaceHost || primaryOwnerSuspended) return false;
+    const owner = surfaceHost.getPrimaryOwner();
+    if (!owner) return false;
+    primaryOwnerSuspended = true;
+    try {
+      owner.dispose();
+    } finally {
+      dom.primaryHost.replaceChildren();
+      setLayerExposed(dom.primaryHost, false);
+    }
+    return true;
+  }
+
+  function synchronizePrimaryOwner(descriptor, {
+    focusEntry = false,
+    replace = false,
+  } = {}) {
+    if (surfaceHost.getSnapshot().device && mobileQuery?.matches) return false;
+    if (primaryOwnerSuspended || !surfaceHost.getPrimaryOwner()) {
+      primaryOwnerSuspended = false;
+      return surfaceHost.replacePrimary(descriptor, { focusEntry });
+    }
+    if (replace) return surfaceHost.replacePrimary(descriptor, { focusEntry });
+    return surfaceHost.activatePrimary(descriptor, {
+      deliberate: true,
+      focusEntry,
+    });
+  }
+
+  function synchronizeMobileSurfaceOwnership(state, project, { focusPiano = false } = {}) {
+    const descriptor = pianoSurfaceDescriptor(state, project);
+    if (!mobileQuery?.matches) {
+      synchronizePrimaryOwner(primarySurfaceDescriptor(state));
+      return synchronizePianoOverlay(state, project, { focusEntry: focusPiano });
+    }
+    if (state.device) {
+      closePianoOverlay();
+      if (!surfaceHost.getPrimaryOwner()) primaryOwnerSuspended = false;
+      return false;
+    }
+    if (!descriptor) {
+      closePianoOverlay();
+      return synchronizePrimaryOwner(primarySurfaceDescriptor(state), { focusEntry: focusPiano });
+    }
+    synchronizePianoOverlay(state, project, { focusEntry: focusPiano });
+    return suspendPrimaryOwner();
+  }
+
+  function raiseFloatingLayer(kind) {
+    const canRaise = kind === "piano-roll"
+      ? Boolean(pianoOverlay)
+      : Boolean(surfaceHost?.getSnapshot().device);
+    if (!canRaise) return false;
+    const pianoRaised = kind === "piano-roll";
+    dom.editorHost.dataset.windowActive = pianoRaised ? "true" : "false";
+    dom.deviceHost.dataset.windowActive = pianoRaised ? "false" : "true";
+    dom.editorHost.style.zIndex = pianoRaised ? "11" : "9";
+    dom.deviceHost.style.zIndex = pianoRaised ? "10" : "11";
+    return true;
+  }
+
+  function focusPianoOverlay() {
+    if (!pianoOverlay || dom.editorHost.hidden || dom.editorHost.inert) return false;
+    raiseFloatingLayer("piano-roll");
+    pianoOverlay.owner.focusEntry.focus?.({ preventScroll: true });
+    return true;
+  }
+
+  function focusPrimaryIfDocumentOrphaned() {
+    const active = documentLike.activeElement;
+    if (active && active !== documentLike.body && active.isConnected) return false;
+    return surfaceHost.focusPrimaryEntry();
+  }
+
+  function synchronizeLayerExposure(state = workspaceState.getState()) {
+    const pianoOpen = Boolean(pianoOverlay && state.activePrimary === "piano-roll");
+    const deviceOpen = Boolean(state.device && surfaceHost?.getSnapshot().device);
+    if (mobileQuery?.matches) {
+      setLayerExposed(dom.primaryHost, !pianoOpen && !deviceOpen);
+      setLayerExposed(dom.editorHost, pianoOpen && !deviceOpen);
+      setLayerExposed(dom.deviceHost, deviceOpen);
+    } else {
+      setLayerExposed(dom.primaryHost, true);
+      setLayerExposed(dom.editorHost, pianoOpen);
+      setLayerExposed(dom.deviceHost, deviceOpen);
+    }
+  }
+
+  function focusSurfaceButton(kind) {
+    const button = studioShell.root.querySelector(`[data-surface="${kind}"]`);
+    button?.focus?.({ preventScroll: true });
+    return button ?? null;
+  }
+
+  function closePianoOverlay({ restoreFocus = false } = {}) {
+    if (!pianoOverlay) {
+      dom.editorHost.replaceChildren();
+      setLayerExposed(dom.editorHost, false);
+      return false;
+    }
+    const closing = pianoOverlay;
+    pianoOverlay = null;
+    closing.windowLifecycle.abort();
+    closing.dragController.dispose();
+    closing.owner.dispose();
+    dom.editorHost.replaceChildren();
+    setLayerExposed(dom.editorHost, false);
+    delete dom.editorHost.dataset.windowActive;
+    dom.editorHost.removeAttribute("aria-label");
+    dom.editorHost.removeAttribute("role");
+    if (surfaceHost?.getSnapshot().device) raiseFloatingLayer("device");
+    if (restoreFocus) queueMicrotask(() => focusSurfaceButton("playlist"));
+    return true;
+  }
+
+  function openPianoOverlay(descriptor, { focusEntry = false, replace = false } = {}) {
+    if (!descriptor) return closePianoOverlay();
+    if (!replace && pianoOverlay?.descriptor.patternId === descriptor.patternId) {
+      pianoOverlay.title.textContent = descriptor.name;
+      pianoOverlay.descriptor = descriptor;
+      dom.editorHost.setAttribute("aria-label", descriptor.name);
+      if (focusEntry) {
+        synchronizeLayerExposure();
+        focusPianoOverlay();
+      }
+      return false;
+    }
+    closePianoOverlay();
+    const owner = renderPrimary(descriptor);
+    const windowLifecycle = new AbortController();
+    const windowNode = documentLike.createElement("section");
+    windowNode.className = "v2-piano-window";
+    windowNode.dataset.surfaceKind = "piano-roll";
+    const header = documentLike.createElement("header");
+    header.className = "v2-floating-window-header";
+    const title = documentLike.createElement("h2");
+    title.className = "v2-floating-window-title";
+    title.textContent = descriptor.name;
+    const close = documentLike.createElement("button");
+    close.className = "v2-floating-window-close";
+    close.type = "button";
+    close.textContent = "Close";
+    close.setAttribute("aria-label", "Close Piano Roll");
+    header.append(title, close);
+    windowNode.append(header, owner.element);
+    dom.editorHost.replaceChildren(windowNode);
+    dom.editorHost.setAttribute("aria-label", descriptor.name);
+    dom.editorHost.setAttribute("role", "region");
+    const dragController = createDraggableWindow({
+      disabled: mobileQuery?.matches ?? false,
+      handle: header,
+      node: dom.editorHost,
+      onActivate: () => raiseFloatingLayer("piano-roll"),
+    });
+    pianoOverlay = {
+      descriptor,
+      dragController,
+      owner,
+      title,
+      windowLifecycle,
+    };
+    windowNode.addEventListener("pointerdown", () => raiseFloatingLayer("piano-roll"), {
+      signal: windowLifecycle.signal,
+    });
+    close.addEventListener("click", () => {
+      workspaceState.activatePlaylist();
+      queueMicrotask(() => focusSurfaceButton("playlist"));
+    }, { signal: windowLifecycle.signal });
+    synchronizeLayerExposure();
+    if (focusEntry) focusPianoOverlay();
+    else if (!surfaceHost?.getSnapshot().device) raiseFloatingLayer("piano-roll");
+    return true;
+  }
+
+  function synchronizePianoOverlay(state, project, {
+    focusEntry = false,
+    replace = false,
+  } = {}) {
+    const descriptor = pianoSurfaceDescriptor(state, project);
+    if (!descriptor) return closePianoOverlay();
+    return openPianoOverlay(descriptor, { focusEntry, replace });
+  }
   surfaceHost = createSurfaceHost({
     deviceContainer: dom.deviceHost,
     document: documentLike,
-    initialPrimary: surfaceDescriptor(workspaceState.getState(), projectState.getState()),
+    initialPrimary: primarySurfaceDescriptor(workspaceState.getState()),
     mobile: mobileQuery?.matches ?? false,
     primaryContainer: dom.primaryHost,
     renderDevice,
@@ -548,6 +770,12 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     },
     surfaceSwitcher: () => studioShell.root.querySelector(".v2-surface-switcher [aria-current='page']"),
   });
+  synchronizePianoOverlay(workspaceState.getState(), projectState.getState(), {
+    focusEntry: true,
+  });
+  synchronizeMobileSurfaceOwnership(workspaceState.getState(), projectState.getState());
+  synchronizeLayerExposure();
+
 
   function synchronizePatternPlaybackContext() {
     if (synchronizingProject || synchronizingPatternContext) return false;
@@ -581,43 +809,121 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     const state = workspaceState.getState();
     const project = projectState.getState();
     const actionType = event?.detail?.action?.type ?? "";
-    const primaryDescriptor = surfaceDescriptor(state, project);
     const replacingProject = ["project/new", "project/reload", "project/replace"].includes(actionType);
-    if (replacingProject) {
-      surfaceHost.replacePrimary(primaryDescriptor, { focusEntry: true });
-    } else {
-      surfaceHost.activatePrimary(primaryDescriptor, {
-        focusEntry: actionType === "primary/activate"
-          || actionType === "pattern/open-from-clip"
-          || actionType === "delete-pattern/repair",
-        deliberate: true,
-      });
-    }
     const descriptor = deviceDescriptor(state.device, project);
+    const isMobile = Boolean(mobileQuery?.matches);
+    const focusPrimary = actionType === "primary/activate"
+      || actionType === "pattern/open-from-clip"
+      || actionType === "delete-pattern/repair";
+    const focusPiano = state.activePrimary === "piano-roll" && (
+      replacingProject
+      || actionType === "primary/activate"
+      || actionType === "pattern/open-from-clip"
+    );
+    let restorePianoAfterClose = false;
+    let restorePrimaryAfterClose = false;
+
+    if (!isMobile) {
+      synchronizePrimaryOwner(primarySurfaceDescriptor(state), {
+        focusEntry: replacingProject || focusPrimary,
+        replace: replacingProject,
+      });
+    } else if (descriptor) {
+      closePianoOverlay();
+    }
+
     if (descriptor) {
       surfaceHost.openDevice(descriptor, {
         focusEntry: actionType === "device/open",
         opener: pendingDeviceOpener,
       });
+      if (!surfaceHost.getPrimaryOwner()) primaryOwnerSuspended = false;
+      if (actionType === "device/open") raiseFloatingLayer("device");
       pendingDeviceOpener = null;
-    } else if (surfaceHost.getSnapshot().device) {
-      surfaceHost.closeDevice({
-        restoreFocus: actionType === "device/close"
-          || actionType === "remove-effect/repair"
-          || actionType === "remove-track/repair",
+    } else {
+      pendingDeviceOpener = null;
+      if (surfaceHost.getSnapshot().device) {
+        const restoreFocus = actionType === "device/close"
+          || actionType.endsWith("/repair");
+        restorePianoAfterClose = Boolean(restoreFocus && state.activePrimary === "piano-roll");
+        restorePrimaryAfterClose = Boolean(restoreFocus && !restorePianoAfterClose);
+        const pianoFocusTarget = restorePianoAfterClose ? pianoOverlay?.owner.focusEntry : null;
+        const deferPianoFocus = restorePianoAfterClose && isMobile;
+        surfaceHost.closeDevice({
+          focusTarget: pianoFocusTarget,
+          restoreFocus: restoreFocus && !deferPianoFocus,
+        });
+      }
+    }
+
+    if (isMobile) {
+      synchronizeMobileSurfaceOwnership(state, project, {
+        focusPiano: focusPiano || restorePianoAfterClose,
       });
+    } else {
+      synchronizePianoOverlay(state, project, {
+        focusEntry: focusPiano,
+        replace: replacingProject,
+      });
+    }
+    synchronizeLayerExposure(state);
+    if (restorePianoAfterClose) {
+      raiseFloatingLayer("piano-roll");
+      if (isMobile) queueMicrotask(focusPianoOverlay);
+    }
+    if (restorePrimaryAfterClose) {
+      queueMicrotask(focusPrimaryIfDocumentOrphaned);
     }
     synchronizePatternPlaybackContext();
   }
   workspaceState.addEventListener("change", synchronizeHost);
 
-  mobileQuery?.addEventListener?.("change", (event) => surfaceHost.syncLayout(event.matches), {
+  mobileQuery?.addEventListener?.("change", (event) => {
+    surfaceHost.syncLayout(event.matches);
+    if (!surfaceHost.getPrimaryOwner()) primaryOwnerSuspended = false;
+    activeDeviceWindow?.syncLayout(event.matches);
+    pianoOverlay?.dragController.setDisabled(event.matches);
+    const state = workspaceState.getState();
+    const project = projectState.getState();
+    synchronizeMobileSurfaceOwnership(state, project, {
+      focusPiano: event.matches && !state.device && state.activePrimary === "piano-roll",
+    });
+    pianoOverlay?.dragController.setDisabled(event.matches);
+    synchronizeLayerExposure();
+    if (state.device) {
+      raiseFloatingLayer("device");
+      if (event.matches) activeDeviceWindow?.focus();
+    } else if (state.activePrimary === "piano-roll") {
+      raiseFloatingLayer("piano-roll");
+    }
+  }, { signal: lifecycle.signal });
+  dom.deviceHost.addEventListener("pointerdown", () => raiseFloatingLayer("device"), {
+    capture: true,
     signal: lifecycle.signal,
   });
+  studioShell.root.addEventListener("click", (event) => {
+    if (!event.target.closest?.('[data-surface="piano-roll"]')) return;
+    queueMicrotask(() => {
+      if (workspaceState.getState().activePrimary === "piano-roll") focusPianoOverlay();
+    });
+  }, { signal: lifecycle.signal });
   documentLike.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && event.defaultPrevented && workspaceState.getState().device) {
-      workspaceState.closeDevice();
+    if (event.key !== "Escape") return;
+    const state = workspaceState.getState();
+    if (state.device) {
+      if (!surfaceHost.getSnapshot().device) {
+        const restorePiano = state.activePrimary === "piano-roll" && Boolean(pianoOverlay);
+        workspaceState.closeDevice();
+        if (restorePiano) queueMicrotask(focusPianoOverlay);
+        else queueMicrotask(focusPrimaryIfDocumentOrphaned);
+      }
+      return;
     }
+    if (event.defaultPrevented || state.activePrimary !== "piano-roll") return;
+    event.preventDefault();
+    event.stopPropagation();
+    workspaceState.activatePlaylist();
+    queueMicrotask(() => focusSurfaceButton("playlist"));
   }, { signal: lifecycle.signal });
 
   function handleProjectChange(event) {
@@ -628,7 +934,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     const removedTrack = [...synchronizedTrackIds].some((trackId) => !nextTrackIds.has(trackId));
     synchronizingProject = true;
     try {
-      if (removedTrack) keyboardAudition.stopAll();
+      if (removedTrack) keyboardAudition.reconcileProject(project);
       if (replacingProject) {
         workspaceState.replaceProject(projectState, {
           projectId: event.detail?.projectId ?? projectPersistence.getActiveDocument().id,
@@ -724,6 +1030,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     surfaceHost.dispose();
     studioShell.dispose();
     helpDialog.dispose();
+    closePianoOverlay();
     workspaceState.dispose();
     scheduler.dispose();
     keyboardAudition.dispose();

@@ -6,7 +6,10 @@ import {
   getBoundedPianoMove,
   getPianoMarqueeNoteIds,
 } from "../src/v2/ui/piano-roll.js";
-import { resolvePlaylistFocusTarget } from "../src/v2/ui/playlist.js";import {
+import {
+  getSnappedPlaylistDropTick,
+  resolvePlaylistFocusTarget,
+} from "../src/v2/ui/playlist.js";import {
   createStudioShell,
   getGlobalHistoryAction,
 } from "../src/v2/ui/studio-shell.js";
@@ -149,6 +152,8 @@ function createShellHarness({ schedulerState, workspacePlayback }) {
   const loopCalls = [];
   let undoCalls = 0;
   let redoCalls = 0;
+  let beginHistoryCalls = 0;
+  let endHistoryCalls = 0;
   project.setBpm = (bpm) => {
     project.setState({
       ...project.getState(),
@@ -166,6 +171,15 @@ function createShellHarness({ schedulerState, workspacePlayback }) {
     });
     return true;
   };
+  project.setMasterVolume = (volume) => {
+    project.setState({
+      ...project.getState(),
+      mixer: { master: { ...project.getState().mixer.master, volume } },
+    });
+    return true;
+  };
+  project.beginHistoryGroup = () => { beginHistoryCalls += 1; return true; };
+  project.endHistoryGroup = () => { endHistoryCalls += 1; return true; };
   project.getArrangementEndTick = () => {
     const state = project.getState();
     const lengths = new Map(state.patterns.map((pattern) => [pattern.id, pattern.lengthTicks]));
@@ -230,6 +244,7 @@ function createShellHarness({ schedulerState, workspacePlayback }) {
   });
   return {
     get historyCalls() { return { redo: redoCalls, undo: undoCalls }; },
+    get historyGroupCalls() { return { begin: beginHistoryCalls, end: endHistoryCalls }; },
     loopCalls,
     playCalls,
     project,
@@ -303,8 +318,10 @@ test("shell owns one direct transport frame stream plus retained loop and histor
   assert.equal(frames.at(-1).songTick, 96);
   assert.equal(frames.at(-1).patternTick, 24);
 
+  const loopToggle = harness.root.querySelector("#transport-loop");
   const loopSummary = harness.root.querySelector("#loop-summary");
-  assert.equal(loopSummary.textContent, "Song loop: Off");
+  assert.equal(loopSummary.textContent, "Song loop range");
+  assert.equal(loopToggle.getAttribute("aria-pressed"), "false");
   const loopEnabled = harness.root.querySelector("#loop-enabled");
   const loopStart = harness.root.querySelector("#loop-start");
   const loopEnd = harness.root.querySelector("#loop-end");
@@ -321,15 +338,14 @@ test("shell owns one direct transport frame stream plus retained loop and histor
     tracks: [{ ...state.tracks[0], clips: [{ id: "clip-1", patternId: "pattern-1", startTick: 0 }] }],
   });
   assert.equal(loopEnabled.disabled, false);
-  loopEnabled.checked = true;
-  loopEnabled.dispatchEvent(new Event("change"));
+  loopToggle.click();
   assert.deepEqual(harness.loopCalls.at(-1), { enabled: true });
-  assert.equal(loopSummary.textContent, "Song loop: On");
+  assert.equal(loopToggle.getAttribute("aria-pressed"), "true");
 
   harness.workspace.setPlayback({ mode: "pattern" });
-  assert.equal(loopSummary.textContent, "Pattern repeats");
+  assert.equal(loopToggle.getAttribute("aria-label"), "Song loop on");
   harness.workspace.setPlayback({ mode: "song" });
-  assert.equal(loopSummary.textContent, "Song loop: On");
+  assert.equal(loopToggle.getAttribute("aria-pressed"), "true");
 
   loopStart.value = "24";
   loopEnd.value = "96";
@@ -339,11 +355,30 @@ test("shell owns one direct transport frame stream plus retained loop and histor
     mode: "custom",
     startTick: 24,
   });
+  const master = harness.root.querySelector("#master-volume");
+  const masterValue = harness.root.querySelector("#master-volume-value");
+  master.value = "62";
+  master.dispatchEvent(new Event("input"));
+  assert.equal(harness.project.getState().mixer.master.volume, 0.62);
+  assert.equal(masterValue.value, "62%");
+  const arrowDown = new Event("keydown");
+  Object.defineProperty(arrowDown, "key", { value: "ArrowRight" });
+  const arrowRepeat = new Event("keydown");
+  Object.defineProperty(arrowRepeat, "key", { value: "ArrowRight" });
+  const arrowUp = new Event("keyup");
+  Object.defineProperty(arrowUp, "key", { value: "ArrowRight" });
+  master.dispatchEvent(arrowDown);
+  master.dispatchEvent(arrowRepeat);
+  assert.deepEqual(harness.historyGroupCalls, { begin: 1, end: 0 });
+  master.dispatchEvent(arrowUp);
+  assert.deepEqual(harness.historyGroupCalls, { begin: 1, end: 1 });
 
   harness.root.querySelector("#global-undo").click();
   harness.root.querySelector("#global-redo").click();
   assert.deepEqual(harness.historyCalls, { redo: 1, undo: 1 });
+  master.dispatchEvent(arrowDown);
   harness.shell.dispose();
+  assert.deepEqual(harness.historyGroupCalls, { begin: 2, end: 2 });
 });
 
 test("global history shortcut ignores native editors and already-owned composite events", () => {
@@ -401,6 +436,34 @@ test("Piano pointer geometry bounds moves and marquee selection to the Pattern g
     ["left"],
   );
 });
+
+test("Playlist Pattern drops snap to the visible Track grid and reject Track headers", () => {
+  assert.equal(getSnappedPlaylistDropTick({
+    clientX: 723,
+    pixelsPerTick: 0.36,
+    snapTicks: 24,
+    timelineLeft: 333,
+  }), 192);
+  assert.equal(getSnappedPlaylistDropTick({
+    clientX: 652,
+    pixelsPerTick: 0.36,
+    snapTicks: 48,
+    timelineLeft: 333,
+  }), null);
+  assert.equal(getSnappedPlaylistDropTick({
+    clientX: 10_000,
+    pixelsPerTick: 0.36,
+    snapTicks: 24,
+    timelineLeft: 0,
+  }), 6120);
+  assert.equal(getSnappedPlaylistDropTick({
+    clientX: Number.NaN,
+    pixelsPerTick: 0.36,
+    snapTicks: 24,
+    timelineLeft: 0,
+  }), null);
+});
+
 test("Playlist focus preference resolves stable clip, nearest clip, Track header, then heading", () => {
   const project = {
     tracks: [
@@ -461,7 +524,7 @@ test("Studio integration orders workspace and graph repair before scheduler resc
     handler.indexOf("workspaceState.repairProject"),
   );
   const removedTrackDetection = handler.indexOf("const removedTrack");
-  const auditionStop = handler.indexOf("if (removedTrack) keyboardAudition.stopAll()");
+  const auditionStop = handler.indexOf("if (removedTrack) keyboardAudition.reconcileProject(project)");
   const graphSync = handler.indexOf("ensureAudioGraph()");
   const modeSync = handler.indexOf("scheduler.setMode");
   const projectSync = handler.indexOf("scheduler.syncProject");
@@ -516,6 +579,10 @@ test("editor composites, shared playheads, opener routing, and replacement owner
   assert.match(shell, /dispatchEvent\(new CustomEvent\("transportframe"/);
   assert.match(studio, /surfaceHost\.replacePrimary/);
   assert.match(studio, /markTrackInput\(trackId, event\.releaseEndTime\)/);
+  assert.match(
+    studio,
+    /markTrackInput\(trackId, event\.releaseEndTime, inputLifecycle\)/,
+  );
   assert.match(studio, /disposeAudioGraph\(\)/);
   assert.match(scheduler, /releaseVoices\(activeSession, now, \(record\) => !isRecordStillOwned/);
 });

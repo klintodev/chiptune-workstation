@@ -57,21 +57,41 @@ async function createNewPattern(page) {
   await actions.getByRole("button", { name: "New Pattern", exact: true }).click();
 }
 
-test("Playlist exposes Pattern adding, clear Track actions, instrument routes, playhead wording and Loop scope", async ({ page }) => {
+test("Playlist exposes Pattern adding, instrument routes, direct Song loop and master volume", async ({ page }) => {
   await createCursorNote(page);
   await createNewPattern(page);
   await createCursorNote(page);
   await page.getByRole("button", { name: "Playlist", exact: true }).click();
 
-  const patternSelect = page.getByLabel("Pattern to add");
-  await expect(patternSelect.locator("option")).toHaveCount(2);
-  await patternSelect.selectOption("pattern-1");
+  const library = page.locator(".v2-playlist-pattern-library");
+  await expect(library).toHaveAttribute("open", "");
+  await expect(library.getByRole("listitem")).toHaveCount(2);
+  await expect(page.getByLabel("Pattern to add")).toHaveCount(0);
+  const patternItems = library.locator(".v2-pattern-library-drag");
+  await expect(patternItems).toHaveCount(2);
+  await expect(patternItems.first()).toHaveAttribute("draggable", "true");
+
+  const patternActions = library.locator(".v2-pattern-library-actions").first();
+  await patternActions.getByLabel("Actions for Pattern 1").click();
+  await expect(patternActions.getByRole("button", { name: "Open Pattern", exact: true })).toBeVisible();
+  await expect(patternActions.getByRole("button", { name: "Duplicate Pattern", exact: true })).toBeVisible();
+  await expect(patternActions.getByRole("button", { name: "Rename Pattern", exact: true })).toBeVisible();
+  await expect(patternActions.getByRole("button", { name: "Delete Pattern", exact: true })).toBeVisible();
+  const patternMenu = patternActions.locator(".v2-action-menu-panel");
+  await expect(patternMenu).toHaveCSS("position", "fixed");
+  const patternMenuBounds = await patternMenu.boundingBox();
+  const viewport = page.viewportSize();
+  expect(patternMenuBounds).not.toBeNull();
+  expect(patternMenuBounds.x).toBeGreaterThanOrEqual(0);
+  expect(patternMenuBounds.y).toBeGreaterThanOrEqual(0);
+  expect(patternMenuBounds.x + patternMenuBounds.width).toBeLessThanOrEqual(viewport.width);
+  expect(patternMenuBounds.y + patternMenuBounds.height).toBeLessThanOrEqual(viewport.height);
+
   const addPattern1 = page.getByRole("button", { name: /Add Pattern 1 to Pulse 1/ });
   await expect(addPattern1).toBeEnabled();
   await addPattern1.click();
   await expect(page.locator(".v2-playlist-clip")).toHaveCount(1);
 
-  await patternSelect.selectOption("pattern-2");
   await page.getByRole("button", { name: /Add Pattern 2 to Pulse 1/ }).click();
   await expect(page.locator(".v2-playlist-clip")).toHaveCount(2);
   await expect(page.locator("#playback-mode")).toHaveValue("song");
@@ -86,7 +106,6 @@ test("Playlist exposes Pattern adding, clear Track actions, instrument routes, p
   await expect(destinations.last()).toHaveAttribute("aria-pressed", "false");
 
   await destinations.last().click();
-  await patternSelect.selectOption("pattern-1");
   await page.getByRole("button", { name: /Add Pattern 1 to Track 2/ }).click();
   const routedClip = page.locator('.v2-playlist-lane[data-track-id="track-2"] .v2-playlist-clip');
   await expect(routedClip).toHaveCount(1);
@@ -121,7 +140,9 @@ test("Playlist exposes Pattern adding, clear Track actions, instrument routes, p
   await expect(page.locator("#v2-device-host")).toHaveAttribute("data-surface-kind", "instrument");
   await expect(page.locator('[data-device-action="reset"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await expect(mixerInstrument).toBeFocused();
+  await expect(page.locator("#v2-primary-host")).toHaveAttribute("data-surface-kind", "playlist");
+  const restoredPlaylistInstrument = page.locator(".v2-playlist-instrument").first();
+  await expect(restoredPlaylistInstrument).toBeFocused();
 
   await page.getByRole("button", { name: "Playlist", exact: true }).click();
   const selectedClip = page.locator(".v2-playlist-clip").last();
@@ -134,12 +155,161 @@ test("Playlist exposes Pattern adding, clear Track actions, instrument routes, p
   await expect(page.getByText(/seeks the Song/i)).toHaveCount(0);
   await expect(page.getByTitle(/Start Song playback/)).toHaveCount(0);
 
+  const loopToggle = page.locator("#transport-loop");
+  await expect(loopToggle).toHaveText("↻");
+  await expect(loopToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(loopToggle).toHaveAccessibleName("Song loop off");
+  await expect(loopToggle).toBeEnabled();
+  await loopToggle.click();
+  await expect(loopToggle).toHaveAttribute("aria-pressed", "true");
+  await expect(loopToggle).toHaveAccessibleName("Song loop on");
+
   const loopSummary = page.locator("#loop-summary");
-  await expect(loopSummary).toHaveText("Song loop: Off");
+  await page.getByLabel("Open Studio menu").click();
+  await expect(loopSummary).toHaveText("Song loop range");
   await loopSummary.click();
   await expect(page.getByText("Pattern playback always repeats. These settings control Song playback only.")).toBeVisible();
-  await page.getByLabel("Enable Song loop").check();
-  await expect(loopSummary).toHaveText("Song loop: On");
+  const loopEnabled = page.getByLabel("Enable Song loop");
+  await expect(loopEnabled).toBeChecked();
+  await loopEnabled.uncheck();
+  await expect(loopToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(loopToggle).toHaveAccessibleName("Song loop off");
+  await page.getByLabel("Open Studio menu").click();
   await page.locator("#playback-mode").selectOption("pattern");
-  await expect(loopSummary).toHaveText("Pattern repeats");
+  await expect(loopSummary).toHaveText("Song loop range");
+
+  const masterVolume = page.getByLabel("Master output volume");
+  await expect(masterVolume).toHaveValue("35");
+  await expect(page.locator("#master-volume-value")).toHaveText("35%");
+  await masterVolume.focus();
+  await masterVolume.press("ArrowRight");
+  await expect(masterVolume).toHaveValue("36");
+  await expect(page.locator("#master-volume-value")).toHaveText("36%");
+  await expect(masterVolume).toBeFocused();
+});
+
+test("Playlist Pattern Library drag-drop snaps exactly and right-click deletes with undo-safe focus", async ({ page }) => {
+  await createCursorNote(page);
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+
+  const libraryPattern = page.locator('.v2-pattern-library-drag[data-pattern-id="pattern-1"]');
+  const lane = page.locator('.v2-playlist-lane[data-track-id="track-1"]');
+  const timeline = page.locator(".v2-playlist-timeline");
+  const bounds = await timeline.boundingBox();
+  expect(bounds).not.toBeNull();
+  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+  const clientX = bounds.x + 320 + 192 * 0.36;
+  const clientY = bounds.y + 46 + 33;
+
+  await libraryPattern.dispatchEvent("dragstart", { dataTransfer });
+  await lane.dispatchEvent("dragover", {
+    clientX,
+    clientY,
+    dataTransfer,
+  });
+  await expect(lane).toHaveClass(/is-pattern-drop-target/);
+  await lane.dispatchEvent("drop", {
+    clientX,
+    clientY,
+    dataTransfer,
+  });
+
+  const clip = lane.locator(".v2-playlist-clip");
+  await expect(clip).toHaveCount(1);
+  await expect(clip).toHaveAccessibleName(/Pattern 1, Pulse 1, starts bar 1, beat 3/);
+  expect(await clip.evaluate((element) => Number.parseFloat(element.style.left))).toBeCloseTo(389.12, 2);
+  await expect(clip).toBeFocused();
+
+  const occupiedDropTransfer = await page.evaluateHandle(() => new DataTransfer());
+  await libraryPattern.dispatchEvent("dragstart", { dataTransfer: occupiedDropTransfer });
+  await lane.dispatchEvent("dragover", {
+    clientX,
+    clientY,
+    dataTransfer: occupiedDropTransfer,
+  });
+  await lane.dispatchEvent("drop", {
+    clientX,
+    clientY,
+    dataTransfer: occupiedDropTransfer,
+  });
+  await expect(lane.locator(".v2-playlist-clip")).toHaveCount(1);
+  await expect(lane.locator(".v2-playlist-clip")).toHaveAccessibleName(/starts bar 1, beat 3/);
+
+  const contextMenuPrevented = await clip.evaluate((element) => {
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true,
+      button: 2,
+      cancelable: true,
+    });
+    element.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(contextMenuPrevented).toBe(true);
+  await expect(lane.locator(".v2-playlist-clip")).toHaveCount(0);
+  await expect(page.locator('.v2-playlist-track-focus[data-track-id="track-1"]')).toBeFocused();
+
+  await page.keyboard.press("Control+z");
+  await expect(lane.locator(".v2-playlist-clip")).toHaveCount(1);
+  await expect(lane.locator(".v2-playlist-clip")).toHaveAccessibleName(/starts bar 1, beat 3/);
+});
+
+test("default desktop keeps the Pattern Library actionable beneath the raised Piano", async ({ page }) => {
+  const content = page.locator(".v2-workspace-content");
+  const editor = page.locator("#v2-editor-host");
+  const library = page.locator(".v2-playlist-pattern-library");
+  const patternCard = library.locator(".v2-pattern-library-item").first();
+  const patternActions = patternCard.locator(".v2-pattern-library-actions");
+
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveCSS("z-index", "11");
+  await expect(library).toHaveCSS("z-index", "auto");
+  await expect(patternCard).toBeVisible();
+
+  const [contentBox, editorBox, cardBox] = await Promise.all([
+    content.boundingBox(),
+    editor.boundingBox(),
+    patternCard.boundingBox(),
+  ]);
+  expect(contentBox).not.toBeNull();
+  expect(editorBox).not.toBeNull();
+  expect(cardBox).not.toBeNull();
+  expect(editorBox.x).toBeGreaterThanOrEqual(contentBox.x);
+  expect(editorBox.x + editorBox.width).toBeLessThanOrEqual(contentBox.x + contentBox.width + 0.5);
+  expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(editorBox.x + 0.5);
+  expect(await patternCard.evaluate((item) => {
+    const bounds = item.getBoundingClientRect();
+    const hit = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    return hit?.closest(".v2-pattern-library-item") === item;
+  })).toBe(true);
+
+  await patternActions.getByLabel("Actions for Pattern 1").click();
+  await expect(patternActions).toHaveCSS("z-index", "60");
+  const panel = patternActions.locator(".v2-action-menu-panel");
+  const firstAction = panel.getByRole("button", { name: "Open Pattern", exact: true });
+  await expect(panel).toHaveCSS("position", "fixed");
+  await expect(panel).toHaveCSS("z-index", "120");
+  await expect(firstAction).toBeVisible();
+
+  await editor.evaluate((element) => {
+    element.style.transform = "translate(-280px, 0px)";
+  });
+  const [raisedEditorBox, actionBox] = await Promise.all([
+    editor.boundingBox(),
+    firstAction.boundingBox(),
+  ]);
+  expect(raisedEditorBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  const overlapWidth = Math.min(raisedEditorBox.x + raisedEditorBox.width, actionBox.x + actionBox.width)
+    - Math.max(raisedEditorBox.x, actionBox.x);
+  const overlapHeight = Math.min(raisedEditorBox.y + raisedEditorBox.height, actionBox.y + actionBox.height)
+    - Math.max(raisedEditorBox.y, actionBox.y);
+  expect(overlapWidth).toBeGreaterThan(0);
+  expect(overlapHeight).toBeGreaterThan(0);
+  expect(await firstAction.evaluate((button) => {
+    const bounds = button.getBoundingClientRect();
+    return document.elementFromPoint(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    ) === button;
+  })).toBe(true);
 });

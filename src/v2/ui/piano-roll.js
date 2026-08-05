@@ -7,6 +7,9 @@ const MAX_PITCH = 112;
 const SNAP_OPTIONS = Object.freeze({ "1/8": 48, "1/16": 24, "1/32": 12 });
 const ROW_HEIGHT = 26;
 const LABEL_WIDTH = 88;
+const MIN_PIXELS_PER_TICK = 0.45;
+const MAX_PIXELS_PER_TICK = 3;
+const PIANO_ZOOM_FACTOR = 1.2;
 
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
@@ -84,12 +87,44 @@ export function getInitialPianoViewportTop(pattern, viewportHeight, contentHeigh
   return clamp(targetCentre - resolvedViewportHeight / 2, 0, resolvedContentHeight - resolvedViewportHeight);
 }
 
+export function getPianoZoomViewport({
+  anchorClientX,
+  currentPixelsPerTick,
+  deltaY,
+  scrollLeft,
+  viewportLeft,
+  viewportWidth,
+}) {
+  const current = clamp(
+    Number(currentPixelsPerTick) || MIN_PIXELS_PER_TICK,
+    MIN_PIXELS_PER_TICK,
+    MAX_PIXELS_PER_TICK,
+  );
+  const normalizedDelta = clamp(Number(deltaY) || 0, -100, 100);
+  const next = clamp(
+    current * PIANO_ZOOM_FACTOR ** (-normalizedDelta / 100),
+    MIN_PIXELS_PER_TICK,
+    MAX_PIXELS_PER_TICK,
+  );
+  const width = Math.max(LABEL_WIDTH, Number(viewportWidth) || LABEL_WIDTH);
+  const fallbackAnchor = LABEL_WIDTH + (width - LABEL_WIDTH) / 2;
+  const localAnchor = Number(anchorClientX) - Number(viewportLeft);
+  const anchor = clamp(Number.isFinite(localAnchor) ? localAnchor : fallbackAnchor, LABEL_WIDTH, width);
+  const anchorTick = Math.max(
+    0,
+    ((Number(scrollLeft) || 0) + anchor - LABEL_WIDTH) / current,
+  );
+  return Object.freeze({
+    pixelsPerTick: next,
+    scrollLeft: Math.max(0, LABEL_WIDTH + anchorTick * next - anchor),
+  });
+}
+
 export function createPianoRollSurface({
   announce = () => {},
   confirmPatternDelete = async () => true,
   confirmPatternResize = async () => true,
   onAddToPlaylist = () => {},
-  onOpenInstrument = () => {},
   onTransportToggle = () => {},
   projectState,
   getTransportFrame = () => null,
@@ -129,7 +164,7 @@ export function createPianoRollSurface({
   const status = createElement("p", {
     className: "v2-editor-help",
     id: "v2-piano-help",
-    textContent: "Arrow keys move the cursor. Enter creates or selects a note. Control or Command with arrows edits the selected note. Space toggles playback. Letter and number note keys audition the selected Track.",
+    textContent: "Arrow keys move the cursor. Enter creates or selects a note. Control or Command with arrows edits the selected note; Control or Command with the wheel, +, or - zooms. Space toggles playback. Letter and number note keys audition the selected Track.",
   });
   const node = createElement("section", {
     className: "v2-primary-surface v2-piano-roll",
@@ -391,6 +426,12 @@ export function createPianoRollSurface({
       if (isPlainSpace(event)) {
         event.preventDefault();
         if (!event.repeat) onTransportToggle();
+      } else if (isMod(event) && ["+", "="].includes(event.key)) {
+        event.preventDefault();
+        zoomPiano(-1, undefined, { announceZoom: true });
+      } else if (isMod(event) && ["-", "_"].includes(event.key)) {
+        event.preventDefault();
+        zoomPiano(1, undefined, { announceZoom: true });
       } else if (event.key === "Enter" && !selected) {
         event.preventDefault();
         const existing = pattern.notes.find((note) => note.pitch === cursorPitch && note.startTick === cursorTick);
@@ -762,15 +803,15 @@ export function createPianoRollSurface({
   }
 
   function handleContextMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    canvas.focus({ preventScroll: true });
     const noteButton = event.target.closest?.(".v2-piano-note");
     if (!noteButton) return;
     const pattern = activePattern();
     const note = pattern.notes.find(({ id }) => id === noteButton.dataset.noteId);
     if (!note) return;
-    event.preventDefault();
-    event.stopPropagation();
     activePointerCancel?.();
-    canvas.focus({ preventScroll: true });
     mutateProject(() => projectState.removeNotes(pattern.id, [note.id]));
     selectedNoteIds.delete(note.id);
     cursorTick = note.startTick;
@@ -922,6 +963,35 @@ export function createPianoRollSurface({
     renderInspector();
   }
 
+  function zoomPiano(deltaY, anchorClientX, { announceZoom = false } = {}) {
+    if (deltaY === 0) return false;
+    const rect = scroller.getBoundingClientRect();
+    const next = getPianoZoomViewport({
+      anchorClientX,
+      currentPixelsPerTick: pixelsPerTick,
+      deltaY,
+      scrollLeft: scroller.scrollLeft,
+      viewportLeft: rect.left,
+      viewportWidth: scroller.clientWidth,
+    });
+    if (next.pixelsPerTick === pixelsPerTick) return false;
+    pixelsPerTick = next.pixelsPerTick;
+    renderEditor();
+    scroller.scrollLeft = next.scrollLeft;
+    updatePatternSession({
+      viewport: { left: scroller.scrollLeft, top: scroller.scrollTop },
+    });
+    if (announceZoom) announce(`Piano Roll zoom ${Math.round(pixelsPerTick / 1.35 * 100)}%.`);
+    return true;
+  }
+
+  function handleWheel(event) {
+    if (!isMod(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    zoomPiano(event.deltaY, event.clientX);
+  }
+
   function renderHeader() {
     const project = snapshot();
     const pattern = activePattern();
@@ -952,13 +1022,6 @@ export function createPianoRollSurface({
       updatePatternSession({ auditionTrackId: auditionSelect.value });
       announce(`${pattern.name} will audition through ${projectState.getTrack(auditionSelect.value).name}.`);
     });
-    const instrumentButton = createElement("button", {
-      className: "v2-device-launcher",
-      textContent: "Open Instrument",
-      type: "button",
-      onClick: (event) => onOpenInstrument(auditionTrackId(), event.currentTarget),
-    });
-
     const toolGroup = createElement("div", { className: "v2-segmented", role: "group", "aria-label": "Piano Roll tool" });
     for (const [value, label] of [["draw", "Draw"], ["select", "Select"], ["pan", "Pan"]]) {
       const button = createElement("button", {
@@ -1038,13 +1101,10 @@ export function createPianoRollSurface({
     const history = createElement("div", { className: "v2-history-actions" }, [
       createElement("button", { disabled: !projectState.getHistoryState().canUndo, textContent: "Undo", type: "button", onClick: () => projectState.undo() }),
       createElement("button", { disabled: !projectState.getHistoryState().canRedo, textContent: "Redo", type: "button", onClick: () => projectState.redo() }),
-      createElement("button", { textContent: "Zoom out", type: "button", onClick: () => { pixelsPerTick = Math.max(0.45, pixelsPerTick - 0.2); renderEditor(); } }),
-      createElement("button", { textContent: "Zoom in", type: "button", onClick: () => { pixelsPerTick = Math.min(3, pixelsPerTick + 0.2); renderEditor(); } }),
     ]);
     header.append(
       createElement("label", {}, ["Pattern", patternSelect]),
       createElement("label", {}, ["Audition Track", auditionSelect]),
-      instrumentButton,
       toolGroup,
       createElement("label", {}, ["Snap", snapSelect]),
       add,
@@ -1067,6 +1127,7 @@ export function createPianoRollSurface({
   canvas.addEventListener("keydown", handleEditorKeyDown, { signal: lifecycle.signal });
   canvas.addEventListener("pointerdown", handlePointerDown, { signal: lifecycle.signal });
   canvas.addEventListener("contextmenu", handleContextMenu, { signal: lifecycle.signal });
+  scroller.addEventListener("wheel", handleWheel, { signal: lifecycle.signal, passive: false });
   mobileEditorQuery?.addEventListener?.("change", (event) => {
     if (!event.matches || tool !== "draw") return;
     tool = "pan";

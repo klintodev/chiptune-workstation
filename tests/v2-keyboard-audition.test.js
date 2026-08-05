@@ -253,6 +253,7 @@ test("V2 keyboard audition keeps held Track and shared Master routes alive with 
   let heartbeatCallback;
   let heartbeatClears = 0;
   const inputEvents = [];
+  const inputLifecycles = [];
   const renderEvents = [];
   const trackDeadlines = new Map();
   let masterDeadline = -Infinity;
@@ -311,8 +312,9 @@ test("V2 keyboard audition keeps held Track and shared Master routes alive with 
     }),
     getTrackId: () => selectedTrackId,
     keyupTarget: documentLike,
-    onTrackInput(trackId, event) {
+    onTrackInput(trackId, event, lifecycle) {
       inputEvents.push({ ...event, trackId });
+      inputLifecycles.push({ ...lifecycle, trackId });
       trackDeadlines.set(
         trackId,
         Math.max(trackDeadlines.get(trackId) ?? -Infinity, event.releaseEndTime),
@@ -358,10 +360,18 @@ test("V2 keyboard audition keeps held Track and shared Master routes alive with 
   assert.equal(trackDeadlines.get("track-2"), 12.41);
   assert.equal(masterDeadline, 12.41);
   assert.equal(heartbeatClears, 1);
+  assert.deepEqual(inputLifecycles, [
+    { inputId: "keyboard-audition:1", phase: "start", trackId: "track-1" },
+    { inputId: "keyboard-audition:2", phase: "start", trackId: "track-2" },
+    { inputId: "keyboard-audition:1", phase: "end", trackId: "track-1" },
+    { inputId: "keyboard-audition:2", phase: "active", trackId: "track-2" },
+    { inputId: "keyboard-audition:2", phase: "active", trackId: "track-2" },
+    { inputId: "keyboard-audition:2", phase: "end", trackId: "track-2" },
+  ]);
   audition.dispose();
 });
 
-test("V2 keyboard audition ownership drains before a held Track route is removed", () => {
+test("V2 keyboard audition drains a held Track before remove/undo graph sync and ignores later keyup", () => {
   const documentLike = new EventTarget();
   documentLike.querySelectorAll = () => [];
   const instrument = {
@@ -372,14 +382,17 @@ test("V2 keyboard audition ownership drains before a held Track route is removed
       waveform: "square",
     },
   };
-  let project = {
+  const originalProject = {
     id: "project-track-removal",
     tracks: [
       { id: "track-held", instrument },
       { id: "track-retained", instrument },
     ],
   };
+  let project = originalProject;
+  let syncedTrackIds = new Set(project.tracks.map(({ id }) => id));
   const inputEvents = [];
+  const inputLifecycles = [];
   let stopCalls = 0;
   const audition = createV2KeyboardAudition({
     audioEngine: { getCurrentTime: () => 3, isReady: () => true },
@@ -408,24 +421,30 @@ test("V2 keyboard audition ownership drains before a held Track route is removed
     }),
     getTrackId: () => "track-held",
     keyupTarget: documentLike,
-    onTrackInput(trackId, event) {
-      if (!project.tracks.some(({ id }) => id === trackId)) {
+    onTrackInput(trackId, event, lifecycle) {
+      if (!syncedTrackIds.has(trackId)) {
         throw new RangeError(`Unknown Track: ${trackId}`);
       }
       inputEvents.push({ ...event, trackId });
+      inputLifecycles.push({ ...lifecycle, trackId });
     },
   });
 
   documentLike.dispatchEvent(keyEvent("keydown", "KeyZ"));
   assert.equal(audition.getActiveVoiceCount(), 1);
-  assert.equal(audition.stopAll(), undefined);
-  assert.equal(audition.getActiveVoiceCount(), 0);
-  assert.equal(stopCalls, 1);
 
   project = {
     ...project,
     tracks: project.tracks.filter(({ id }) => id !== "track-held"),
   };
+  assert.equal(audition.reconcileProject(project), true, "ownership drains before graph sync");
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  assert.equal(stopCalls, 1);
+  syncedTrackIds = new Set(project.tracks.map(({ id }) => id));
+
+  project = originalProject;
+  syncedTrackIds = new Set(project.tracks.map(({ id }) => id));
+  assert.equal(audition.reconcileProject(project), false, "undo does not recreate key ownership");
   const keyup = keyEvent("keyup", "KeyZ");
   assert.doesNotThrow(() => documentLike.dispatchEvent(keyup));
   assert.equal(keyup.defaultPrevented, false);
@@ -433,6 +452,10 @@ test("V2 keyboard audition ownership drains before a held Track route is removed
   assert.deepEqual(inputEvents, [
     { trackId: "track-held", releaseEndTime: 3 },
     { trackId: "track-held", releaseEndTime: 3.21 },
+  ]);
+  assert.deepEqual(inputLifecycles, [
+    { inputId: "keyboard-audition:1", phase: "start", trackId: "track-held" },
+    { inputId: "keyboard-audition:1", phase: "end", trackId: "track-held" },
   ]);
   audition.dispose();
 });

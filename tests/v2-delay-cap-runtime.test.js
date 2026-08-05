@@ -110,6 +110,44 @@ test("Delay caps wet output ten seconds after actual input end and later input e
   runtime.dispose();
 });
 
+test("Delay waits for the final overlapping input owner before arming its cap", () => {
+  const harness = createHarness({ currentTime: 0 });
+  const runtime = createKlintoDelayRuntime({
+    context: harness.context,
+    instance: delay(),
+    scheduleTransition: harness.schedule,
+  });
+
+  assert.equal(runtime.markNonSilentInput(0, { inputId: "voice-a", phase: "start" }), true);
+  assert.equal(runtime.markNonSilentInput(0, { inputId: "voice-b", phase: "start" }), true);
+  assert.equal(runtime.getActiveInputCount(), 2);
+  assert.equal(harness.tasks.length, 0);
+
+  assert.equal(runtime.markNonSilentInput(2, { inputId: "voice-a", phase: "end" }), true);
+  assert.equal(runtime.getActiveInputCount(), 1);
+  assert.equal(harness.tasks.length, 0, "one ending voice cannot arm the shared Delay cap");
+
+  assert.equal(runtime.markNonSilentInput(5, { inputId: "voice-b", phase: "active" }), true);
+  assert.equal(harness.tasks.length, 0, "an active heartbeat cannot arm the cap either");
+  assert.equal(runtime.markNonSilentInput(7, { inputId: "voice-b", phase: "end" }), true);
+  assert.equal(runtime.getActiveInputCount(), 0);
+  assert.equal(harness.tasks.at(-1).delaySeconds, 17);
+  assert.ok(runtime.wetGainNode.gain.events.some((event) => (
+    event[0] === "ramp" && event[1] === 0 && event[2] === 17
+  )));
+  assert.equal(
+    runtime.markNonSilentInput(8, { inputId: "voice-b", phase: "end" }),
+    false,
+    "duplicate ends are idempotent",
+  );
+  assert.throws(
+    () => runtime.markNonSilentInput(8, { inputId: "voice-c", phase: "paused" }),
+    /lifecycle phase/,
+  );
+  assert.throws(() => runtime.markNonSilentInput(8, { inputId: "", phase: "start" }), /inputId/);
+  runtime.dispose();
+});
+
 test("offline-style scheduling writes the final 20 ms fade without a wall-clock callback", () => {
   const harness = createHarness({ currentTime: 0 });
   const runtime = createKlintoDelayRuntime({

@@ -24,7 +24,14 @@ export function createV2ThemeController({
       button.setAttribute("aria-pressed", String(theme === "light"));
       button.setAttribute("aria-label", `Use ${nextTheme} theme`);
       button.title = `Use ${nextTheme} theme`;
-      button.textContent = `Theme: ${theme === "light" ? "Light" : "Dark"}`;
+      const icon = button.querySelector?.("[data-theme-icon]");
+      const label = button.querySelector?.("[data-theme-label]");
+      if (icon && label) {
+        icon.textContent = theme === "dark" ? "\u263e" : "\u2600";
+        label.textContent = theme === "dark" ? "Dark" : "Light";
+      } else {
+        button.textContent = `Theme: ${theme === "light" ? "Light" : "Dark"}`;
+      }
     }
   }
 

@@ -6,6 +6,19 @@ const SNAP_OPTIONS = Object.freeze({ "1/8": 48, "1/16": 24, "1/32": 12 });
 const LANE_HEIGHT = 66;
 const TRACK_HEADER_WIDTH = 320;
 const TRACK_ACTION_ORDER = Object.freeze(["select", "instrument", "move-up", "move-down", "remove"]);
+const PATTERN_DRAG_TYPE = "application/x-klinto-pattern-id";
+
+export function getSnappedPlaylistDropTick({ clientX, pixelsPerTick, snapTicks, timelineLeft }) {
+  if (![clientX, pixelsPerTick, snapTicks, timelineLeft].every(Number.isFinite)
+    || pixelsPerTick <= 0
+    || snapTicks <= 0) return null;
+  const horizontal = clientX - timelineLeft - TRACK_HEADER_WIDTH;
+  if (horizontal < 0) return null;
+  return Math.max(0, Math.min(
+    MAX_SONG_TICKS - snapTicks,
+    Math.round(horizontal / pixelsPerTick / snapTicks) * snapTicks,
+  ));
+}
 
 function findClip(project, clipId) {
   for (const track of project.tracks) {
@@ -52,6 +65,15 @@ export function resolvePlaylistFocusTarget(project, preference = {}) {
 
 export function createPlaylistSurface({
   announce = () => {},
+  confirmPatternDelete = async (pattern) => globalThis.confirm?.(
+    `Delete ${pattern.name} and every Playlist clip that uses it?`,
+  ) ?? false,
+  confirmPatternResize = async (pattern, lengthTicks) => {
+    const impact = projectState.getPatternResizeImpact(pattern.id, lengthTicks);
+    return !impact.requiresConfirmation || (globalThis.confirm?.(
+      `Shortening ${pattern.name} will remove or truncate notes. Continue?`,
+    ) ?? false);
+  },
   confirmTrackRemoval = async () => true,
   onAddPattern = null,
   onOpenInstrument = () => {},
@@ -71,6 +93,7 @@ export function createPlaylistSurface({
   let pixelsPerTick = 0.36;
   let playheadElement = null;
   let snapTicks = 24;
+  let draggedPatternId = null;
 
   const title = createElement("h2", { id: "v2-playlist-title", className: "v2-surface-title", textContent: "Playlist", tabIndex: -1 });
   const header = createElement("div", { className: "v2-surface-header v2-playlist-header" });
@@ -83,6 +106,10 @@ export function createPlaylistSurface({
     "aria-keyshortcuts": "Home S",
   });
   const scroller = createElement("div", { className: "v2-playlist-scroll" }, [timeline]);
+  const patternLibrary = createElement("details", {
+    className: "v2-playlist-pattern-library",
+    open: true,
+  });
   const inspector = createElement("aside", { className: "v2-clip-inspector", "aria-label": "Playlist selection" });
   const help = createElement("p", {
     className: "v2-editor-help",
@@ -93,7 +120,7 @@ export function createPlaylistSurface({
     className: "v2-primary-surface v2-playlist",
     "aria-labelledby": title.id,
     dataset: { primarySurface: "playlist" },
-  }, [header, scroller, inspector, help]);
+  }, [header, patternLibrary, scroller, inspector, help]);
 
   function project() {
     return projectState.getState();
@@ -216,16 +243,33 @@ export function createPlaylistSurface({
     return Boolean(target);
   }
 
-  function addPatternAtCursor(patternId = patternToAddId()) {
+  function addPatternToTrack(patternId, trackId, requestedTick, { exact = false } = {}) {
     const state = project();
     const pattern = state.patterns.find(({ id }) => id === patternId);
-    const track = state.tracks.find(({ id }) => id === destinationTrackId()) ?? state.tracks[0];
+    const track = state.tracks.find(({ id }) => id === trackId);
     if (!pattern || !track) return false;
     try {
+      if (exact && projectState.canPlaceClip?.(track.id, pattern.id, requestedTick) === false) {
+        throw new RangeError(
+          `${pattern.name} does not fit at ${formatTickPosition(requestedTick)} on ${track.name}.`,
+        );
+      }
       const result = mutateProject(() => (
         typeof onAddPattern === "function"
-          ? onAddPattern(pattern.id, track.id, cursorTick(), snapTicks)
-          : projectState.addPatternToPlaylist(pattern.id, track.id, cursorTick(), { snapTicks })
+          ? onAddPattern(pattern.id, track.id, requestedTick, snapTicks, { exact })
+          : exact
+            ? (() => {
+                const clipId = projectState.addClip(track.id, pattern.id, requestedTick);
+                return {
+                  clipId,
+                  endTick: requestedTick + pattern.lengthTicks,
+                  patternId: pattern.id,
+                  playlistCursorTick: requestedTick + pattern.lengthTicks,
+                  startTick: requestedTick,
+                  trackId: track.id,
+                };
+              })()
+            : projectState.addPatternToPlaylist(pattern.id, track.id, requestedTick, { snapTicks })
       ));
       if (!result) return false;
       rememberFocus({ clipId: result.clipId, tick: result.startTick, trackId: result.trackId });
@@ -241,6 +285,23 @@ export function createPlaylistSurface({
       announce(error.message);
       renderInspector();
       return false;
+    }
+  }
+
+  function addPatternAtCursor(patternId = patternToAddId()) {
+    return addPatternToTrack(patternId, destinationTrackId(), cursorTick());
+  }
+
+  function getTransferredPatternId(dataTransfer) {
+    const candidate = draggedPatternId
+      || dataTransfer?.getData?.(PATTERN_DRAG_TYPE)
+      || dataTransfer?.getData?.("text/plain");
+    return project().patterns.some(({ id }) => id === candidate) ? candidate : null;
+  }
+
+  function clearPatternDropTargets() {
+    for (const lane of timeline.querySelectorAll?.(".v2-playlist-lane.is-pattern-drop-target") ?? []) {
+      lane.classList.remove("is-pattern-drop-target");
     }
   }
 
@@ -367,23 +428,27 @@ export function createPlaylistSurface({
     return true;
   }
 
-  function removeSelected() {
-    const id = selectedClipId();
-    if (!id) return false;
+  function removeClip(clipId) {
+    if (!clipId) return false;
     const state = project();
-    const before = findClip(state, id);
+    const before = findClip(state, clipId);
+    if (!before) return false;
     const trackIndex = state.tracks.findIndex(({ id: trackId }) => trackId === before?.track.id);
     rememberFocus({
-      clipId: id,
+      clipId,
       tick: before?.clip.startTick ?? cursorTick(),
       trackId: before?.track.id,
       trackIndex,
     });
-    mutateProject(() => projectState.removeClip(id));
+    mutateProject(() => projectState.removeClip(clipId));
     setSession({ selectedClipId: null, cursorTick: before?.clip.startTick ?? cursorTick() });
     announce("Clip deleted.");
     render();
     return true;
+  }
+
+  function removeSelected() {
+    return removeClip(selectedClipId());
   }
 
   function openSelected() {
@@ -568,42 +633,235 @@ export function createPlaylistSurface({
     );
   }
 
+  function focusPatternLibraryItem(patternId) {
+    node.querySelector(`.v2-pattern-library-drag[data-pattern-id="${selectorId(patternId)}"]`)
+      ?.focus({ preventScroll: true });
+  }
+
+  function renderPatternLibrary() {
+    const state = project();
+    const destination = state.tracks.find(({ id }) => id === destinationTrackId()) ?? state.tracks[0];
+    clearElement(patternLibrary);
+    patternLibrary.append(createElement("summary", {
+      "aria-label": `Pattern Library, ${state.patterns.length} Pattern${state.patterns.length === 1 ? "" : "s"}`,
+      textContent: `Patterns (${state.patterns.length})`,
+    }));
+
+    const libraryHeader = createElement("div", { className: "v2-pattern-library-header" }, [
+      createElement("p", {
+        id: "v2-pattern-library-help",
+        textContent: `Drag a Pattern into a Track, or use Add to place it at the ${destination.name} cursor.`,
+      }),
+    ]);
+    const createPattern = createElement("button", {
+      disabled: state.patterns.length >= 64,
+      textContent: "New Pattern",
+      type: "button",
+    });
+    createPattern.addEventListener("click", () => {
+      try {
+        const id = mutateProject(() => projectState.createPattern());
+        workspaceState.setActivePattern?.(id);
+        announce(`Created ${projectState.getPattern(id).name}.`);
+        render();
+        focusPatternLibraryItem(id);
+      } catch (error) {
+        announce(error.message);
+      }
+    });
+    libraryHeader.append(createPattern);
+
+    const list = createElement("div", {
+      "aria-describedby": "v2-pattern-library-help",
+      className: "v2-pattern-library-list",
+      role: "list",
+    });
+    for (const pattern of state.patterns) {
+      const audible = pattern.notes.some(({ velocity }) => velocity > 0);
+      const item = createElement("div", {
+        className: "v2-pattern-library-item",
+        dataset: { patternLibraryId: pattern.id },
+        role: "listitem",
+      });
+      const dragPattern = createElement("button", {
+        "aria-label": `${pattern.name}, ${formatDurationTicks(pattern.lengthTicks)}. Drag to a Playlist Track`,
+        className: "v2-pattern-library-drag",
+        dataset: { patternId: pattern.id },
+        draggable: true,
+        title: `Drag ${pattern.name} to a Playlist Track`,
+        type: "button",
+      }, [
+        createElement("strong", { textContent: pattern.name }),
+        createElement("small", { textContent: formatDurationTicks(pattern.lengthTicks) }),
+      ]);
+      dragPattern.addEventListener("click", () => {
+        workspaceState.setActivePattern?.(pattern.id);
+        announce(`${pattern.name} selected in the Pattern Library.`);
+      });
+      dragPattern.addEventListener("dragstart", (event) => {
+        draggedPatternId = pattern.id;
+        event.dataTransfer?.setData(PATTERN_DRAG_TYPE, pattern.id);
+        event.dataTransfer?.setData("text/plain", pattern.id);
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+        dragPattern.classList.add("is-dragging");
+      });
+      dragPattern.addEventListener("dragend", () => {
+        draggedPatternId = null;
+        dragPattern.classList.remove("is-dragging");
+        clearPatternDropTargets();
+      });
+
+      const add = createElement("button", {
+        "aria-label": audible
+          ? `Add ${pattern.name} to ${destination.name} at or after ${formatTickPosition(cursorTick())}`
+          : `Cannot add ${pattern.name}: add an audible note first`,
+        className: "v2-pattern-library-add",
+        disabled: !audible,
+        textContent: "Add",
+        title: audible
+          ? `Add ${pattern.name} to ${destination.name} at or after ${formatTickPosition(cursorTick())}`
+          : `${pattern.name} needs an audible note before it can be added`,
+        type: "button",
+        onClick: () => addPatternAtCursor(pattern.id),
+      });
+
+      const actions = createElement("details", { className: "v2-pattern-library-actions v2-action-menu" });
+      const actionSummary = createElement("summary", {
+        "aria-label": `Actions for ${pattern.name}`,
+        textContent: "\u2699",
+        title: `Actions for ${pattern.name}`,
+      });
+      actions.append(actionSummary);
+      const panel = createElement("div", { className: "v2-action-menu-panel" });
+      actions.addEventListener("toggle", () => {
+        if (!actions.open) return;
+        for (const other of node.querySelectorAll(".v2-pattern-library-actions[open]")) {
+          if (other !== actions) other.open = false;
+        }
+        queueMicrotask(() => {
+          if (!actions.open || !actions.isConnected) return;
+          const anchor = actionSummary.getBoundingClientRect();
+          const menu = panel.getBoundingClientRect();
+          const view = node.ownerDocument?.defaultView;
+          const viewportWidth = view?.innerWidth ?? 0;
+          const viewportHeight = view?.innerHeight ?? 0;
+          const gap = 6;
+          const edge = 8;
+          const left = Math.max(edge, Math.min(
+            anchor.right - menu.width,
+            viewportWidth - menu.width - edge,
+          ));
+          const below = anchor.bottom + gap;
+          const top = below + menu.height <= viewportHeight - edge
+            ? below
+            : Math.max(edge, anchor.top - menu.height - gap);
+          panel.style.left = `${Math.round(left)}px`;
+          panel.style.right = "auto";
+          panel.style.top = `${Math.round(top)}px`;
+        });
+      }, { signal: lifecycle.signal });
+      panel.addEventListener("click", (event) => {
+        if (event.target.closest?.("button")) actions.open = false;
+      }, { signal: lifecycle.signal });
+      panel.append(createElement("button", {
+        textContent: "Open Pattern",
+        type: "button",
+        onClick: () => onOpenPattern(pattern.id, destination.id),
+      }));
+      panel.append(createElement("button", {
+        disabled: state.patterns.length >= 64,
+        textContent: "Duplicate Pattern",
+        type: "button",
+        onClick: () => {
+          try {
+            const id = mutateProject(() => projectState.duplicatePattern(pattern.id));
+            workspaceState.setActivePattern?.(id);
+            announce(`Duplicated ${pattern.name}.`);
+            render();
+            focusPatternLibraryItem(id);
+          } catch (error) {
+            announce(error.message);
+          }
+        },
+      }));
+      panel.append(createElement("button", {
+        textContent: "Rename Pattern",
+        type: "button",
+        onClick: () => {
+          const name = globalThis.prompt?.("Pattern name", pattern.name);
+          if (name === null || name === undefined) return;
+          try {
+            mutateProject(() => projectState.renamePattern(pattern.id, name));
+            announce(`Renamed Pattern to ${projectState.getPattern(pattern.id).name}.`);
+            render();
+            focusPatternLibraryItem(pattern.id);
+          } catch (error) {
+            announce(error.message);
+          }
+        },
+      }));
+      const length = createElement("select", { "aria-label": `${pattern.name} length` });
+      for (let ticks = 96; ticks <= 3072; ticks += 96) {
+        length.append(createElement("option", {
+          textContent: `${ticks / 384} bar${ticks === 384 ? "" : "s"} (${ticks} ticks)`,
+          value: ticks,
+        }));
+      }
+      length.value = String(pattern.lengthTicks);
+      length.addEventListener("change", async () => {
+        const next = Number(length.value);
+        try {
+          const confirmed = await confirmPatternResize(pattern, next);
+          if (!confirmed) {
+            length.value = String(pattern.lengthTicks);
+            return;
+          }
+          mutateProject(() => projectState.resizePattern(pattern.id, next, {
+            confirm: true,
+            confirmTruncate: true,
+          }));
+          announce(`Resized ${pattern.name}.`);
+          render();
+          focusPatternLibraryItem(pattern.id);
+        } catch (error) {
+          length.value = String(pattern.lengthTicks);
+          announce(error.message);
+        }
+      });
+      panel.append(length);
+      panel.append(createElement("button", {
+        className: "v2-danger-button",
+        disabled: state.patterns.length === 1,
+        textContent: "Delete Pattern",
+        type: "button",
+        onClick: async () => {
+          if (!await confirmPatternDelete(pattern)) return;
+          const patternIndex = state.patterns.findIndex(({ id }) => id === pattern.id);
+          const focusId = state.patterns[patternIndex + 1]?.id
+            ?? state.patterns[patternIndex - 1]?.id;
+
+          try {
+            mutateProject(() => projectState.deletePattern(pattern.id, { removeReferences: true }));
+            announce(`Deleted ${pattern.name}.`);
+            render();
+            focusPatternLibraryItem(focusId);
+          } catch (error) {
+            announce(error.message);
+          }
+        },
+      }));
+      actions.append(panel);
+      item.append(dragPattern, add, actions);
+      list.append(item);
+    }
+    patternLibrary.append(libraryHeader, list);
+  }
+
   function renderInspector() {
     clearElement(inspector);
     const state = project();
     const found = findClip(state, selectedClipId());
     const destination = state.tracks.find(({ id }) => id === destinationTrackId()) ?? state.tracks[0];
-    const patternSelect = createElement("select", { "aria-label": "Pattern to add" });
-    for (const candidate of state.patterns) {
-      patternSelect.append(createElement("option", { textContent: candidate.name, value: candidate.id }));
-    }
-    patternSelect.value = patternToAddId();
-    const addPattern = createElement("button", {
-      className: "v2-primary-action",
-      type: "button",
-    });
-    const synchronizePatternAdd = () => {
-      const pattern = state.patterns.find(({ id }) => id === patternSelect.value) ?? state.patterns[0];
-      const audible = pattern.notes.some(({ velocity }) => velocity > 0);
-      addPattern.disabled = !audible;
-      addPattern.textContent = `Add to ${destination.name}`;
-      addPattern.title = audible
-        ? `Add ${pattern.name} to ${destination.name} at or after ${formatTickPosition(cursorTick())}`
-        : `${pattern.name} needs an audible note before it can be added`;
-      addPattern.setAttribute(
-        "aria-label",
-        audible
-          ? `Add ${pattern.name} to ${destination.name} at or after ${formatTickPosition(cursorTick())}`
-          : `Cannot add ${pattern.name}: add an audible note first`,
-      );
-    };
-    patternSelect.addEventListener("change", () => {
-      workspaceState.setActivePattern?.(patternSelect.value);
-      synchronizePatternAdd();
-    });
-    addPattern.addEventListener("click", () => addPatternAtCursor(patternSelect.value));
-    synchronizePatternAdd();
-    inspector.append(createElement("label", {}, ["Pattern", patternSelect]), addPattern);
     if (!found) {
       const track = destination;
       inspector.append(createElement("p", { textContent: `${track.name} · insertion cursor ${formatTickPosition(cursorTick())}` }));
@@ -619,7 +877,7 @@ export function createPlaylistSurface({
           className: "v2-primary-action",
           textContent: "Open Piano Roll",
           type: "button",
-          onClick: () => onOpenPattern(patternSelect.value, track.id),
+          onClick: () => onOpenPattern(patternToAddId(), track.id),
         }));
       }
       return;
@@ -700,6 +958,39 @@ export function createPlaylistSurface({
         role: "row",
         "aria-rowindex": trackIndex + 1,
         style: { top: `${46 + trackIndex * LANE_HEIGHT}px` },
+      });
+      lane.addEventListener("dragover", (event) => {
+        const patternId = getTransferredPatternId(event.dataTransfer);
+        const dropTick = getSnappedPlaylistDropTick({
+          clientX: event.clientX,
+          pixelsPerTick,
+          snapTicks,
+          timelineLeft: timeline.getBoundingClientRect().left,
+        });
+        if (!patternId || dropTick === null) return;
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+        clearPatternDropTargets();
+        lane.classList.add("is-pattern-drop-target");
+      });
+      lane.addEventListener("dragleave", (event) => {
+        if (!lane.contains(event.relatedTarget)) lane.classList.remove("is-pattern-drop-target");
+      });
+      lane.addEventListener("drop", (event) => {
+        const patternId = getTransferredPatternId(event.dataTransfer);
+        const dropTick = getSnappedPlaylistDropTick({
+          clientX: event.clientX,
+          pixelsPerTick,
+          snapTicks,
+          timelineLeft: timeline.getBoundingClientRect().left,
+        });
+        event.preventDefault();
+        event.stopPropagation();
+        clearPatternDropTargets();
+        draggedPatternId = null;
+        if (!patternId || dropTick === null) return;
+        workspaceState.setActivePattern?.(patternId);
+        addPatternToTrack(patternId, track.id, dropTick, { exact: true });
       });
       const trackHeader = createElement("div", {
         "aria-label": track.name,
@@ -811,6 +1102,12 @@ export function createPlaylistSurface({
         bindClipPointer(button, found);
         button.addEventListener("click", () => selectClip(clip.id));
         button.addEventListener("dblclick", () => onOpenPattern(pattern.id, track.id));
+        button.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          button.focus({ preventScroll: true });
+          removeClip(clip.id);
+        });
         lane.append(button);
       }
       timeline.append(lane);
@@ -849,6 +1146,7 @@ export function createPlaylistSurface({
   function render() {
     captureFocusPreference();
     renderHeader();
+    renderPatternLibrary();
     renderTimeline();
   }
 
@@ -865,6 +1163,12 @@ export function createPlaylistSurface({
       lane?.dataset.trackId ?? destinationTrackId(),
     );
   }, { signal: lifecycle.signal });
+  node.ownerDocument?.addEventListener?.("pointerdown", (event) => {
+    if (event.target.closest?.(".v2-pattern-library-actions")) return;
+    for (const actions of node.querySelectorAll(".v2-pattern-library-actions[open]")) {
+      actions.open = false;
+    }
+  }, { capture: true, signal: lifecycle.signal });
   const replacementOperations = new Set(["open-project", "replace", "create-project-from-template"]);
   const handleProjectChange = (event) => {
     if (localProjectMutationDepth > 0 || replacementOperations.has(event?.detail?.operation)) return;

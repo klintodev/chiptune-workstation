@@ -182,11 +182,6 @@ function findDevice(project, kind, instanceId) {
     : null;
 }
 
-function primaryIdentity(state) {
-  if (state.activePrimary === "piano-roll") return `piano-roll:${state.activePatternId}`;
-  return `${state.activePrimary}:${state.projectId}`;
-}
-
 function stateEquals(left, right) {
   return left === right || JSON.stringify(left) === JSON.stringify(right);
 }
@@ -344,7 +339,7 @@ function activatePrimary(state, action, project) {
     activePatternId,
     patternSurfaces,
   };
-  if (primaryIdentity(next) !== primaryIdentity(state)) next.device = null;
+  if (kind === "mixer" || state.activePrimary === "mixer") next.device = null;
   return repairWorkspaceState(next, root);
 }
 
@@ -405,7 +400,7 @@ export function reduceWorkspaceState(state, action, project) {
         ...state,
         activePatternId: pattern.id,
         patternSurfaces,
-        device: state.activePrimary === "piano-roll" ? null : state.device,
+        device: state.device,
       }, root);
     }
     case "pattern/update":

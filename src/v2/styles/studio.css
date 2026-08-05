@@ -656,6 +656,136 @@ body {
 }
 
 /* Playlist */
+.v2-playlist {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+}
+
+.v2-playlist-pattern-library {
+  position: relative;
+  min-width: 0;
+  border-bottom: 1px solid var(--v2-line);
+  background: var(--v2-panel-soft);
+}
+
+.v2-playlist-pattern-library > summary {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 5px 12px;
+  color: var(--v2-text);
+  cursor: pointer;
+  font-family: "Silkscreen", "Courier New", monospace;
+  font-size: 0.68rem;
+  list-style: none;
+}
+
+.v2-playlist-pattern-library > summary::before {
+  margin-right: 7px;
+  color: var(--v2-accent-strong);
+  content: "\25B8";
+}
+
+.v2-playlist-pattern-library[open] > summary::before {
+  content: "\25BE";
+}
+
+.v2-playlist-pattern-library > summary::-webkit-details-marker,
+.v2-pattern-library-actions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.v2-pattern-library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 12px 7px;
+}
+
+.v2-pattern-library-header p {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--v2-muted);
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-pattern-library-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  max-height: 178px;
+  gap: 6px;
+  overflow: auto;
+  padding: 0 12px 9px;
+}
+
+.v2-pattern-library-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid var(--v2-line);
+  border-radius: 5px;
+  background: var(--v2-panel-raised);
+}
+
+.v2-pattern-library-drag {
+  display: grid;
+  min-width: 0;
+  min-height: 38px !important;
+  align-content: center;
+  cursor: grab;
+  text-align: left;
+}
+
+.v2-pattern-library-drag:active,
+.v2-pattern-library-drag.is-dragging {
+  cursor: grabbing;
+  opacity: 0.62;
+}
+
+.v2-pattern-library-drag strong,
+.v2-pattern-library-drag small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-pattern-library-drag small {
+  color: var(--v2-muted);
+}
+
+.v2-pattern-library-add,
+.v2-pattern-library-actions > summary {
+  min-width: 40px;
+  min-height: 38px;
+}
+
+.v2-pattern-library-actions[open] {
+  z-index: 60;
+  display: block;
+}
+
+.v2-pattern-library-actions[open] > summary {
+  position: relative;
+  z-index: 1;
+}
+
+.v2-pattern-library-actions .v2-action-menu-panel {
+  position: fixed;
+  z-index: 120;
+  width: 220px;
+  max-height: min(270px, calc(100dvh - 16px));
+  overflow: auto;
+  margin: 0;
+  box-shadow: 0 16px 38px var(--v2-shadow-soft);
+}
+
 .v2-playlist-scroll {
   min-width: 0;
   min-height: 0;
@@ -697,6 +827,11 @@ body {
 
 .v2-playlist-lane:nth-child(2n) {
   background: color-mix(in srgb, var(--v2-bg) 60%, transparent);
+}
+
+.v2-playlist-lane.is-pattern-drop-target {
+  background: color-mix(in srgb, var(--v2-accent) 18%, var(--v2-panel));
+  box-shadow: inset 0 0 0 2px var(--v2-accent-strong);
 }
 
 .v2-playlist-lane.is-destination {
@@ -1272,5 +1407,583 @@ body {
     border: 2px solid ButtonText !important;
     background: ButtonFace !important;
     color: ButtonText !important;
+  }
+}
+
+/* V1 visual identity -------------------------------------------------------
+   V2 adds editing surfaces, but it deliberately reuses the original Klinto
+   chrome and control language instead of presenting a second brand. */
+.v2-workspace-shell {
+  display: block;
+  max-block-size: none;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.v2-global-shell.global-bar {
+  display: grid;
+  width: 100%;
+  height: var(--global-bar-height);
+  min-width: 0;
+  grid-template-columns: minmax(300px, 1fr) auto minmax(300px, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  border-bottom: 2px solid var(--line-strong);
+  background: linear-gradient(var(--surface-soft), var(--surface));
+}
+
+.v2-project-cluster,
+.v2-global-transport,
+.v2-global-status {
+  min-width: 0;
+}
+
+.v2-brand.studio-badge {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.v2-brand-mark.studio-mark {
+  width: 9px;
+  height: 9px;
+  border: 0;
+  border-radius: 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.v2-brand-name {
+  margin: 0;
+  color: var(--accent);
+  font-family: "Silkscreen", monospace;
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.v2-beta-badge.studio-beta {
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font: 400 0.44rem/1 "Silkscreen", monospace;
+  letter-spacing: 0.08em;
+  opacity: 0.78;
+  text-transform: uppercase;
+}
+
+.v2-project-summary.project-summary {
+  display: grid;
+  min-width: 0;
+  max-width: 330px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 9px;
+  border-color: var(--line-strong);
+  background: var(--bg-1);
+  text-align: left;
+  text-transform: none;
+}
+
+.v2-project-summary #project-title {
+  font-family: "VT323", monospace;
+  font-size: 1.15rem;
+}
+
+.v2-global-transport.global-transport {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.v2-arrangement-transport.arrangement-transport button {
+  width: 34px;
+  min-width: 34px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-color: var(--line-strong);
+  color: var(--label);
+  background: var(--surface-strong);
+  font-family: sans-serif;
+  font-size: 0.8rem;
+  text-transform: none;
+}
+
+.v2-arrangement-transport .v2-transport-play {
+  width: 46px;
+  border-color: var(--accent) !important;
+  color: var(--black) !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.v2-arrangement-transport #transport-loop[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--black);
+  background: var(--accent);
+}
+
+.v2-mode-control.mode-control,
+.v2-tempo.tempo-control,
+.v2-master-control.master-control {
+  border-color: var(--line-strong);
+  background: var(--bg-1);
+}
+
+.v2-mode-control.mode-control select {
+  min-height: 18px;
+  border: 0;
+  background: transparent;
+}
+
+.v2-tempo.tempo-control input {
+  min-height: 24px;
+  border: 0;
+  background: transparent;
+}
+
+.v2-master-control.master-control input[type="range"] {
+  min-height: 12px;
+  border: 0;
+  background: transparent;
+}
+
+.v2-global-status.global-status {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.v2-audio-status.status-cluster {
+  min-width: 92px;
+  min-height: 34px;
+  height: 34px;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--bg-1);
+  text-align: left;
+  text-transform: none;
+}
+
+.v2-audio-status.status-cluster strong {
+  font-family: "VT323", monospace;
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.v2-workspace[data-audio-state="running"] .v2-status-light {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 9px var(--accent);
+}
+
+.v2-surface-switcher {
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--bg-1);
+}
+
+.v2-surface-switcher > button,
+.v2-secondary-menu > summary {
+  min-height: 30px;
+  border-color: var(--line-strong);
+  color: var(--label);
+  background: var(--surface-strong);
+}
+
+.v2-transport-status {
+  position: absolute;
+  right: 0;
+  bottom: -24px;
+  z-index: 12;
+  max-width: 260px;
+  padding: 3px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  color: var(--muted);
+  background: var(--panel-raised);
+  box-shadow: 0 4px 12px var(--shadow);
+  font-size: 0.78rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.v2-primary-host {
+  background: var(--surface);
+}
+
+.v2-surface-header,
+.v2-note-inspector,
+.v2-clip-inspector,
+.v2-playlist-pattern-library {
+  background: var(--panel-raised);
+}
+
+.v2-piano-note {
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent-bright) !important;
+}
+
+.v2-piano-note.is-selected {
+  border-color: var(--selection) !important;
+  background: color-mix(in srgb, var(--selection) 18%, var(--surface)) !important;
+  color: var(--ink) !important;
+}
+
+.v2-device-host > *,
+.v2-editor-host > * {
+  border: 1px solid var(--line-bright);
+  border-radius: 6px;
+  background: var(--panel-raised);
+  box-shadow: 0 20px 70px var(--shadow);
+}
+
+.v2-floating-window-header,
+.v2-device-header {
+  background: linear-gradient(var(--surface-soft), var(--surface));
+}
+
+@media (max-width: 1180px) {
+  .v2-global-shell.global-bar {
+    grid-template-columns: minmax(130px, 1fr) auto minmax(160px, 1fr);
+    gap: 8px;
+    padding-inline: 8px;
+  }
+}
+
+
+.v2-brand-name {
+  display: block;
+}
+
+.v2-piano-window .v2-surface-title {
+  display: none;
+}
+
+@media (max-width: 1400px) {
+  .v2-global-shell.global-bar {
+    grid-template-columns: minmax(210px, 1fr) auto 356px;
+    gap: 8px;
+    padding-inline: 8px;
+  }
+
+  .v2-beta-badge,
+  .v2-transport-status {
+    display: none;
+  }
+
+  .v2-project-summary.project-summary {
+    max-width: 210px;
+  }
+
+  .v2-surface-switcher > button {
+    width: 38px;
+    min-width: 38px;
+    overflow: hidden;
+    padding-inline: 4px;
+    font-size: 0;
+  }
+
+  .v2-surface-switcher > button::before {
+    content: attr(data-mobile-label);
+    font-size: 0.54rem;
+  }
+
+  .v2-audio-status.status-cluster {
+    width: 34px;
+    min-width: 34px;
+    justify-content: center;
+    padding-inline: 6px;
+  }
+
+  .v2-audio-status.status-cluster strong,
+  .account-summary > span:last-child {
+    display: none;
+  }
+
+  .account-summary {
+    width: 34px;
+    min-width: 34px;
+    padding-inline: 6px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .v2-global-shell.global-bar {
+    grid-template-columns: minmax(130px, 1fr) auto 326px;
+  }
+
+  .v2-brand-name,
+  .v2-beta-badge {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .v2-global-shell.global-bar {
+    grid-template-columns: minmax(90px, 1fr) auto 220px;
+  }
+
+  .v2-surface-switcher > button {
+    width: 36px;
+    min-width: 36px;
+  }
+}
+
+@media (max-width: 700px) {
+  .v2-global-shell.global-bar {
+    grid-template-areas: "project status" "transport transport";
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 44px 44px;
+  }
+
+  .v2-project-cluster { grid-area: project; }
+  .v2-global-transport { grid-area: transport; }
+  .v2-global-status { grid-area: status; }
+  .account-summary { width: 44px; min-width: 44px; }
+}
+
+@media (max-width: 1180px) {
+  .v2-brand-name,
+  .v2-beta-badge,
+  .v2-transport-status {
+    display: none;
+  }
+
+  .v2-project-summary.project-summary {
+    max-width: 150px;
+  }
+}
+
+@media (max-width: 900px) {
+  .v2-global-shell.global-bar {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .v2-master-control,
+  .v2-tempo,
+  .v2-mode-control {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .v2-global-shell.global-bar {
+    height: 96px;
+    min-height: 96px;
+    grid-template-areas: "project status" "transport transport";
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 44px 44px;
+    gap: 4px 6px;
+    padding: 4px 8px;
+  }
+
+  .v2-project-cluster { grid-area: project; }
+  .v2-global-transport { grid-area: transport; justify-self: center; }
+  .v2-global-status { grid-area: status; justify-self: end; }
+  .v2-brand { display: none !important; }
+  .v2-project-summary.project-summary { max-width: 96px; }
+  .v2-project-summary .project-save-pill { display: none; }
+  .v2-arrangement-transport.arrangement-transport button {
+    width: 42px;
+    min-width: 42px;
+    height: 40px;
+    min-height: 40px;
+  }
+  .v2-arrangement-transport .v2-transport-play { width: 48px; }
+  .v2-audio-status.status-cluster { display: none; }
+}
+
+/* The workstation itself remains the edge-to-edge V1 canvas. Floating V2
+   editors add depth locally without wrapping the entire studio in a new skin. */
+html,
+body {
+  background: var(--bg-0);
+}
+
+.v2-workspace {
+  inline-size: 100%;
+  block-size: 100dvh;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg-0);
+  box-shadow: none;
+}
+
+.v2-workspace::after {
+  display: none;
+}
+
+@media (max-height: 640px) and (min-width: 701px) {
+  .v2-global-shell.global-bar {
+    height: 56px;
+    min-height: 56px;
+  }
+}
+
+
+/* Compact mobile chrome keeps project and audio state available while the
+   control rail preserves the full set of primary navigation actions. */
+@media (max-width: 700px) {
+  .v2-global-shell.global-bar {
+    height: 112px;
+    min-height: 112px;
+    grid-template-areas: "project status" "transport status";
+    grid-template-columns: minmax(0, 1fr) 128px;
+    grid-template-rows: 46px 46px;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .v2-project-cluster {
+    display: flex;
+    width: 100%;
+    grid-area: project;
+  }
+
+  .v2-project-summary.project-summary {
+    width: 100%;
+    max-width: none;
+    min-height: 44px;
+    gap: 4px;
+    padding: 4px 6px;
+  }
+
+  .v2-project-summary .project-save-pill {
+    display: flex;
+    min-width: 0;
+    max-width: 44px;
+    gap: 2px;
+    overflow: hidden;
+    padding: 2px 3px;
+  }
+
+  .v2-project-summary .project-save-pill > span {
+    flex: 0 0 auto;
+    width: 4px;
+    height: 4px;
+  }
+
+  .v2-project-summary #project-save-status {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    margin-left: 0;
+    font-size: 0.4rem;
+    letter-spacing: 0.03em;
+  }
+
+  .v2-menu-slot.global-tools,
+  .v2-menu-slot.account-slot {
+    display: none;
+  }
+
+  .v2-global-transport.global-transport {
+    width: auto;
+    max-width: 100%;
+    grid-area: transport;
+    justify-self: center;
+  }
+
+  .v2-global-status.global-status {
+    display: grid;
+    width: 128px;
+    height: 94px;
+    grid-area: status;
+    grid-template-areas: "surfaces surfaces surfaces" "audio theme menu";
+    grid-template-columns: 52px 34px 34px;
+    grid-template-rows: 44px 44px;
+    align-self: center;
+    align-items: center;
+    justify-content: stretch;
+    gap: 6px 4px;
+  }
+
+  .v2-global-status .v2-surface-switcher {
+    display: flex;
+    width: 100%;
+    height: 44px;
+    grid-area: surfaces;
+    justify-content: center;
+    gap: 2px;
+    padding: 1px;
+  }
+
+  .v2-global-status .v2-surface-switcher > button {
+    width: 36px;
+    min-width: 36px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .v2-audio-status.status-cluster {
+    display: flex;
+    width: 52px;
+    min-width: 52px;
+    height: 44px;
+    min-height: 44px;
+    grid-area: audio;
+    gap: 3px;
+    padding: 3px 4px;
+  }
+
+  .v2-audio-status.status-cluster strong {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.76rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .v2-audio-status .v2-status-light {
+    flex: 0 0 auto;
+    margin-right: 0;
+  }
+
+  .v2-global-status .theme-toggle {
+    width: 34px;
+    min-width: 34px;
+    height: 44px;
+    min-height: 44px;
+    grid-area: theme;
+  }
+
+  .v2-global-status .v2-secondary-menu {
+    width: 34px;
+    grid-area: menu;
+  }
+
+  .v2-global-status .v2-secondary-menu > summary {
+    width: 34px;
+    min-width: 34px;
+    height: 44px;
+    min-height: 44px;
+    padding-inline: 1px;
+    font-size: 0.52rem;
+  }
+
+  .v2-secondary-menu-panel {
+    top: 116px;
+    max-height: calc(100dvh - 124px);
   }
 }

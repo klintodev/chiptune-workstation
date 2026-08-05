@@ -56,10 +56,8 @@ export function createV2KeyboardAudition({
     return true;
   }
 
-  function heldTrackIds() {
-    return new Set(activeVoices
-      .filter((record) => record.inputMarked !== true)
-      .map((record) => record.trackId));
+  function heldVoiceRecords() {
+    return activeVoices.filter((record) => record.inputMarked !== true);
   }
 
   function heartbeat() {
@@ -67,17 +65,22 @@ export function createV2KeyboardAudition({
       stopHeartbeat();
       return;
     }
-    const trackIds = heldTrackIds();
-    if (trackIds.size === 0) {
+    const records = heldVoiceRecords();
+    if (records.length === 0) {
       stopHeartbeat();
       return;
     }
     const inputTime = audioEngine.getCurrentTime();
-    for (const trackId of trackIds) markInput(trackId, inputTime);
+    for (const record of records) {
+      markInput(record.trackId, inputTime, {
+        inputId: record.inputId,
+        phase: "active",
+      });
+    }
   }
 
   function syncHeartbeat() {
-    if (disposed || heldTrackIds().size === 0) {
+    if (disposed || heldVoiceRecords().length === 0) {
       stopHeartbeat();
       return;
     }
@@ -104,8 +107,8 @@ export function createV2KeyboardAudition({
     syncHeartbeat();
   }
 
-  function markInput(trackId, releaseEndTime) {
-    onTrackInput(trackId, Object.freeze({ releaseEndTime }));
+  function markInput(trackId, releaseEndTime, lifecycle) {
+    onTrackInput(trackId, Object.freeze({ releaseEndTime }), Object.freeze(lifecycle));
   }
 
   function createVoiceEngine() {
@@ -127,6 +130,7 @@ export function createV2KeyboardAudition({
           + VOICE_DISCONNECT_GRACE_SECONDS;
         const voiceId = nextVoiceId;
         nextVoiceId += 1;
+        const inputId = `keyboard-audition:${voiceId}`;
         const voice = runtime.trigger(Object.freeze({
           attackSeconds: event.attackSeconds,
           durationSeconds,
@@ -135,7 +139,7 @@ export function createV2KeyboardAudition({
             clipId: null,
             mode: "audition",
             noteId: null,
-            occurrenceId: `keyboard-audition:${voiceId}`,
+            occurrenceId: inputId,
             patternId: null,
             projectId: getProject().id ?? null,
             trackId: track.id,
@@ -152,7 +156,10 @@ export function createV2KeyboardAudition({
         function markFinalInputEnd(inputEndTime) {
           if (record.inputMarked) return false;
           record.inputMarked = true;
-          markInput(track.id, inputEndTime);
+          markInput(track.id, inputEndTime, {
+            inputId,
+            phase: "end",
+          });
           syncHeartbeat();
           return true;
         }
@@ -190,13 +197,17 @@ export function createV2KeyboardAudition({
         });
         record = {
           detachEnded: null,
+          inputId,
           inputEndTime: releaseEndTime,
           inputMarked: false,
           trackId: track.id,
           wrapper,
         };
         activeVoices.push(record);
-        markInput(track.id, startTime);
+        markInput(track.id, startTime, {
+          inputId,
+          phase: "start",
+        });
         record.detachEnded = voice.addEndedListener?.(() => {
           markFinalInputEnd(record.inputEndTime);
           removeRecord(record);
@@ -240,6 +251,23 @@ export function createV2KeyboardAudition({
       return true;
     },
     getActiveVoiceCount: () => activeVoices.length,
+    /**
+     * Drain computer-key ownership that targets a Track absent from the next
+     * Project. Call this after Project state changes but before graph sync, so
+     * final input-end markers still reach the retiring route exactly once.
+     */
+    reconcileProject(project = getProject()) {
+      if (!Array.isArray(project?.tracks)) {
+        throw new TypeError("Audition Project reconciliation requires Tracks.");
+      }
+      const validTrackIds = new Set(project.tracks.map(({ id }) => id));
+      const ownsInvalidTrack = activeVoices.some((record) => (
+        record.inputMarked !== true && !validTrackIds.has(record.trackId)
+      ));
+      if (!ownsInvalidTrack) return false;
+      inputController.stopAll();
+      return true;
+    },
     stopAll: inputController.stopAll,
   });
 }

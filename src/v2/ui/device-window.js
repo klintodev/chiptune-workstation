@@ -1,5 +1,6 @@
 import { DEVICE_REGISTRY } from "../audio/device-registry.js";
 import { createElement, clearElement, setPressed } from "./dom.js";
+import { createDraggableWindow } from "./draggable-window.js";
 
 const RANGE_EDIT_KEYS = new Set([
   "ArrowDown",
@@ -77,7 +78,9 @@ function createParameter({
 export function createDeviceWindow({
   device,
   mobile = false,
+  dragTarget,
   onClose,
+  onActivate,
   onInvalid = onClose,
   projectState,
 }) {
@@ -86,6 +89,7 @@ export function createDeviceWindow({
   const controls = new Map();
   let bypassControl = null;
   let disposed = false;
+  let currentMobile = Boolean(mobile);
   let historyOwner = null;
   let mountedDefinition = null;
   let mountedEditor = null;
@@ -98,7 +102,7 @@ export function createDeviceWindow({
   const title = createElement("h2", { className: "v2-device-title", tabIndex: -1 });
   const close = createElement("button", {
     className: "v2-device-close",
-    textContent: mobile ? "Back" : "Close",
+    textContent: currentMobile ? "Back" : "Close",
     type: "button",
     onClick: onClose,
   });
@@ -114,6 +118,12 @@ export function createDeviceWindow({
     className: `v2-device-header${reset ? " has-device-reset" : ""}`,
   }, reset ? [title, reset, close] : [title, close]);
   node.append(header, body);
+  const dragController = createDraggableWindow({
+    disabled: currentMobile || !dragTarget,
+    handle: header,
+    node: dragTarget ?? node,
+    onActivate,
+  });
 
   function project() {
     return projectState.getState();
@@ -317,6 +327,16 @@ export function createDeviceWindow({
   projectState.addEventListener("change", handleProjectChange);
   build();
 
+  function syncLayout(nextMobile) {
+    if (disposed) return false;
+    const next = Boolean(nextMobile);
+    const changed = next !== currentMobile;
+    currentMobile = next;
+    close.textContent = currentMobile ? "Back" : "Close";
+    dragController.setDisabled(currentMobile || !dragTarget);
+    return changed;
+  }
+
   return Object.freeze({
     device: Object.freeze({ ...device, owner: resolvedOwner }),
     dispose() {
@@ -326,6 +346,7 @@ export function createDeviceWindow({
       controlLifecycle.abort();
       unmountDefinition();
       lifecycle.abort();
+      dragController.dispose();
       projectState.removeEventListener("change", handleProjectChange);
       node.remove();
       return true;
@@ -333,5 +354,6 @@ export function createDeviceWindow({
     focus: () => title.focus({ preventScroll: true }),
     node,
     synchronize,
+    syncLayout,
   });
 }

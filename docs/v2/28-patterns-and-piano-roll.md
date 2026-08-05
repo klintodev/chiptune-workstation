@@ -6,13 +6,13 @@ Depends on: PRDs 26â€“27
 
 ## Description
 
-Replace V1's one-note-per-sixteenth-step Pattern and step editor with a shared tick/event foundation and a dedicated Piano Roll for each Pattern.
+Replace V1's one-note-per-sixteenth-step Pattern and step editor with a shared tick/event foundation and an independently addressable Piano Roll presented as a draggable modeless desktop window above Playlist.
 
 This PRD owns every musical-time conversion required by V2: Pattern length, note events, Playlist clip starts and transport loop bounds. Playlist presentation is delivered by PRD 31, but it consumes this completed tick model. No production V2 document is written until PRD 32 activates the final schema.
 
 ## Product outcome
 
-A user can write chords and melodies, set note duration and velocity, audition through a chosen Track and add the linked Pattern to Playlist. The Piano Roll is the one dominant first-run surface and is fully operable on desktop with pointer or keyboard.
+A user can write chords and melodies, set note duration and velocity, audition through a chosen Track and add the linked Pattern to Playlist. The Piano Roll is the dominant first-run desktop window above the useful Playlist base and is fully operable with pointer or keyboard.
 
 ## Pattern ownership and audition context
 
@@ -76,6 +76,7 @@ Invariants:
 - Playlist clips retain stable ID and Pattern reference but use integer `startTick`.
 - Clip duration is always the referenced Pattern's current `lengthTicks`.
 - Transport loop state uses `{ enabled, mode, startTick, endTick }`; `mode` remains `custom | arrangement`, `endTick` is exclusive and greater than `startTick`, and arrangement mode continues to follow the computed song end.
+- The user-facing control retains V1's direct `↻` Song-loop semantics: enabling it sets arrangement mode over `[0, currentSongEnd)`, disabling it turns looping off, and Pattern playback continues to repeat automatically without using this toggle.
 - The existing maximum song duration is converted exactly from sixteenth steps to ticks.
 - Pattern, clip and loop fields switch to ticks as one foundation. Step and tick fields never coexist in an activated schema.
 
@@ -125,7 +126,7 @@ Committed edits during playback follow this launch policy:
 
 Tempo changes rebuild only future scheduling from a stable tick playhead. Tests define the small look-ahead boundary rather than promising impossible sample-instant cancellation.
 
-## Piano Roll surface
+## Piano Roll window
 
 ### Persistent header
 
@@ -136,17 +137,19 @@ Only these groups remain permanently visible:
 - active tool and snap;
 - Add to Playlist.
 
-Zoom and history are grouped. The Pattern switcher menu owns New, Duplicate, Rename, Length and Delete. New creates a blank 384-tick `Pattern N`, activates its Piano Roll, preserves the current valid audition Track and focuses the editor as one undoable command. At 64 Patterns, New/Duplicate are disabled with a reason. Delete is disabled for the final Pattern; undoing creation closes the removed surface and restores the prior Pattern/switcher focus. Instrument opens from the audition-Track control. The header does not duplicate transport, Mixer or Project controls.
+History is grouped; Piano Roll zoom has no buttons and is controlled only by `Mod+wheel` over the editor. The Pattern switcher menu owns New, Duplicate, Rename, Length and Delete. New creates a blank 384-tick `Pattern N`, activates its Piano Roll, preserves the current valid audition Track and focuses the editor as one undoable command. At 64 Patterns, New/Duplicate are disabled with a reason. Delete is disabled for the final Pattern; undoing creation closes the removed surface and restores the prior Pattern/switcher focus. The audition-Track control changes destination only: Piano Roll contains no `Open Instrument` action or other Instrument launcher. The header does not duplicate transport, Mixer or Project controls.
 
 ### Editor
 
-The editor shows pitch rows, bar/beat grid, notes, selection and a visual playhead. Velocity appears only for selection/property editing, not as a permanent full-width lane. Zoom and pan never modify musical data.
+The editor shows pitch rows, bar/beat grid, notes, selection and a visual playhead. Velocity appears only for selection/property editing, not as a permanent full-width lane. `Control+wheel` on Windows/Linux and `Command+wheel` on macOS zoom around the pointer; ordinary wheel/trackpad input pans or scrolls. Zoom and pan never modify musical data or invoke page zoom while the editor owns the gesture.
 
 Launch tools:
 
 - **Draw:** click/drag empty space to create one snapped note with default duration of one snap; drag a note to move; drag its end handle to resize.
 - **Select:** select one or a bounded group, marquee, move, copy/paste and edit properties.
-- **Pan:** explicit pan tool plus wheel/trackpad scrolling that cannot create notes.
+- **Pan:** explicit pan tool plus unmodified wheel/trackpad scrolling that cannot create notes.
+- **Zoom:** `Mod+wheel` over the editor changes viewport scale; no zoom button is rendered.
+- **Context click:** right-clicking empty editor space suppresses the browser context menu and makes no change; right-clicking a note deletes that note as one undoable command.
 
 Every gesture previews a proposed change but commits one atomic domain command on completion. Invalid boundaries or caps reject the complete gesture and announce the reason. Pointer cancellation makes no change.
 
@@ -168,11 +171,11 @@ Cursor and selection repair deterministically after delete, Pattern resize and u
 
 ## Add to Playlist
 
-The action is always visible. It is disabled with `Add a note with non-zero velocity first` when the Pattern has no audible note. Otherwise it delegates to PRD 31 using `auditionTrackId` and the session-local Playlist insertion cursor, which defaults to tick 0 and never advances during Pattern playback. PRD 31 finds the first valid snapped position at or after that cursor. Success switches the session to Song mode, opens Playlist, selects the clip and advances the insertion cursor to its end; failure leaves Piano Roll active and explains that no valid space remains.
+The action is always visible. It is disabled with `Add a note with non-zero velocity first` when the Pattern has no audible note. Otherwise it delegates to PRD 31 using `auditionTrackId` and the session-local Playlist insertion cursor, which defaults to tick 0 and never advances during Pattern playback. PRD 31 finds the first valid snapped position at or after that cursor. On desktop, success keeps the modeless Piano Roll available above Playlist, selects/reveals the new clip and advances the insertion cursor to its end; at narrow widths it switches to fullscreen Playlist. Failure leaves Piano Roll active and explains that no valid space remains.
 
 ## Responsive boundary
 
-Desktop supports the full pointer and keyboard contract. At approximately 390Ã—844, V2 guarantees view/pan, cursor/select, explicit single-note create/delete, transport, Pattern/Track switching, save/reload and safe Back/focus. Multi-note touch selection, drag move/resize, velocity gestures and precision touch parity are post-V2. Touch targets for required explicit controls meet the target-size policy.
+Desktop supports the full pointer and keyboard contract in its modeless window. At approximately 390Ã—844, Piano Roll is the only exposed fullscreen surface and guarantees view/pan, cursor/select, explicit single-note create/delete, transport, Pattern/Track switching, save/reload and safe Back/focus. Multi-note touch selection, drag move/resize, velocity gestures and precision touch parity are post-V2. Touch targets for required explicit controls meet the target-size policy.
 
 ## Performance and reliability
 
@@ -186,7 +189,7 @@ Desktop supports the full pointer and keyboard contract. At approximately 390Ã�
 
 ### Musical/time foundation
 
-- V1 step fixtures map exactly to 24-tick boundaries; clips and loops move to ticks in the same normalized result.
+- V1 step fixtures map exactly to 24-tick boundaries; clips and loops move to ticks in the same normalized result, and direct `↻` enable targets the full current Song exactly as V1.
 - A Pattern supports chords and overlapping same-pitch notes with distinct stable IDs.
 - Pitch 36â€“112, duration, boundary, velocity and count validation rejects malformed input before audio activation.
 - Pattern increase preflights all linked clips; decrease removes/truncates disclosed notes as one undoable command.
@@ -194,21 +197,22 @@ Desktop supports the full pointer and keyboard contract. At approximately 390Ã�
 
 ### Editor and lifecycle
 
-- A new Project opens Pattern 1 Piano Roll and no competing primary surface.
+- A new desktop Project opens Pattern 1 Piano Roll above visible Playlist; no second Piano Roll, device or Mixer competes with it.
 - Pointer and keyboard journeys create, select, move, resize, change velocity, delete and undo notes on desktop.
+- `Mod+wheel` zooms without zoom buttons; empty right-click is suppressed/no-op, note right-click deletes, and Piano Roll exposes no Instrument launcher.
 - Open-from-clip changes audition Track; ordinary surface return preserves it; Track removal repairs it without closing the Pattern.
 - Active-note delete/move/pitch change releases the owned voice without stuck notes or unrelated cut-offs.
 - New/Duplicate/Rename/Delete obey the 64-Pattern cap and final-Pattern rule; undo of active-Pattern creation/deletion repairs the surface and focuses a visible Pattern control.
-- At 1366Ã—768 there is no page scroll; at 200% zoom required editor and grouped actions remain reachable.
+- At 1366Ã—768 the fixed-size draggable window stays bounded above Playlist with no page scroll; at 200% zoom required editor and grouped actions remain reachable.
 
 ## Automated coverage
 
 - Pure migration fixtures for Pattern, clip and loop time/mode, deterministic IDs, `rootOctave` removal and 6/18-tick legacy endpoint editing
 - Validation/property tests for event invariants, limits, ordering and Pattern resize atomicity
-- Scheduler tests for chords, same-pitch overlap, deterministic simultaneous ordering/oldest-voice retirement, loop boundaries, tempo/seek/stop and the live-edit policy
+- Scheduler tests for chords, same-pitch overlap, deterministic simultaneous ordering/oldest-voice retirement, V1 direct whole-Song `↻` loop boundaries, tempo/seek/stop and the live-edit policy
 - Shared occurrence-projection parity tests for Pattern, Song, offline and public adapters
-- Desktop Playwright pointer and exact keyboard-command compose journeys covering create, move, transpose, resize, velocity, delete, undo and focus/announcement checks
-- 1366Ã—768 layout and 390Ã—844 reduced mobile smoke tests
+- Desktop Playwright pointer and exact keyboard-command compose journeys covering create, move, transpose, resize, velocity, right-click rules, `Mod+wheel`, delete, undo and focus/announcement checks, including absence of zoom buttons/Instrument launcher
+- 1366Ã—768 Playlist-under-window layout and 390Ã—844 single-fullscreen-surface smoke tests
 - Lifecycle/leak coverage for Pattern/Track/Project deletion and surface switching
 
 ## Delivery slices
@@ -216,7 +220,7 @@ Desktop supports the full pointer and keyboard contract. At approximately 390Ã�
 1. **Musical-time domain:** event Pattern plus tick clip/loop models, validators, complete pure V1 normalization and fixture tests.
 2. **Shared occurrence projection:** scheduler ownership and live-edit tests; live/offline/public adapters consume it behind the V2 flag.
 3. **Read-only Piano Roll:** semantic cursor, rendering, viewport and bounded performance fixture.
-4. **Editor commands:** draw/select/pan, keyboard commands, clipboard, Pattern operations and undo/redo.
+4. **Editor commands:** draw/select/pan, `Mod+wheel` zoom, context-click delete/suppression, keyboard commands, clipboard, Pattern operations and undo/redo.
 5. **Audition/Add integration:** transient Track context, Klinto Chip hand-off and PRD 31 command boundary.
 6. **Responsive/accessibility closure:** desktop assistive journey, 200% zoom and reduced mobile smoke.
 
@@ -231,6 +235,8 @@ These slices use feature-flagged in-memory fixtures or isolated development stor
 - Expression lanes beyond velocity, automation or MPE
 - Humanize, quantize dialogue, scale helpers, chord generators or MIDI import/export
 - Full mobile gesture parity
+- Piano Roll zoom buttons, an in-window Instrument launcher or arbitrary/custom editor context menus
+- User resizing or persisted Piano Roll geometry
 
 ## Resolved decisions
 
@@ -243,6 +249,8 @@ These slices use feature-flagged in-memory fixtures or isolated development stor
 - Already submitted Web Audio occurrences are not broadly rescheduled; active destructive edits release the owned voice, and future occurrences use new state.
 - Overflow deterministically retires the oldest inserted Track voice after canonical occurrence ordering, matching the V1 runtime cap.
 - Playback mode and Playlist insertion cursor are session state; Pattern playback never moves the insertion cursor.
+- The direct `↻` control toggles full-Song arrangement looping with V1 semantics; Pattern playback loops independently.
+- Piano Roll uses `Mod+wheel` zoom with no zoom buttons or Instrument launcher; empty right-click is suppressed and note right-click deletes.
 - A Project always retains at least one Pattern.
 - Normal release/effect tails may cross Pattern boundaries; gates may not.
 - The production schema cutover is deferred to PRD 32's atomic activation gate.

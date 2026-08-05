@@ -55,6 +55,7 @@ export function createDeviceRuntimeRegistry({
   smoothingSeconds = AUDIO_PARAM_SMOOTHING_SECONDS,
 } = {}) {
   if (!context?.createGain) throw new TypeError("An AudioContext-like object is required.");
+  const activeInputsByTrack = new Map();
   const instrumentRuntimes = new Map();
   const effectRuntimes = new Map();
   const trackRuntimes = new Map();
@@ -266,6 +267,49 @@ export function createDeviceRuntimeRegistry({
     }
   }
 
+  function routeInputId(trackId, inputId) {
+    return JSON.stringify([trackId, inputId]);
+  }
+
+  function addEffectTail(inputs, effect, project) {
+    const tailSeconds = getEffectTailSeconds(effect, project.transport.bpm);
+    if (tailSeconds === 0) return inputs;
+    return inputs.map((input) => ({
+      ...input,
+      inputEndTime: input.inputEndTime + tailSeconds,
+    }));
+  }
+
+  /** Seed every current route from exact held ownership after graph mutation. */
+  function reconcileActiveInputRoutes(project) {
+    const validTrackIds = new Set(project.tracks.map(({ id }) => id));
+    for (const trackId of activeInputsByTrack.keys()) {
+      if (!validTrackIds.has(trackId)) activeInputsByTrack.delete(trackId);
+    }
+
+    const masterInputs = [];
+    for (const track of project.tracks) {
+      let routedInputs = [...(activeInputsByTrack.get(track.id)?.values() ?? [])]
+        .map((input) => ({
+          inputEndTime: input.inputEndTime,
+          inputId: routeInputId(track.id, input.inputId),
+        }));
+      for (const effect of track.mixer.effects) {
+        effectRuntimes.get(effect.instanceId)?.runtime
+          .reconcileNonSilentInputs?.(routedInputs);
+        routedInputs = addEffectTail(routedInputs, effect, project);
+      }
+      masterInputs.push(...routedInputs);
+    }
+
+    let routedMasterInputs = masterInputs;
+    for (const effect of project.mixer.master.effects) {
+      effectRuntimes.get(effect.instanceId)?.runtime
+        .reconcileNonSilentInputs?.(routedMasterInputs);
+      routedMasterInputs = addEffectTail(routedMasterInputs, effect, project);
+    }
+  }
+
   function sync(project) {
     if (disposed) throw new Error("The audio runtime registry has been disposed.");
     const normalized = preflight(project);
@@ -335,6 +379,7 @@ export function createDeviceRuntimeRegistry({
       smoothAudioParam(master.volumeNode.gain, targetMasterVolume, context, smoothingSeconds);
     }
     lastProject = project;
+    reconcileActiveInputRoutes(project);
     return describeProjectAudioRoute(project);
   }
 
@@ -357,27 +402,67 @@ export function createDeviceRuntimeRegistry({
     });
   }
 
-  function markTrackInput(trackId, inputEndTime) {
+  function markTrackInput(trackId, inputEndTime, inputLifecycle) {
     if (!lastProject) return false;
     const track = lastProject.tracks.find((candidate) => candidate.id === trackId);
     if (!track) throw new RangeError(`Unknown Track: ${trackId}`);
+    let routedLifecycle;
+    if (inputLifecycle?.phase !== undefined) {
+      if (!["start", "active", "end"].includes(inputLifecycle.phase)) {
+        throw new RangeError(`Unknown routed input lifecycle phase: ${inputLifecycle.phase}.`);
+      }
+      if (typeof inputLifecycle.inputId !== "string" || inputLifecycle.inputId.length === 0) {
+        throw new TypeError("Routed input lifecycle requires a non-empty inputId.");
+      }
+      const inputId = routeInputId(trackId, inputLifecycle.inputId);
+      routedLifecycle = Object.freeze({
+        inputId,
+        phase: inputLifecycle.phase,
+      });
+    }
+    let activeTrackInputs;
+    let ownershipChanged = false;
+    if (routedLifecycle) {
+      if (!Number.isFinite(inputEndTime) || inputEndTime < 0) {
+        throw new RangeError("Routed input end time must be a non-negative finite number.");
+      }
+      activeTrackInputs = activeInputsByTrack.get(trackId);
+      if (inputLifecycle.phase === "start" || inputLifecycle.phase === "active") {
+        if (!activeTrackInputs) {
+          activeTrackInputs = new Map();
+          activeInputsByTrack.set(trackId, activeTrackInputs);
+        }
+        ownershipChanged = !activeTrackInputs.has(inputLifecycle.inputId);
+        activeTrackInputs.set(inputLifecycle.inputId, {
+          inputEndTime,
+          inputId: inputLifecycle.inputId,
+        });
+      } else {
+        ownershipChanged = activeTrackInputs?.has(inputLifecycle.inputId) === true;
+        if (!ownershipChanged) return false;
+      }
+    }
     let marked = false;
     let routedInputEndTime = inputEndTime;
     for (const effect of track.mixer.effects) {
       marked = effectRuntimes.get(effect.instanceId)?.runtime
-        .markNonSilentInput?.(routedInputEndTime) || marked;
+        .markNonSilentInput?.(routedInputEndTime, routedLifecycle) || marked;
       if (Number.isFinite(routedInputEndTime)) {
         routedInputEndTime += getEffectTailSeconds(effect, lastProject.transport.bpm);
       }
     }
     for (const effect of lastProject.mixer.master.effects) {
       marked = effectRuntimes.get(effect.instanceId)?.runtime
-        .markNonSilentInput?.(routedInputEndTime) || marked;
+        .markNonSilentInput?.(routedInputEndTime, routedLifecycle) || marked;
       if (Number.isFinite(routedInputEndTime)) {
         routedInputEndTime += getEffectTailSeconds(effect, lastProject.transport.bpm);
       }
     }
-    return marked;
+    if (inputLifecycle?.phase === "end") {
+      activeTrackInputs.delete(inputLifecycle.inputId);
+      if (activeTrackInputs.size === 0) activeInputsByTrack.delete(trackId);
+    }
+    return marked || ownershipChanged;
   }
 
   function dispose() {
@@ -390,6 +475,7 @@ export function createDeviceRuntimeRegistry({
     for (const record of effectRuntimes.values()) record.runtime.dispose();
     instrumentRuntimes.clear();
     effectRuntimes.clear();
+    activeInputsByTrack.clear();
     for (const runtime of trackRuntimes.values()) {
       safeDisconnect(runtime.channelGain);
       safeDisconnect(runtime.panner);
