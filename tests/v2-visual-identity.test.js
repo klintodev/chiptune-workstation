@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+import { createV2ThemeController } from "../src/v2/ui/theme-controller.js";
+
+const root = new URL("../", import.meta.url);
+
+test("V2 reuses the established Klinto palette, typography, and framed shell", async () => {
+  const css = await readFile(new URL("src/v2/styles/studio.css", root), "utf8");
+
+  assert.match(css, /--v2-bg:\s*var\(--bg-0\)/);
+  assert.match(css, /--v2-accent:\s*var\(--accent\)/);
+  assert.match(css, /\.v2-workspace\s*{[^}]*margin:\s*14px;[^}]*font-family:\s*"VT323"/s);
+  assert.match(css, /\.v2-workspace button,[\s\S]*font-family:\s*"Silkscreen"/);
+  assert.doesNotMatch(css, /Atkinson Hyperlegible|#ffbd5b|#6ee7e0/i);
+  assert.doesNotMatch(css, /var\(--v2-accent-bright\)/);
+  assert.match(css, /\.v2-piano-note\.is-selected\s*{[^}]*var\(--v2-selection\) 42%/s);
+});
+
+test("V2 theme state changes the shared theme root and exposes its current state", () => {
+  const values = new Map([["chiptune-workstation:theme", "dark"]]);
+  const button = {
+    attributes: new Map(),
+    dataset: {},
+    setAttribute(name, value) {
+      this.attributes.set(name, value);
+    },
+    textContent: "",
+    title: "",
+  };
+  const documentLike = {
+    documentElement: { dataset: {} },
+    querySelector: (selector) => selector === "#theme-toggle" ? button : null,
+  };
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+
+  const controller = createV2ThemeController({ document: documentLike, storage });
+  assert.equal(documentLike.documentElement.dataset.theme, "dark");
+  assert.equal(button.textContent, "Theme: Dark");
+  assert.equal(button.attributes.get("aria-label"), "Use light theme");
+
+  assert.equal(controller.toggle(), "light");
+  assert.equal(documentLike.documentElement.dataset.theme, "light");
+  assert.equal(button.dataset.theme, "light");
+  assert.equal(button.attributes.get("aria-pressed"), "true");
+  assert.equal(button.textContent, "Theme: Light");
+  assert.equal(values.get("chiptune-workstation:theme"), "light");
+});
+
+test("Piano Roll grid geometry and Mixer density remain visually bounded", async () => {
+  const css = await readFile(new URL("src/v2/styles/studio.css", root), "utf8");
+
+  assert.match(css, /--v2-piano-label-width:\s*88px/);
+  assert.match(css, /background-position:\s*var\(--v2-piano-label-width\) 0,\s*var\(--v2-piano-label-width\) 0/);
+  assert.match(css, /\.v2-pitch-label\s*{[^}]*width:\s*var\(--v2-piano-label-width\)/s);
+  assert.match(css, /\.v2-mixer-channels\s*{[^}]*align-items:\s*flex-start/s);
+  assert.match(css, /\.v2-insert-chain\s*{[^}]*margin-top:\s*6px/s);
+  assert.match(css, /@media \(max-width:\s*1400px\)\s*{[\s\S]*\.v2-brand-name,[\s\S]*\.v2-master-readout\s*{\s*display:\s*none/s);
+  assert.match(css, /@media \(max-width:\s*1040px\)\s*{[\s\S]*\.v2-global-shell\s*{[^}]*min-width:\s*0/s);
+  assert.match(css, /@media \(max-width:\s*700px\)\s*{[\s\S]*grid-template-rows:\s*44px 44px/s);
+});

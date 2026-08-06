@@ -59,6 +59,13 @@ test("computer note keys work from non-editable controls and stop across focus c
   const input = {
     closest: (selector) => selector.split(", ").includes("input") ? input : null,
   };
+  const rangeInput = {
+    tagName: "INPUT",
+    type: "range",
+    closest(selector) {
+      return selector.split(", ").includes("input") ? this : null;
+    },
+  };
   const createEvent = (target, values = {}) => {
     let prevented = false;
     return {
@@ -86,9 +93,16 @@ test("computer note keys work from non-editable controls and stop across focus c
   assert.equal(keyUp.prevented, true);
 
   controller.handleKeyDown(createEvent(input));
+  const rangeDown = createEvent(rangeInput, { code: "KeyX" });
+  controller.handleKeyDown(rangeDown);
+  assert.equal(rangeDown.prevented, true);
+  assert.equal(triggered.length, 2);
+  controller.handleKeyUp(createEvent(rangeInput, { code: "KeyX" }));
+  assert.equal(stopped.length, 2);
+
   controller.handleKeyDown(createEvent(button, { ctrlKey: true }));
   blockingSurfaces = [{ closest: () => null }];
   controller.handleKeyDown(createEvent(button));
-  assert.equal(triggered.length, 1);
+  assert.equal(triggered.length, 2);
   controller.dispose();
 });

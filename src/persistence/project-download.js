@@ -20,12 +20,11 @@ export function createProjectFilename(title) {
   return `${safeBase.slice(0, maximumBaseLength).trimEnd() || "chiptune-project"}${PROJECT_FILE_EXTENSION}`;
 }
 
-export function downloadProjectFile(text, title, {
+function downloadTextFile(text, title, {
   BlobClass = globalThis.Blob,
   documentTarget = globalThis.document,
   urlTarget = globalThis.URL,
 } = {}) {
-  parseProjectDocument(text);
   if (
     typeof BlobClass !== "function"
     || typeof documentTarget?.createElement !== "function"
@@ -49,4 +48,24 @@ export function downloadProjectFile(text, title, {
     urlTarget.revokeObjectURL(url);
   }
   return filename;
+}
+
+export function downloadProjectFile(text, title, options = {}) {
+  parseProjectDocument(text);
+  return downloadTextFile(text, title, options);
+}
+
+/**
+ * Download a quarantined record without project normalization. Recovery data is
+ * still required to be JSON text, but future/malformed nested project state is
+ * intentionally preserved byte-for-byte.
+ */
+export function downloadRawProjectFile(text, title, options = {}) {
+  if (typeof text !== "string") throw new TypeError("Recovery copy contents must be text.");
+  try {
+    JSON.parse(text);
+  } catch {
+    throw new SyntaxError("Recovery copy is not valid JSON.");
+  }
+  return downloadTextFile(text, title, options);
 }

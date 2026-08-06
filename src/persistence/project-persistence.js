@@ -3,6 +3,7 @@ import {
   createProjectDocument,
   createProjectIdentifier,
   normalizeProjectDocument,
+  normalizeProjectDocumentForSchema,
   parseProjectDocument,
   reviseProjectDocument,
   serializeProjectDocument,
@@ -10,13 +11,20 @@ import {
 import { createBoundedUniqueName } from "../shared/bounded-name.js";
 import {
   MAX_PROJECT_TITLE_LENGTH,
+  PROJECT_SCHEMA_VERSION as LEGACY_PROJECT_SCHEMA_VERSION,
   createDefaultProject,
 } from "../state/project-state.js";
+import {
+  PROJECT_SCHEMA_VERSION as V2_PROJECT_SCHEMA_VERSION,
+  createDefaultV2Project,
+} from "../v2/domain/schema.js";
 
 function uniqueTitle(base, summaries, { fallback = "Untitled chiptune", suffix = "" } = {}) {
   return createBoundedUniqueName(
     base,
-    summaries.map(({ title }) => title),
+    summaries
+      .filter(({ availability }) => availability !== "unavailable")
+      .map(({ title }) => title),
     { fallback, maximumLength: MAX_PROJECT_TITLE_LENGTH, suffix },
   );
 }
@@ -26,25 +34,40 @@ export async function loadInitialProjectDocument({
   now = () => new Date().toISOString(),
   preferences,
   repository,
+  targetSchemaVersion = LEGACY_PROJECT_SCHEMA_VERSION,
 } = {}) {
   const preferredId = preferences?.getLastProjectId?.();
   if (preferredId) {
     try {
       const preferred = await repository.get(preferredId);
-      if (preferred) return preferred;
+      if (preferred) {
+        return normalizeProjectDocumentForSchema(preferred, targetSchemaVersion);
+      }
     } catch {
       // Fall through to the most recent valid project.
     }
   }
   const projects = await repository.list();
-  if (projects.length > 0) {
-    const recent = await repository.get(projects[0].id);
-    if (recent) {
-      preferences?.setLastProjectId?.(recent.id);
-      return recent;
+  for (const summary of projects) {
+    if (
+      summary.availability === "unavailable"
+      && summary.schemaVersion !== targetSchemaVersion
+    ) continue;
+    try {
+      const recent = await repository.get(summary.id);
+      if (recent) {
+        const compatible = normalizeProjectDocumentForSchema(recent, targetSchemaVersion);
+        preferences?.setLastProjectId?.(compatible.id);
+        return compatible;
+      }
+    } catch {
+      // Keep unsupported records listed and untouched; continue to an activatable Project.
     }
   }
-  const document = createProjectDocument(createDefaultProject(), { id: createId(), now: now() });
+  const project = targetSchemaVersion === V2_PROJECT_SCHEMA_VERSION
+    ? createDefaultV2Project()
+    : createDefaultProject();
+  const document = createProjectDocument(project, { id: createId(), now: now() });
   await repository.save(document);
   preferences?.setLastProjectId?.(document.id);
   return document;
@@ -64,7 +87,13 @@ export function createProjectPersistence({
   setTimer = globalThis.setTimeout,
 }) {
   const events = new EventTarget();
-  let activeDocument = normalizeProjectDocument(initialDocument);
+  const runtimeSchemaVersion = projectState.getState().schemaVersion;
+
+  function normalizeForRuntime(document) {
+    return normalizeProjectDocumentForSchema(document, runtimeSchemaVersion);
+  }
+
+  let activeDocument = normalizeForRuntime(initialDocument);
   let autosaveTimer = null;
   let changeGeneration = 0;
   let dirty = false;
@@ -124,7 +153,7 @@ export function createProjectPersistence({
     savePromise = repository.save(candidate);
     try {
       const saved = await savePromise;
-      activeDocument = normalizeProjectDocument(saved);
+      activeDocument = normalizeForRuntime(saved);
       preferences?.setLastProjectId?.(activeDocument.id);
       if (generation === changeGeneration) {
         dirty = false;
@@ -155,7 +184,7 @@ export function createProjectPersistence({
   projectState.addEventListener("change", handleProjectChange);
 
   async function activate(document, { detail = {}, flushCurrent = true } = {}) {
-    const target = normalizeProjectDocument(document);
+    const target = normalizeForRuntime(document);
     if (flushCurrent) await saveNow();
     suppressAutosave = true;
     try {
@@ -183,15 +212,25 @@ export function createProjectPersistence({
   async function openProject(id) {
     if (id === activeDocument.id) return activeDocument;
     await saveNow();
-    const document = await repository.get(id);
-    if (!document) throw new RangeError("That local project no longer exists.");
-    return activate(document, { flushCurrent: false });
+    try {
+      const document = await repository.get(id);
+      if (!document) throw new RangeError("That local project no longer exists.");
+      return await activate(document, { flushCurrent: false });
+    } catch (error) {
+      throw new Error(
+        "This project is unavailable for editing. Download its raw recovery copy to preserve the original.",
+        { cause: error },
+      );
+    }
   }
 
   async function createProject(title = "Untitled chiptune") {
     await saveNow();
     const summaries = await repository.list();
-    const project = JSON.parse(JSON.stringify(createDefaultProject()));
+    const defaultProject = runtimeSchemaVersion === V2_PROJECT_SCHEMA_VERSION
+      ? createDefaultV2Project()
+      : createDefaultProject();
+    const project = JSON.parse(JSON.stringify(defaultProject));
     project.metadata.title = uniqueTitle(title, summaries);
     const document = createProjectDocument(project, { id: createId(), now: now() });
     const saved = await repository.save(document);
@@ -229,17 +268,27 @@ export function createProjectPersistence({
       return activeDocument;
     }
     const remaining = await repository.list();
-    if (remaining.length > 0) {
-      const next = await repository.get(remaining[0].id);
-      return activate(next, { flushCurrent: false });
+    for (const summary of remaining) {
+      if (
+        summary.availability === "unavailable"
+        && summary.schemaVersion !== runtimeSchemaVersion
+      ) continue;
+      try {
+        const next = await repository.get(summary.id);
+        if (next) return activate(next, { flushCurrent: false });
+      } catch {
+        // Preserve unavailable records and continue to another activatable Project.
+      }
     }
     return createProject();
   }
 
   async function importProject(text) {
-    let imported = parseProjectDocument(text);
+    let imported = normalizeForRuntime(parseProjectDocument(text));
     await saveNow();
-    const existing = await repository.get(imported.id);
+    const existing = typeof repository.getRaw === "function"
+      ? await repository.getRaw(imported.id)
+      : await repository.get(imported.id);
     if (existing) {
       const summaries = await repository.list();
       imported = copyProjectDocument(imported, {
@@ -262,6 +311,15 @@ export function createProjectPersistence({
     const candidate = reviseProjectDocument(activeDocument, project, { now: now() });
     const saved = await repository.save(candidate);
     return activate(saved, { detail, flushCurrent: false });
+  }
+
+  async function getRawRecoveryText(id) {
+    if (typeof repository.getRaw !== "function") {
+      throw new Error("Raw project recovery is not supported by this storage provider.");
+    }
+    const raw = await repository.getRaw(id);
+    if (!raw) throw new RangeError("That recovery record no longer exists.");
+    return `${JSON.stringify(raw, null, 2)}\n`;
   }
 
   function getExportText() {
@@ -289,6 +347,7 @@ export function createProjectPersistence({
     exportProject,
     getActiveDocument: () => activeDocument,
     getExportText,
+    getRawRecoveryText,
     getState,
     hasUnsavedChanges,
     importProject,

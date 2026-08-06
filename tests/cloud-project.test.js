@@ -5,6 +5,8 @@ import test from "node:test";
 import {
   createCloudProjectRecord,
   normalizeCloudProjectRecord,
+  serializeRawCloudProjectRecord,
+  summarizeCloudProjectRecordForRecovery,
 } from "../src/firebase/cloud-project.js";
 import { createProjectDocument } from "../src/persistence/project-document.js";
 import { createDefaultProject } from "../src/state/project-state.js";
@@ -20,6 +22,39 @@ test("cloud records bind a validated project to one owner and revision", () => {
   assert.equal(record.cloudRevision, 3);
   assert.deepEqual(normalizeCloudProjectRecord(record, { ownerId: "user-one" }), record);
   assert.throws(() => normalizeCloudProjectRecord(record, { ownerId: "user-two" }), /owner/);
+});
+
+test("cloud recovery summaries retain future and malformed records by Firestore key", () => {
+  const document = createProjectDocument(createDefaultProject(), { id: "project-one", now: NOW });
+  const future = structuredClone(createCloudProjectRecord("user-one", document, 3));
+  future.document.project.schemaVersion = 99;
+  future.document.project.metadata.title = "Future cloud tune";
+  future.title = "Future cloud tune";
+  const malformed = {
+    cloudFormat: "broken",
+    title: "<Unavailable & untouched>",
+    document: { updatedAt: "not-a-date" },
+  };
+
+  const futureSummary = summarizeCloudProjectRecordForRecovery(future, {
+    ownerId: "user-one",
+    recoveryKey: "firestore-future",
+  });
+  const malformedSummary = summarizeCloudProjectRecordForRecovery(malformed, {
+    ownerId: "user-one",
+    recoveryKey: "firestore-malformed",
+  });
+
+  assert.equal(futureSummary.availability, "unavailable");
+  assert.equal(futureSummary.id, null);
+  assert.equal(futureSummary.recoveryKey, "firestore-future");
+  assert.equal(futureSummary.title, "Future cloud tune");
+  assert.match(futureSummary.reason, /Unsupported project schema version/);
+  assert.equal(malformedSummary.availability, "unavailable");
+  assert.equal(malformedSummary.recoveryKey, "firestore-malformed");
+  assert.equal(malformedSummary.updatedAt, null);
+  assert.equal(malformedSummary.title, "<Unavailable & untouched>");
+  assert.equal(serializeRawCloudProjectRecord(malformed), `${JSON.stringify(malformed, null, 2)}\n`);
 });
 
 test("cloud records reject projects with excessive collection counts", () => {

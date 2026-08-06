@@ -13,3 +13,5 @@
 @import url("./src/features/account/account.css?v=20260721-6");
 @import url("./src/features/audio-export/audio-export.css?v=20260721-2");
 @import url("./src/features/publishing/publishing.css?v=20260721-2");
+@import url("./src/v2/styles/workspace.css?v=20260804-1");
+@import url("./src/v2/styles/studio.css?v=20260804-1");

@@ -54,7 +54,7 @@ export function createAudioStatusFeature({
   if (elements.setup.open) elements.setup.close();
 
   function focusAfterSetup() {
-    const fallback = root.querySelector(".pattern-step-set");
+    const fallback = root.querySelector(".v2-piano-canvas, .pattern-step-set");
     const target = setupReturnFocus?.isConnected
       && setupReturnFocus !== root.body
       ? setupReturnFocus

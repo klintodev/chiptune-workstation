@@ -26,7 +26,7 @@ Existing safety limits remain unless a preceding PRD explicitly tightens them:
 
 The first public V2 Project is `schemaVersion: 7` inside the unchanged outer `documentVersion: 1` envelope. [The V2 Project schema contract](./v2-project-schema-contract.md) is the single normative shape; feature-PRD excerpts are non-normative. Version 7 lands atomically containing all of:
 
-- 96 PPQ Pattern `lengthTicks` and note events;
+- 96 PPQ note events and canonical content-derived Pattern `lengthTicks`;
 - tick-based clip `startTick` and loop `{ enabled, mode, startTick, endTick }`, retaining `custom | arrangement`;
 - Track `instrument` records for Klinto Chip;
 - Track `mixer` objects with empty-or-populated effect chains;
@@ -49,7 +49,7 @@ Migration is a pure trust-boundary operation: clone/parse â†’ validate sour
 
 ### Musical time
 
-- Pattern step count Ã— 24 â†’ `lengthTicks`; Â¼/Â¾ gates become exact 6/18-tick durations and remain editable without implicit quantization.
+- Populated steps become notes first, then `lengthTicks` is derived from the greatest note end; unused trailing V1 steps no longer impose a fixed Pattern size. Â¼/Â¾ gates become exact 6/18-tick durations and remain editable without implicit quantization.
 - Each populated step â†’ one deterministic note ID and `{ pitch, startTick, durationTicks, velocity }` per PRD 28.
 - Clip `startStep * 24` â†’ `startTick`.
 - Loop step bounds Ã— 24 â†’ exclusive tick bounds; preserve `transport.loop.mode` exactly and retain arrangement-mode auto-follow behaviour.
@@ -100,7 +100,7 @@ For audio fixtures:
 Fixtures cover V1 Project schemas 1 through 6 through the production migration chain, plus documented legacy aliases, including:
 
 - empty/default Project;
-- every Pattern length and boundary step;
+- every content-derived Pattern span and note boundary;
 - every waveform, octave and parameter boundary;
 - chords produced after migration only through distinct steps/Tracks, zero-velocity notes and maximum voice/count cases;
 - multiple linked clips, touching clips, maximum song boundary and loop bounds;

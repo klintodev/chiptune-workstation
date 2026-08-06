@@ -1,3 +1,4 @@
+import { downloadRawProjectFile } from "../../persistence/project-download.js";
 import { publicErrorMessage } from "../../shared/public-error.js";
 
 const SYNC_LABELS = Object.freeze({
@@ -11,10 +12,60 @@ const SYNC_LABELS = Object.freeze({
 });
 
 function formatUpdatedAt(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(date);
+}
+
+export function getCloudProjectRowModel(summary) {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+    throw new TypeError("A cloud project summary must be an object.");
+  }
+  const unavailable = summary.availability === "unavailable";
+  const id = typeof summary.id === "string" && summary.id.trim() ? summary.id : null;
+  const recoveryKey = typeof summary.recoveryKey === "string" && summary.recoveryKey
+    ? summary.recoveryKey
+    : null;
+  const title = typeof summary.title === "string" && summary.title.trim()
+    ? summary.title.trim()
+    : "Unavailable cloud project";
+  const revision = Number.isInteger(summary.cloudRevision) && summary.cloudRevision >= 1
+    ? `cloud revision ${summary.cloudRevision}`
+    : "cloud revision unavailable";
+  const reason = typeof summary.reason === "string" && summary.reason.trim()
+    ? summary.reason.trim()
+    : "This cloud record cannot be opened safely.";
+  return Object.freeze({
+    availability: unavailable ? "unavailable" : "ready",
+    canDelete: !unavailable && id !== null,
+    canOpen: !unavailable && id !== null,
+    canRecover: unavailable && recoveryKey !== null,
+    id,
+    meta: unavailable
+      ? `Unavailable / ${formatUpdatedAt(summary.updatedAt)} / ${reason.slice(0, 160)}`
+      : `${formatUpdatedAt(summary.updatedAt)} / ${revision}`,
+    reason,
+    recoveryKey,
+    title,
+  });
+}
+
+export async function downloadUnavailableCloudRecovery(summary, {
+  cloudProjectService,
+  downloadRecoveryProject = downloadRawProjectFile,
+} = {}) {
+  const model = getCloudProjectRowModel(summary);
+  if (!model.canRecover) {
+    throw new RangeError("Only an unavailable cloud record can be downloaded as a raw recovery copy.");
+  }
+  if (typeof cloudProjectService?.getRawRecoveryText !== "function") {
+    throw new Error("Raw cloud recovery is unavailable.");
+  }
+  const text = await cloudProjectService.getRawRecoveryText(model.recoveryKey);
+  return downloadRecoveryProject(text, `${model.title} cloud recovery`);
 }
 
 function createInterface(root) {
@@ -157,6 +208,7 @@ export function createAccountFeature({
   const elements = createInterface(root);
   let busy = false;
   let cloudGeneration = 0;
+  let cloudSummaries = new Map();
   let pendingDelete = null;
   let currentCloudState = Object.freeze({ status: "local-only", link: null });
 
@@ -180,25 +232,49 @@ export function createAccountFeature({
   }
 
   function createCloudRow(summary) {
+    const model = getCloudProjectRowModel(summary);
     const row = root.createElement("div");
     row.className = "account-cloud-project";
+    row.classList.toggle("unavailable", model.availability === "unavailable");
+    row.dataset.availability = model.availability;
+    const title = root.createElement("strong");
+    title.textContent = model.title;
+    const details = root.createElement("span");
+    details.textContent = model.meta;
+
+    if (!model.canOpen) {
+      const summaryText = root.createElement("div");
+      summaryText.className = "account-cloud-open account-cloud-unavailable-summary";
+      summaryText.setAttribute("aria-label", `${model.title}. ${model.meta}`);
+      summaryText.append(title, details);
+      const recover = root.createElement("button");
+      recover.type = "button";
+      recover.className = "account-cloud-recover";
+      recover.disabled = !model.canRecover;
+      if (model.canRecover) {
+        recover.dataset.action = "recover";
+        recover.dataset.recoveryKey = model.recoveryKey;
+      }
+      recover.setAttribute("aria-label", `Download raw recovery copy for ${model.title}`);
+      recover.title = "Download untouched raw cloud record";
+      recover.textContent = "Download";
+      row.append(summaryText, recover);
+      return row;
+    }
+
     const open = root.createElement("button");
     open.type = "button";
     open.className = "account-cloud-open";
     open.dataset.action = "open";
-    open.dataset.projectId = summary.id;
-    const title = root.createElement("strong");
-    title.textContent = summary.title;
-    const details = root.createElement("span");
-    details.textContent = `${formatUpdatedAt(summary.updatedAt)} / cloud revision ${summary.cloudRevision}`;
+    open.dataset.projectId = model.id;
     open.append(title, details);
     const remove = root.createElement("button");
     remove.type = "button";
     remove.className = "account-cloud-delete";
     remove.dataset.action = "delete";
-    remove.dataset.projectId = summary.id;
-    remove.dataset.projectTitle = summary.title;
-    remove.setAttribute("aria-label", `Remove ${summary.title} from cloud`);
+    remove.dataset.projectId = model.id;
+    remove.dataset.projectTitle = model.title;
+    remove.setAttribute("aria-label", `Remove ${model.title} from cloud`);
     remove.title = "Remove cloud copy";
     remove.innerHTML = "&times;";
     row.append(open, remove);
@@ -238,6 +314,7 @@ export function createAccountFeature({
     const generation = ++cloudGeneration;
     const { account } = accountService.getState();
     if (account?.emailVerified !== true) {
+      cloudSummaries = new Map();
       elements.cloudList.replaceChildren();
       return;
     }
@@ -248,6 +325,9 @@ export function createAccountFeature({
     try {
       const projects = await cloudProjectService.listProjects();
       if (generation !== cloudGeneration) return;
+      cloudSummaries = new Map(projects
+        .filter(({ recoveryKey }) => typeof recoveryKey === "string" && recoveryKey)
+        .map((summary) => [summary.recoveryKey, summary]));
       if (projects.length === 0) {
         const empty = root.createElement("p");
         empty.textContent = "No cloud projects yet.";
@@ -444,6 +524,17 @@ export function createAccountFeature({
   elements.cloudList.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button || busy) return;
+    if (button.dataset.action === "recover") {
+      const summary = cloudSummaries.get(button.dataset.recoveryKey);
+      if (summary?.availability !== "unavailable") return;
+      void run(
+        () => downloadUnavailableCloudRecovery(summary, {
+          cloudProjectService,
+        }),
+        "Raw cloud recovery copy downloaded.",
+      );
+      return;
+    }
     if (button.dataset.action === "delete") {
       requestCloudDelete(button.dataset.projectId, button.dataset.projectTitle);
       return;

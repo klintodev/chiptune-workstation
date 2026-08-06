@@ -1,0 +1,259 @@
+:root {
+  --v2-shell-height: 64px;
+}
+
+.v2-workspace {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(48px, min(var(--v2-shell-height), 72px)) minmax(0, 1fr);
+  inline-size: 100%;
+  block-size: 100dvh;
+  min-block-size: 0;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.v2-workspace-shell {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-block-size: 72px;
+  min-inline-size: 0;
+  overflow: auto hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+.v2-workspace-content {
+  position: relative;
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+.v2-primary-host,
+.v2-device-host {
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.v2-primary-host {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  overflow: hidden;
+}
+
+.v2-primary-host > [data-v2-surface],
+.v2-primary-surface {
+  min-inline-size: 0;
+  min-block-size: 0;
+  block-size: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.v2-device-host {
+  position: absolute;
+  z-index: 10;
+  inset-block-start: clamp(12px, 3vh, 32px);
+  inset-inline-end: clamp(12px, 3vw, 40px);
+  display: grid;
+  inline-size: min(720px, 60vw);
+  max-block-size: min(560px, 75vh);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.v2-device-host[hidden],
+.v2-primary-host[hidden] {
+  display: none !important;
+}
+
+.v2-device-host > *,
+.v2-device-window {
+  min-inline-size: 0;
+  min-block-size: 0;
+  max-block-size: min(560px, 75vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
+
+.v2-device-window__header {
+  position: sticky;
+  z-index: 1;
+  inset-block-start: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.v2-workspace :focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (max-width: 700px) {
+  .v2-workspace {
+    --v2-shell-height: 56px;
+  }
+
+  .v2-workspace-shell {
+    gap: 0.25rem;
+  }
+
+  .v2-device-host {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    max-block-size: none;
+  }
+
+  .v2-device-host > *,
+  .v2-device-window {
+    block-size: 100%;
+    max-block-size: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .v2-workspace {
+    --v2-shell-height: 112px;
+    grid-template-rows: var(--v2-shell-height) minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-workspace *,
+  .v2-workspace *::before,
+  .v2-workspace *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .v2-workspace-shell,
+  .v2-device-window,
+  .v2-device-host > * {
+    border: 1px solid CanvasText;
+  }
+
+  .v2-workspace :focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
+.v2-editor-host {
+  position: absolute;
+  z-index: 9;
+  inset-block-start: clamp(12px, 2vh, 24px);
+  inset-inline-start: clamp(12px, 2vw, 28px);
+  display: grid;
+  inline-size: min(1040px, calc(100% - 64px));
+  block-size: min(720px, calc(100% - 48px));
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: hidden;
+  pointer-events: none;
+  will-change: transform;
+}
+
+@media (min-width: 1200px) {
+  .v2-editor-host {
+    --v2-editor-inline-start: clamp(292px, 22vw, 320px);
+    inset-inline-start: var(--v2-editor-inline-start);
+    inline-size: min(1040px, calc(100% - var(--v2-editor-inline-start) - 24px));
+  }
+}
+
+.v2-editor-host[hidden] {
+  display: none !important;
+}
+
+.v2-editor-host > * {
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.v2-piano-window {
+  display: grid;
+  block-size: 100%;
+  grid-template-rows: 38px minmax(0, 1fr);
+}
+
+.v2-piano-window > .v2-primary-surface {
+  min-inline-size: 0;
+  min-block-size: 0;
+  block-size: 100%;
+}
+
+.v2-floating-window-header {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 6px 4px 12px;
+  border-bottom: 1px solid var(--line-strong);
+  user-select: none;
+  touch-action: none;
+}
+
+.v2-floating-window-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--label);
+  font-family: "Silkscreen", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.v2-floating-window-close {
+  min-height: 28px !important;
+  padding: 3px 8px;
+}
+
+.v2-window-drag-handle {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+[data-dragging="true"] .v2-window-drag-handle {
+  cursor: grabbing;
+}
+
+@media (max-width: 700px) {
+  .v2-editor-host {
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    transform: none !important;
+  }
+
+  .v2-device-host {
+    transform: none !important;
+  }
+
+  .v2-piano-window {
+    grid-template-rows: 44px minmax(0, 1fr);
+  }
+
+  .v2-window-drag-handle {
+    cursor: default;
+  }
+}

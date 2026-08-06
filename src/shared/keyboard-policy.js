@@ -57,13 +57,22 @@ export function hasOpenShortcutBlockingSurface(root) {
   );
 }
 
+function isBlockingMusicalInput(target) {
+  const candidate = target?.closest?.(MUSICAL_INPUT_SELECTOR);
+  if (!candidate) return false;
+  const tagName = candidate.tagName?.toLowerCase?.();
+  const type = candidate.type?.toLowerCase?.();
+  // Range controls remain playable so a musician can audition while tuning.
+  return !(tagName === "input" && type === "range");
+}
+
 export function isMusicalKeyboardEligible(event, root) {
   return !event.defaultPrevented
     && !event.repeat
     && !event.altKey
     && !event.ctrlKey
     && !event.metaKey
-    && !event.target?.closest?.(MUSICAL_INPUT_SELECTOR)
+    && !isBlockingMusicalInput(event.target)
     && !hasVisibleMatchingSurface(root, "dialog[open], [role='menu']:not([hidden])");
 }
 

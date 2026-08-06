@@ -22,6 +22,7 @@ import {
   createMemoryPublicationLinkRepository,
 } from "./firebase/publication-link-repository.js";
 import { createPublicationService } from "./firebase/publication-service.js";
+import { createV2UpgradeDisclosurePreference } from "./v2/persistence/upgrade-disclosure.js";
 import {
   projectPersistence,
   projectPreferences,
@@ -35,6 +36,7 @@ const audioExportFeature = createAudioExportFeature({
   persistence: projectPersistence,
   projectState,
 });
+const upgradeDisclosurePreference = createV2UpgradeDisclosurePreference();
 const accountSessionPreference = createAccountSessionPreference();
 const accountService = createAccountService({
   async loadClient() {
@@ -59,6 +61,7 @@ const cloudProjectService = createLazyCloudProjectService({
       accountService,
       linkRepository,
       localRepository: projectRepository,
+      onProjectUpgrade: upgradeDisclosurePreference.queue,
       persistence: projectPersistence,
       preferences: projectPreferences,
     });
