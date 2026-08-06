@@ -26,7 +26,7 @@ export function createV2HelpDialog({ root = document } = {}) {
     createElement("section", {}, [
       createElement("h3", { textContent: "Keyboard editing" }),
       createElement("p", { textContent: "In Piano Roll, arrow keys move the cursor and Enter creates or selects a note. Control or Command with arrows edits selected notes. In Playlist, arrows move the insertion cursor; Enter selects or opens a clip; Alt with arrows moves it." }),
-      createElement("p", { textContent: "Space toggles playback while an editor has focus. Escape closes the active device window and returns focus to its launcher." }),
+      createElement("p", { textContent: "Space toggles playback throughout Studio except while typing in a text field. Escape closes the active device window and returns focus to its launcher." }),
     ]),
     createElement("section", {}, [
       createElement("h3", { textContent: "Projects and sound" }),

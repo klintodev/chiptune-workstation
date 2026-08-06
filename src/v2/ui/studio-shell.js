@@ -3,6 +3,7 @@ import { formatPercent, formatTickPosition } from "./music-format.js";
 
 const MAX_SONG_TICKS = 6_144;
 const RANGE_EDIT_KEYS = new Set(["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Home", "PageDown", "PageUp"]);
+const TEXT_ENTRY_INPUT_TYPES = new Set(["email", "password", "search", "tel", "text", "url"]);
 
 function isNativeHistoryTarget(target) {
   if (!target) return false;
@@ -18,6 +19,18 @@ export function getGlobalHistoryAction(event) {
   if (key === "z") return event.shiftKey ? "redo" : "undo";
   if (key === "y" && !event.shiftKey) return "redo";
   return null;
+}
+
+export function isGlobalTransportShortcut(event) {
+  if (!event || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return false;
+  if (event.code !== "Space" && event.key !== " " && event.key !== "Spacebar") return false;
+
+  const target = event.target;
+  if (target?.isContentEditable || target?.closest?.("textarea, [contenteditable]")) return false;
+  const input = target?.closest?.("input");
+  if (!input) return true;
+  const inputType = String(input.type || input.getAttribute?.("type") || "text").toLowerCase();
+  return !TEXT_ENTRY_INPUT_TYPES.has(inputType);
 }
 
 export function createStudioShell({

@@ -107,6 +107,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 ### Global shell
 
 - One row, fixed maximum height, containing compact project identity/save state, V1-style transport with direct `↻` Song-loop toggle, Pattern/Song mode, tempo, the inline Master slider/readout and workspace controls.
+- Space starts or pauses transport from every Studio surface and non-text control, without scrolling the page or activating the focused control; text fields retain Space for typing.
 - Audio enable/state remains visible.
 - The recognisable V1 Klinto visual identity and working direct dark/light theme toggle are retained; the visualiser remains removed.
 - Project management, help, sharing and account actions live in one secondary menu.

@@ -12,6 +12,7 @@ import {
 } from "../src/v2/ui/playlist.js";import {
   createStudioShell,
   getGlobalHistoryAction,
+  isGlobalTransportShortcut,
 } from "../src/v2/ui/studio-shell.js";
 
 class FakeClassList {
@@ -399,6 +400,32 @@ test("global history shortcut ignores native editors and already-owned composite
     ...base,
     target: { closest: () => ({ tagName: "INPUT" }) },
   }), null);
+});
+
+test("global transport shortcut owns plain Space outside text entry", () => {
+  const target = (match = null, properties = {}) => ({
+    closest: (selector) => (selector.includes(match) ? properties.closestMatch ?? {} : null),
+    ...properties,
+  });
+  const base = {
+    altKey: false,
+    code: "Space",
+    ctrlKey: false,
+    defaultPrevented: false,
+    key: " ",
+    metaKey: false,
+    target: null,
+  };
+
+  assert.equal(isGlobalTransportShortcut(base), true);
+  assert.equal(isGlobalTransportShortcut({ ...base, target: target("input", { closestMatch: { type: "range" } }) }), true);
+  assert.equal(isGlobalTransportShortcut({ ...base, target: target("input", { closestMatch: { type: "number" } }) }), true);
+  assert.equal(isGlobalTransportShortcut({ ...base, target: target("input", { closestMatch: { type: "text" } }) }), false);
+  assert.equal(isGlobalTransportShortcut({ ...base, target: target("textarea") }), false);
+  assert.equal(isGlobalTransportShortcut({ ...base, target: { isContentEditable: true } }), false);
+  assert.equal(isGlobalTransportShortcut({ ...base, ctrlKey: true }), false);
+  assert.equal(isGlobalTransportShortcut({ ...base, defaultPrevented: true }), false);
+  assert.equal(isGlobalTransportShortcut({ ...base, code: "Enter", key: "Enter" }), false);
 });
 
 test("Piano pointer geometry bounds moves and marquee selection to the Pattern grid", () => {

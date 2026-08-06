@@ -33,7 +33,7 @@ import { createV2HelpDialog } from "./ui/help-dialog.js";
 import { createMixerSurface } from "./ui/mixer.js";
 import { createPianoRollSurface } from "./ui/piano-roll.js";
 import { createPlaylistSurface } from "./ui/playlist.js";
-import { createStudioShell } from "./ui/studio-shell.js";
+import { createStudioShell, isGlobalTransportShortcut } from "./ui/studio-shell.js";
 import { createSurfaceHost } from "./ui/surface-host.js";
 import { createV2ThemeController } from "./ui/theme-controller.js";
 
@@ -907,6 +907,12 @@ export async function createV2StudioApp({ document: documentLike = document } = 
       if (workspaceState.getState().activePrimary === "piano-roll") focusPianoOverlay();
     });
   }, { signal: lifecycle.signal });
+  documentLike.addEventListener("keydown", (event) => {
+    if (!isGlobalTransportShortcut(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.repeat) toggleTransport();
+  }, { capture: true, signal: lifecycle.signal });
   documentLike.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     const state = workspaceState.getState();

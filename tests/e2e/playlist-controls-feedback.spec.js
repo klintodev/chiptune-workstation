@@ -207,6 +207,55 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await expect(masterVolume).toBeFocused();
 });
 
+test("Space toggles transport from controls anywhere in Studio without activating them", async ({ page }) => {
+  await page.getByRole("button", { name: "Open audio setup" }).click();
+  const setup = page.getByRole("dialog", { name: "Klinto Studio" });
+  await setup.getByRole("button", { name: "Start making music" }).click();
+  await expect(setup).toBeHidden();
+  await expect(page.locator("#audio-state")).toHaveText("Ready");
+  await createCursorNote(page);
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+  await page.locator("#playback-mode").selectOption("pattern");
+
+  const patternPicker = page.getByLabel("Playlist Pattern", { exact: true });
+  const newPattern = page.locator(".v2-playlist-pattern-library").getByRole("button", { name: "New Pattern", exact: true });
+  const mixer = page.getByRole("button", { name: "Mixer", exact: true });
+  const playlist = page.getByRole("button", { name: "Playlist", exact: true });
+  const initialPatternId = await patternPicker.inputValue();
+  const initialScroll = await page.evaluate(() => ({
+    page: window.scrollY,
+    workspace: document.querySelector(".v2-workspace-content")?.scrollTop ?? 0,
+  }));
+
+  await mixer.focus();
+  await mixer.press("Space");
+  await expect(page.getByRole("button", { name: /Pause pattern/i })).toBeVisible();
+  await expect(mixer).toHaveAttribute("aria-pressed", "false");
+  await expect(playlist).toHaveAttribute("aria-pressed", "true");
+  await mixer.press("Space");
+  await expect(page.getByRole("button", { name: /Play pattern/i })).toBeVisible();
+
+  await patternPicker.focus();
+  await patternPicker.press("Space");
+  await expect(page.getByRole("button", { name: /Pause pattern/i })).toBeVisible();
+  await expect(patternPicker).toHaveValue(initialPatternId);
+  await patternPicker.press("Space");
+  await expect(page.getByRole("button", { name: /Play pattern/i })).toBeVisible();
+
+  await newPattern.focus();
+  await newPattern.press("Space");
+  await expect(page.getByRole("button", { name: /Pause pattern/i })).toBeVisible();
+  await expect(patternPicker.locator("option")).toHaveCount(1);
+  await newPattern.press("Space");
+  await expect(page.getByRole("button", { name: /Play pattern/i })).toBeVisible();
+  await expect(patternPicker.locator("option")).toHaveCount(1);
+
+  await expect.poll(() => page.evaluate(() => ({
+    page: window.scrollY,
+    workspace: document.querySelector(".v2-workspace-content")?.scrollTop ?? 0,
+  }))).toEqual(initialScroll);
+});
+
 test("Pattern Library stays compact with 25 Patterns", async ({ page }) => {
   const projectState = createV2ProjectState();
   for (let index = 1; index < 25; index += 1) {

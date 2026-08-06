@@ -117,7 +117,7 @@ Playlist exposes one named timeline/grid entry point with managed selection; emp
 - Tab enters/exits the timeline in Navigation mode. Left/Right move `playlistCursorTick` by snap; Up/Down change the destination Track; none mutates a clip.
 - Enter selects the clip under the cursor, or announces the empty position. With a clip selected, Enter opens its Pattern and Escape clears selection back to Navigation mode at the clip start.
 - With a clip selected, Alt+Left/Right moves it by snap and Alt+Up/Down moves it one Track after atomic validation. Delete/Backspace deletes it and never triggers browser navigation. The explicit Duplicate action (shortcut shown as platform `Mod+D`) duplicates once.
-- Space toggles transport only from the timeline/background; native controls and text fields retain native Space/Enter behaviour. Platform undo/redo remain available.
+- Space toggles transport throughout Studio from the timeline, surfaces and non-text controls, without scrolling or activating a focused control. Repeated keydown does not retrigger transport, text fields retain Space for typing and platform undo/redo remain available.
 - A clip announcement includes Pattern name, destination Track, start bar/beat, duration and selected state. Animation frames never update the announcement channel.
 - Commands take precedence only while the timeline owns focus; visible focus follows stable clip identity through move/reorder/undo.
 
