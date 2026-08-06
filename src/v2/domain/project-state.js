@@ -1,5 +1,4 @@
 import {
-  DEFAULT_PATTERN_LENGTH_TICKS,
   DEFAULT_SNAP_TICKS,
   MAX_ARRANGEMENT_TICKS,
   MAX_EFFECTS_PER_CHAIN,
@@ -8,7 +7,6 @@ import {
   MAX_PROJECT_PATTERNS,
   MAX_PROJECT_TRACKS,
   MAX_TRACK_NAME_LENGTH,
-  PATTERN_LENGTH_INCREMENT_TICKS,
   SNAP_TICKS,
 } from "./constants.js";
 import {
@@ -33,6 +31,7 @@ import {
   createDefaultV2Project,
   getV2ArrangementEndTick,
 } from "./project-schema.js";
+import { derivePatternLengthTicks, EMPTY_PATTERN_LENGTH_TICKS } from "./pattern-span.js";
 
 function projectsEqual(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -149,35 +148,6 @@ function normalizeNoteIds(noteIds) {
   return [...new Set(noteIds)];
 }
 
-export function getPatternResizeImpact(project, patternId, newLengthTicks) {
-  const normalized = normalizeV2Project(project);
-  const pattern = findPattern(normalized, patternId);
-  assertInteger(newLengthTicks, "Pattern lengthTicks", 96, 3_072);
-  if (newLengthTicks % PATTERN_LENGTH_INCREMENT_TICKS !== 0) {
-    throw new RangeError("Pattern lengthTicks must use 96-tick increments.");
-  }
-  const removedNoteIds = pattern.notes
-    .filter((note) => note.startTick >= newLengthTicks)
-    .map((note) => note.id);
-  const truncatedNoteIds = pattern.notes
-    .filter((note) => note.startTick < newLengthTicks && note.startTick + note.durationTicks > newLengthTicks)
-    .map((note) => note.id);
-  const linkedClipIds = normalized.tracks
-    .flatMap((track) => track.clips)
-    .filter((clip) => clip.patternId === patternId)
-    .map((clip) => clip.id);
-  return deepFreeze({
-    patternId,
-    previousLengthTicks: pattern.lengthTicks,
-    newLengthTicks,
-    removedNoteIds,
-    truncatedNoteIds,
-    linkedClipIds,
-    requiresConfirmation: newLengthTicks < pattern.lengthTicks
-      && (removedNoteIds.length > 0 || truncatedNoteIds.length > 0),
-  });
-}
-
 export function createV2ProjectState(initialProject = createDefaultV2Project()) {
   const events = new EventTarget();
   const past = [];
@@ -252,8 +222,25 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
 
   function updatePattern(patternId, update, detail = {}) {
     const pattern = getPattern(patternId);
-    const nextPattern = update(pattern);
+    const updatedPattern = update(pattern);
+    const nextPattern = updatedPattern === pattern ? pattern : {
+      ...updatedPattern,
+      lengthTicks: derivePatternLengthTicks(updatedPattern.notes),
+    };
     if (nextPattern === pattern) return false;
+    if (nextPattern.lengthTicks > pattern.lengthTicks) {
+      for (const track of state.tracks) {
+        for (const clip of track.clips.filter((candidate) => candidate.patternId === patternId)) {
+          if (!canPlaceClip(state, track.id, patternId, clip.startTick, clip.id, nextPattern.lengthTicks)) {
+            throw new V2DomainError(
+              `The Pattern cannot grow because linked clip ${clip.id} would overlap another clip or exceed the song boundary.`,
+              "PATTERN_CONTENT_CLIP_CONFLICT",
+              { clipId: clip.id, patternId, trackId: track.id },
+            );
+          }
+        }
+      }
+    }
     return commit({
       ...state,
       patterns: state.patterns.map((candidate) => candidate.id === patternId ? nextPattern : candidate),
@@ -270,7 +257,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     }, { trackId, ...detail });
   }
 
-  function createPattern(name, { lengthTicks = DEFAULT_PATTERN_LENGTH_TICKS } = {}) {
+  function createPattern(name) {
     if (state.patterns.length >= MAX_PROJECT_PATTERNS) {
       throw new RangeError(`A Project supports at most ${MAX_PROJECT_PATTERNS} Patterns.`);
     }
@@ -282,7 +269,12 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     });
     commit({
       ...state,
-      patterns: [...state.patterns, { id, name: resolvedName, lengthTicks, notes: [] }],
+      patterns: [...state.patterns, {
+        id,
+        name: resolvedName,
+        lengthTicks: EMPTY_PATTERN_LENGTH_TICKS,
+        notes: [],
+      }],
     }, { operation: "create-pattern", patternId: id });
     return id;
   }
@@ -306,7 +298,12 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     });
     commit({
       ...state,
-      patterns: [...state.patterns, { id, name: resolvedName, lengthTicks: source.lengthTicks, notes }],
+      patterns: [...state.patterns, {
+        id,
+        name: resolvedName,
+        lengthTicks: derivePatternLengthTicks(notes),
+        notes,
+      }],
     }, { operation: "duplicate-pattern", patternId: id, sourcePatternId: patternId });
     return id;
   }
@@ -316,46 +313,6 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     return updatePattern(patternId, (pattern) => pattern.name === resolvedName
       ? pattern
       : { ...pattern, name: resolvedName }, { operation: "rename-pattern" });
-  }
-
-  function resizePattern(patternId, newLengthTicks, options = {}) {
-    const pattern = getPattern(patternId);
-    if (pattern.lengthTicks === newLengthTicks) return false;
-    const impact = getPatternResizeImpact(state, patternId, newLengthTicks);
-    if (impact.requiresConfirmation && options.confirmTruncate !== true && options.confirmed !== true) {
-      throw new V2DomainError(
-        "Shortening this Pattern removes or truncates notes and requires confirmation.",
-        "PATTERN_RESIZE_CONFIRMATION_REQUIRED",
-        impact,
-      );
-    }
-    if (newLengthTicks > pattern.lengthTicks) {
-      for (const track of state.tracks) {
-        for (const clip of track.clips.filter((candidate) => candidate.patternId === patternId)) {
-          if (!canPlaceClip(state, track.id, patternId, clip.startTick, clip.id, newLengthTicks)) {
-            throw new V2DomainError(
-              `Pattern ${patternId} cannot grow because linked clip ${clip.id} would overlap or exceed the song boundary.`,
-              "PATTERN_RESIZE_CLIP_CONFLICT",
-              { clipId: clip.id, patternId, trackId: track.id },
-            );
-          }
-        }
-      }
-    }
-    const notes = pattern.notes.flatMap((note) => {
-      if (note.startTick >= newLengthTicks) return [];
-      if (note.startTick + note.durationTicks > newLengthTicks) {
-        return [{ ...note, durationTicks: newLengthTicks - note.startTick }];
-      }
-      return [note];
-    });
-    commit({
-      ...state,
-      patterns: state.patterns.map((candidate) => candidate.id === patternId
-        ? { ...candidate, lengthTicks: newLengthTicks, notes }
-        : candidate),
-    }, { operation: "resize-pattern", patternId, impact });
-    return impact;
   }
 
   function deletePattern(patternId, { removeReferences = false } = {}) {
@@ -837,7 +794,6 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     getEffect,
     getHistoryState,
     getPattern,
-    getPatternResizeImpact: (patternId, newLengthTicks) => getPatternResizeImpact(state, patternId, newLengthTicks),
     getState,
     getTrack,
     moveClip,
@@ -855,7 +811,6 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     replace,
     resetEffect,
     resetInstrument,
-    resizePattern,
     setBpm,
     setEffectBypassed,
     setEffectParam,

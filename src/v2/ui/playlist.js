@@ -41,6 +41,10 @@ function clipLabel(project, track, clip) {
   return `${pattern?.name ?? "Unknown Pattern"}, ${track.name}, starts ${formatTickPosition(clip.startTick)}, duration ${formatDurationTicks(pattern?.lengthTicks ?? 0)}`;
 }
 
+function formatPatternSpan(pattern) {
+  return pattern.notes.length === 0 ? "Empty" : formatDurationTicks(pattern.lengthTicks);
+}
+
 export function resolvePlaylistFocusTarget(project, preference = {}) {
   let clipId = preference.clipId;
   if (!clipId || !findClip(project, clipId)) {
@@ -76,12 +80,6 @@ export function createPlaylistSurface({
   confirmPatternDelete = async (pattern) => globalThis.confirm?.(
     `Delete ${pattern.name} and every Playlist clip that uses it?`,
   ) ?? false,
-  confirmPatternResize = async (pattern, lengthTicks) => {
-    const impact = projectState.getPatternResizeImpact(pattern.id, lengthTicks);
-    return !impact.requiresConfirmation || (globalThis.confirm?.(
-      `Shortening ${pattern.name} will remove or truncate notes. Continue?`,
-    ) ?? false);
-  },
   confirmTrackRemoval = async () => true,
   onAddPattern = null,
   onOpenInstrument = () => {},
@@ -730,7 +728,7 @@ export function createPlaylistSurface({
         dataset: { patternLibraryId: pattern.id },
       });
       const dragPattern = createElement("button", {
-        "aria-label": `${pattern.name}, ${formatDurationTicks(pattern.lengthTicks)}. Double-click to edit or drag to a Playlist Track`,
+        "aria-label": `${pattern.name}, ${formatPatternSpan(pattern)}. Double-click to edit or drag to a Playlist Track`,
         className: "v2-pattern-library-drag",
         dataset: { patternId: pattern.id },
         draggable: true,
@@ -738,7 +736,7 @@ export function createPlaylistSurface({
         type: "button",
       }, [
         createElement("strong", { textContent: pattern.name }),
-        createElement("small", { textContent: formatDurationTicks(pattern.lengthTicks) }),
+        createElement("small", { textContent: formatPatternSpan(pattern) }),
       ]);
       dragPattern.addEventListener("click", () => {
         workspaceState.setActivePattern?.(pattern.id);
@@ -849,35 +847,6 @@ export function createPlaylistSurface({
           }
         },
       }));
-      const length = createElement("select", { "aria-label": `${pattern.name} length` });
-      for (let ticks = 96; ticks <= 3072; ticks += 96) {
-        length.append(createElement("option", {
-          textContent: `${ticks / 384} bar${ticks === 384 ? "" : "s"} (${ticks} ticks)`,
-          value: ticks,
-        }));
-      }
-      length.value = String(pattern.lengthTicks);
-      length.addEventListener("change", async () => {
-        const next = Number(length.value);
-        try {
-          const confirmed = await confirmPatternResize(pattern, next);
-          if (!confirmed) {
-            length.value = String(pattern.lengthTicks);
-            return;
-          }
-          mutateProject(() => projectState.resizePattern(pattern.id, next, {
-            confirm: true,
-            confirmTruncate: true,
-          }));
-          announce(`Resized ${pattern.name}.`);
-          render();
-          focusPatternLibraryItem(pattern.id);
-        } catch (error) {
-          length.value = String(pattern.lengthTicks);
-          announce(error.message);
-        }
-      });
-      panel.append(length);
       panel.append(createElement("button", {
         className: "v2-danger-button",
         disabled: state.patterns.length === 1,
@@ -954,7 +923,9 @@ export function createPlaylistSurface({
       createElement("button", { textContent: "Duplicate", type: "button", onClick: duplicateSelected }),
       createElement("button", { className: "v2-danger-button", textContent: "Delete clip", type: "button", onClick: removeSelected }),
     );
-    inspector.append(createElement("span", { textContent: `${pattern.lengthTicks} ticks, linked` }));
+    inspector.append(createElement("span", {
+      textContent: `${formatDurationTicks(pattern.lengthTicks)}, automatically sized to Pattern content`,
+    }));
   }
 
   function updatePlayhead(frame = getTransportFrame?.()) {
@@ -1131,7 +1102,7 @@ export function createPlaylistSurface({
           "aria-selected": String(selectedId === clip.id),
           style: {
             left: `${TRACK_HEADER_WIDTH + clip.startTick * pixelsPerTick}px`,
-            width: `${Math.max(24, pattern.lengthTicks * pixelsPerTick)}px`,
+            width: `${Math.max(8, pattern.lengthTicks * pixelsPerTick)}px`,
           },
         }, [createElement("strong", { textContent: pattern.name }), createElement("small", { textContent: formatDurationTicks(pattern.lengthTicks) })]);
         const found = { clip, track };

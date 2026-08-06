@@ -32,7 +32,7 @@ test("note commands are immutable, atomic, canonically ordered and history-backe
   assert.equal(project.getPattern().notes.length, 2);
 });
 
-test("Pattern resize preflights every linked clip and confirms destructive shortening as one undo entry", () => {
+test("Pattern span grows and shrinks with note content while preflighting every linked clip", () => {
   const project = createV2ProjectState();
   const crossing = project.addNote("pattern-1", {
     pitch: 60,
@@ -48,27 +48,25 @@ test("Pattern resize preflights every linked clip and confirms destructive short
   });
   project.addClip("track-1", "pattern-1", 0);
   project.addClip("track-1", "pattern-1", 384);
+  assert.equal(project.getPattern().lengthTicks, 324);
   const beforeConflict = project.getState();
 
-  assert.throws(() => project.resizePattern("pattern-1", 768), (error) => {
-    assert.equal(error.code, "PATTERN_RESIZE_CLIP_CONFLICT");
+  assert.throws(() => project.updateNote("pattern-1", removed, { startTick: 372 }), (error) => {
+    assert.equal(error.code, "PATTERN_CONTENT_CLIP_CONFLICT");
     return true;
   });
   assert.equal(project.getState(), beforeConflict);
 
-  assert.throws(() => project.resizePattern("pattern-1", 192), (error) => {
-    assert.equal(error.code, "PATTERN_RESIZE_CONFIRMATION_REQUIRED");
-    assert.deepEqual(error.details.removedNoteIds, [removed]);
-    assert.deepEqual(error.details.truncatedNoteIds, [crossing]);
-    return true;
-  });
-  const impact = project.resizePattern("pattern-1", 192, { confirmTruncate: true });
-  assert.equal(impact.requiresConfirmation, true);
+  project.removeNotes("pattern-1", [removed]);
+  assert.equal(project.getPattern().lengthTicks, 300);
+  project.updateNote("pattern-1", crossing, { durationTicks: 12 });
   assert.equal(project.getPattern().lengthTicks, 192);
   assert.equal(project.getPattern().notes.length, 1);
   assert.equal(project.getPattern().notes[0].durationTicks, 12);
   project.undo();
-  assert.equal(project.getPattern().lengthTicks, 384);
+  assert.equal(project.getPattern().lengthTicks, 300);
+  project.undo();
+  assert.equal(project.getPattern().lengthTicks, 324);
   assert.equal(project.getPattern().notes.length, 2);
 });
 
@@ -80,16 +78,16 @@ test("Add to Playlist scans forward, then clip move/duplicate/delete remain atom
   const first = project.addPatternToPlaylist("pattern-1", "track-1", 0);
   const second = project.addPatternToPlaylist(secondPatternId, "track-1", 0);
   assert.equal(first.startTick, 0);
-  assert.equal(second.startTick, 384);
-  assert.equal(second.playlistCursorTick, 768);
+  assert.equal(second.startTick, 24);
+  assert.equal(second.playlistCursorTick, 48);
 
   const duplicateId = project.duplicateClip(second.clipId);
-  assert.equal(project.getClip(duplicateId).clip.startTick, 768);
+  assert.equal(project.getClip(duplicateId).clip.startTick, 48);
   const track2 = project.addTrack("Bass");
   project.moveClip(duplicateId, track2, 24);
   assert.equal(project.getClip(duplicateId).track.id, track2);
-  assert.throws(() => project.moveClip(second.clipId, "track-1", 24), V2DomainError);
-  assert.equal(project.getClip(second.clipId).clip.startTick, 384);
+  assert.throws(() => project.moveClip(second.clipId, "track-1", 12), V2DomainError);
+  assert.equal(project.getClip(second.clipId).clip.startTick, 24);
   project.removeClip(duplicateId);
   project.undo();
   assert.equal(project.getClip(duplicateId).track.id, track2);
@@ -130,15 +128,15 @@ test("arrangement-mode loop follows clips only while enabled and final-object ru
     enabled: true,
     mode: "arrangement",
     startTick: 0,
-    endTick: 768,
+    endTick: 408,
   });
   project.removeClip(clipId);
   assert.equal(project.getState().transport.loop.enabled, false);
   assert.equal(project.getState().transport.loop.mode, "arrangement");
-  assert.equal(project.getState().transport.loop.endTick, 768);
+  assert.equal(project.getState().transport.loop.endTick, 408);
   project.addClip("track-1", "pattern-1", 0);
   assert.equal(project.getState().transport.loop.enabled, false);
-  assert.equal(project.getState().transport.loop.endTick, 768);
+  assert.equal(project.getState().transport.loop.endTick, 408);
   assert.throws(() => project.deletePattern("pattern-1"), /final Pattern/);
   assert.throws(() => project.removeTrack("track-1"), /final Track/);
 });

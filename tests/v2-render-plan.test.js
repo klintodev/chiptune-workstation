@@ -52,7 +52,7 @@ test("Pattern and Song plans share canonical timing, ownership and synthesis par
   assert.deepEqual(song.events.map(({ startTick }) => startTick), [48, 48, 48]);
   assert.equal(song.events[0].startSeconds, 0.25);
   assert.equal(song.events[0].clipId, "clip-1");
-  assert.equal(song.toTick, 432);
+  assert.equal(song.toTick, 72);
   assert.equal(RENDER_PLAN_ADAPTERS.live, RENDER_PLAN_ADAPTERS.offline);
   assert.equal(RENDER_PLAN_ADAPTERS.live, RENDER_PLAN_ADAPTERS.public);
 });

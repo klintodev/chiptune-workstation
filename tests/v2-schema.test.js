@@ -58,7 +58,7 @@ test("the default is the exact, deeply frozen canonical schema-7 Project", () =>
     bpm: 120,
     loop: { enabled: false, mode: "custom", startTick: 0, endTick: 384 },
   });
-  assert.deepEqual(project.patterns, [{ id: "pattern-1", name: "Pattern 1", lengthTicks: 384, notes: [] }]);
+  assert.deepEqual(project.patterns, [{ id: "pattern-1", name: "Pattern 1", lengthTicks: 1, notes: [] }]);
   assert.deepEqual(project.tracks[0].instrument.params, KLINTO_CHIP_CONTRACT.defaults);
   assert.deepEqual(project.mixer, { master: { volume: 0.35, effects: [] } });
   assert.equal(Object.isFrozen(project.tracks[0].instrument.params), true);
@@ -92,8 +92,12 @@ test("strict validation rejects unknown keys, unresolved links, device state, bo
   }), /duplicated/);
   assert.throws(() => canonicalizeV2Project({
     ...valid,
+    patterns: [{ ...valid.patterns[0], lengthTicks: 0 }],
+  }), /between 1 and 3072/);
+  assert.equal(canonicalizeV2Project({
+    ...valid,
     patterns: [{ ...valid.patterns[0], lengthTicks: 100 }],
-  }), /96-tick increments/);
+  }).patterns[0].lengthTicks, 1);
 });
 
 test("canonicalization sorts notes and clips while retaining Pattern, Track and Effect-chain order", () => {
@@ -130,7 +134,7 @@ test("schemas 2 through 6 migrate with exact ticks, parameters, ordering and det
     assert.equal(migrated.transport.loop.startTick, 24);
     assert.equal(migrated.transport.loop.endTick, 744);
     assert.equal(migrated.transport.loop.mode, "arrangement");
-    assert.equal(migrated.patterns[0].lengthTicks, 96);
+    assert.equal(migrated.patterns[0].lengthTicks, 66);
     assert.deepEqual(migrated.patterns[0].notes.map(({ startTick, durationTicks, velocity }) => ({
       startTick,
       durationTicks,

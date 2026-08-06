@@ -446,9 +446,8 @@ test("clicking an empty Playlist lane adds the selected Pattern at the snapped p
 
   await patternPicker.selectOption("pattern-2");
   await pattern2.click();
-  await page.mouse.click(bounds.x + 323, laneY);
+  await page.mouse.click(bounds.x + 320 + 192 * 0.36, laneY);
   await expect(clips).toHaveCount(1);
-  await expect(page.locator("#workstation-status")).toContainText("Pattern 2 does not fit at bar 1, beat 1 on Pulse 1");
 
   await page.mouse.click(bounds.x + 320 + 768 * 0.36, laneY);
   await expect(clips).toHaveCount(2);

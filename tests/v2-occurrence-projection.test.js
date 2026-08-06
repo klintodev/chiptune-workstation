@@ -28,7 +28,7 @@ test("Pattern projection preserves chords/overlaps, canonical order, ownership a
 
   assert.equal(occurrences.length, 6);
   assert.deepEqual(occurrences.slice(0, 3).map(({ noteId }) => noteId), [lowA, lowB, high]);
-  assert.deepEqual(occurrences.slice(3).map(({ startTick }) => startTick), [384, 384, 384]);
+  assert.deepEqual(occurrences.slice(3).map(({ startTick }) => startTick), [96, 96, 96]);
   assert.equal(occurrences[0].mode, "pattern");
   assert.equal(occurrences[0].clipId, null);
   assert.equal(occurrences[0].endTick, 48);

@@ -70,6 +70,7 @@ test.beforeAll(async () => {
           } else {
             project.patterns[0].steps[0] = { gate: 0.75, note: 60, volume: 0.73 };
             project.patterns[0].steps[2] = { gate: 0.25, note: 67, volume: 0.61 };
+            project.patterns[0].steps[3] = { gate: 1, note: 60, volume: 0 };
           }
           project.tracks[0].clips = [{ id: "clip-parity", patternId: "pattern-1", startStep: 0 }];
           return project;

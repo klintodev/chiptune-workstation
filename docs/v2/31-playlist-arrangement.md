@@ -47,15 +47,15 @@ Track removal closes only device presentations owned by that Track. Pattern surf
 
 ## Clip model and invariants
 
-A clip contains stable `id`, `patternId` and integer `startTick`; destination is its owning Track. Duration is always the referenced Pattern's current `lengthTicks`.
+A clip contains stable `id`, `patternId` and integer `startTick`; destination is its owning Track. Duration is always the referenced Pattern's current content-derived `lengthTicks`.
 
 - Clip starts are snapped to 1/8, 1/16 or 1/32; default 1/16.
 - Clips may touch but may not overlap another clip on the same Track.
 - A clip must end within the existing song boundary: 6,144 ticks, the exact conversion of V1's 256 sixteenth-step limit.
 - The Pattern reference must resolve before Project activation.
-- Editing a Pattern changes every linked clip's content/duration.
-- Increasing Pattern length follows PRD 28's all-linked-clip preflight and rejects atomically on overlap/boundary failure.
-- Decreasing length shortens linked clips in place and cannot create an overlap.
+- Editing a Pattern changes every linked clip's content/duration automatically.
+- A note edit that grows the Pattern follows PRD 28's all-linked-clip preflight and rejects atomically on overlap/boundary failure.
+- A note edit that shrinks the Pattern shortens linked clips in place and cannot create an overlap.
 - Clip move/duplicate preserves the Pattern link. There is no per-clip note data, stretch, transpose, gain or independent variant in V2.
 
 ## Add to Playlist
@@ -159,8 +159,8 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Selecting a Pattern in the library and clicking an empty Track position adds that Pattern exactly at the snapped click position without changing existing clip-click behavior.
 - Double-clicking a Pattern card in the library opens that Pattern in the reusable Piano Roll for editing.
 - Creating a Pattern from the Playlist library immediately opens the newly created Pattern in the Piano Roll.
-- Pattern-library cog Rename/Duplicate/Length/Delete actions obey caps, final-Pattern rules, atomic history and focus repair.
-- Increasing Pattern length rejects when any linked clip would become invalid; decreasing shortens all clips.
+- Pattern-library cog Rename/Duplicate/Delete actions obey caps, final-Pattern rules, atomic history and focus repair.
+- Pattern growth caused by note content rejects when any linked clip would become invalid; content shrinkage shortens all linked clips.
 - Track removal closes its devices, keeps Pattern surfaces and repairs audition Track.
 - Pattern removal deletes linked clips and closes only that Pattern surface.
 - Final-clip and final-clip-Track removal leave visible, valid focus and no gap.
@@ -176,7 +176,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 ## Automated coverage
 
 - Domain tests for overlap, boundary, audible-Pattern disabled state, cursor scan/advance, two-Pattern placement, duplicate preflight and atomic failure
-- Pattern-resize/linked-clip tests and Track/Pattern deletion/undo lifecycle tests
+- Pattern-content-span/linked-clip tests and Track/Pattern deletion/undo lifecycle tests
 - Shared scheduler projection tests for Pattern/Song/loop/seek/tempo
 - Playwright desktop compose â†’ Add â†’ arrange â†’ open Pattern journey with focus/announcement checkpoints
 - Final-clip/final-Track focus fallback and exclusive-Mixer/narrow-width hidden-tree tests
@@ -208,7 +208,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 
 - Desktop Playlist, including its default-expanded collapsible Pattern-library details, is persistent beneath the two bounded modeless windows defined by PRD 27; Mixer remains exclusive, while narrow widths expose one fullscreen surface.
 - PRD 28 owns tick schema/migration; this PRD owns Playlist UI and commands.
-- Clips remain linked, fixed to Pattern length and non-overlapping per Track.
+- Clips remain linked, follow the Pattern's automatically derived content span and remain non-overlapping per Track.
 - Add uses the audition Track and first valid snapped position at/after the session insertion cursor, then advances it; Pattern playback never moves it.
 - Only Patterns with an audible note may be added.
 - Removing a Track never closes project-level Pattern surfaces; it repairs their audition context.

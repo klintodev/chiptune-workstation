@@ -1,4 +1,9 @@
-import { MAX_NOTES_PER_PATTERN, MAX_NOTES_PER_PROJECT } from "../domain/index.js";
+import {
+  MAX_NOTES_PER_PATTERN,
+  MAX_NOTES_PER_PROJECT,
+  MAX_PATTERN_CONTENT_TICKS,
+  getPatternEditorEndTick,
+} from "../domain/index.js";
 import { createElement, clearElement, setPressed } from "./dom.js";
 import { formatDurationTicks, formatMidiPitch, formatPercent, formatTickPosition } from "./music-format.js";
 
@@ -123,7 +128,6 @@ export function getPianoZoomViewport({
 export function createPianoRollSurface({
   announce = () => {},
   confirmPatternDelete = async () => true,
-  confirmPatternResize = async () => true,
   onAddToPlaylist = () => {},
   onTransportToggle = () => {},
   projectState,
@@ -262,18 +266,20 @@ export function createPianoRollSurface({
 
   function repairSelection() {
     const pattern = activePattern();
+    const editorEndTick = getPatternEditorEndTick(pattern);
     const session = patternSession();
     const stored = session.selection ?? session.selectedNoteIds;
     if (Array.isArray(stored) && selectedNoteIds.size === 0) selectedNoteIds = new Set(stored);
     const valid = new Set(pattern.notes.map(({ id }) => id));
     selectedNoteIds = new Set([...selectedNoteIds].filter((id) => valid.has(id)));
-    cursorTick = clamp(session.cursor?.tick ?? session.cursorTick ?? cursorTick, 0, Math.max(0, pattern.lengthTicks - snapTicks));
+    cursorTick = clamp(session.cursor?.tick ?? session.cursorTick ?? cursorTick, 0, Math.max(0, editorEndTick - snapTicks));
     cursorPitch = clamp(session.cursor?.pitch ?? session.cursorPitch ?? cursorPitch, MIN_PITCH, MAX_PITCH);
   }
 
   function setCursor(nextTick, nextPitch, { announceCursor = true } = {}) {
     const pattern = activePattern();
-    cursorTick = clamp(nextTick, 0, Math.max(0, pattern.lengthTicks - snapTicks));
+    const editorEndTick = getPatternEditorEndTick(pattern);
+    cursorTick = clamp(nextTick, 0, Math.max(0, editorEndTick - snapTicks));
     cursorPitch = clamp(nextPitch, MIN_PITCH, MAX_PITCH);
     updatePatternSession({ cursorPitch, cursorTick });
     if (announceCursor) {
@@ -289,11 +295,12 @@ export function createPianoRollSurface({
 
   function addNoteAt(tick, pitch, durationTicks = snapTicks) {
     const pattern = activePattern();
-    const startTick = clamp(Math.round(tick / snapTicks) * snapTicks, 0, pattern.lengthTicks - snapTicks);
+    const editorEndTick = getPatternEditorEndTick(pattern);
+    const startTick = clamp(Math.round(tick / snapTicks) * snapTicks, 0, editorEndTick - snapTicks);
     const resolvedDuration = clamp(
       Math.round(durationTicks),
       1,
-      pattern.lengthTicks - startTick,
+      MAX_PATTERN_CONTENT_TICKS - startTick,
     );
     const noteId = mutateProject(() => projectState.addNote(pattern.id, {
       pitch: clamp(Math.round(pitch), MIN_PITCH, MAX_PITCH),
@@ -312,17 +319,14 @@ export function createPianoRollSurface({
     const pattern = activePattern();
     const notes = uniqueSelectedNotes(pattern, selectedNoteIds);
     if (notes.length === 0) return false;
-    mutateProject(() => {
-      projectState.beginHistoryGroup?.();
-      try {
-        for (const note of notes) {
-          const patch = transform(note);
-          if (patch) projectState.updateNote(pattern.id, note.id, patch);
-        }
-      } finally {
-        projectState.endHistoryGroup?.();
-      }
-    });
+    const patches = new Map(notes.map((note) => [note.id, transform(note)]));
+    mutateProject(() => projectState.updatePattern(pattern.id, (candidate) => ({
+      ...candidate,
+      notes: candidate.notes.map((note) => {
+        const patch = patches.get(note.id);
+        return patch ? { ...note, ...patch } : note;
+      }),
+    }), { operation: "update-notes" }));
     renderEditor();
     renderHeader();
     return true;
@@ -333,7 +337,7 @@ export function createPianoRollSurface({
     const notes = uniqueSelectedNotes(pattern, selectedNoteIds);
     if (notes.some((note) => (
       note.startTick + deltaTick < 0
-      || note.startTick + note.durationTicks + deltaTick > pattern.lengthTicks
+      || note.startTick + note.durationTicks + deltaTick > MAX_PATTERN_CONTENT_TICKS
       || note.pitch + deltaPitch < MIN_PITCH
       || note.pitch + deltaPitch > MAX_PITCH
     ))) throw new RangeError("The selected note would move outside the Pattern or pitch range.");
@@ -348,7 +352,7 @@ export function createPianoRollSurface({
     const notes = uniqueSelectedNotes(pattern, selectedNoteIds);
     if (notes.some((note) => (
       note.durationTicks + deltaTick < 1
-      || note.startTick + note.durationTicks + deltaTick > pattern.lengthTicks
+      || note.startTick + note.durationTicks + deltaTick > MAX_PATTERN_CONTENT_TICKS
     ))) throw new RangeError("The selected note would have an invalid duration.");
     return updateSelectedNotes((note) => ({ durationTicks: note.durationTicks + deltaTick }));
   }
@@ -372,7 +376,7 @@ export function createPianoRollSurface({
     const shift = cursorTick - firstTick;
     const planned = clipboard.map((note) => ({ ...note, startTick: note.startTick + shift }));
     if (planned.some((note) => (
-      note.startTick < 0 || note.startTick + note.durationTicks > pattern.lengthTicks
+      note.startTick < 0 || note.startTick + note.durationTicks > MAX_PATTERN_CONTENT_TICKS
     ))) {
       throw new RangeError("The copied notes do not fit at the cursor.");
     }
@@ -489,7 +493,11 @@ export function createPianoRollSurface({
   function pointerPosition(event) {
     const pattern = activePattern();
     const rect = canvas.getBoundingClientRect();
-    const x = clamp((event.clientX - rect.left - LABEL_WIDTH) / pixelsPerTick, 0, pattern.lengthTicks);
+    const x = clamp(
+      (event.clientX - rect.left - LABEL_WIDTH) / pixelsPerTick,
+      0,
+      getPatternEditorEndTick(pattern),
+    );
     const pitch = clamp(
       MAX_PITCH - Math.floor((event.clientY - rect.top) / ROW_HEIGHT),
       MIN_PITCH,
@@ -620,7 +628,7 @@ export function createPianoRollSurface({
           notes,
           requestedTick,
           requestedPitch,
-          pattern.lengthTicks,
+          getPatternEditorEndTick(pattern),
         ));
         paintNoteMovePreview(notes, deltaTick, deltaPitch);
       },
@@ -642,10 +650,11 @@ export function createPianoRollSurface({
     const dragSelection = selectionForDrag(note.id, event.shiftKey);
     const clickSelection = selectionForClick(note.id, event.shiftKey);
     const notes = uniqueSelectedNotes(pattern, dragSelection);
+    const editorEndTick = getPatternEditorEndTick(pattern);
     const originX = event.clientX;
     const minimumDelta = Math.max(...notes.map(({ durationTicks }) => 1 - durationTicks));
     const maximumDelta = Math.min(...notes.map((candidate) => (
-      pattern.lengthTicks - candidate.startTick - candidate.durationTicks
+      editorEndTick - candidate.startTick - candidate.durationTicks
     )));
     let deltaTick = 0;
     const reset = () => resetNotePreview(dragSelection, "width");
@@ -677,14 +686,15 @@ export function createPianoRollSurface({
 
   function startDraw(event) {
     const pattern = activePattern();
+    const editorEndTick = getPatternEditorEndTick(pattern);
     const origin = pointerPosition(event);
     const startTick = clamp(
       Math.round(origin.tick / snapTicks) * snapTicks,
       0,
-      pattern.lengthTicks - snapTicks,
+      editorEndTick - snapTicks,
     );
     const pitch = origin.pitch;
-    let durationTicks = Math.min(snapTicks, pattern.lengthTicks - startTick);
+    let durationTicks = Math.min(snapTicks, editorEndTick - startTick);
     const preview = createElement("div", {
       "aria-hidden": "true",
       className: "v2-piano-draw-preview",
@@ -703,7 +713,7 @@ export function createPianoRollSurface({
         const endTick = clamp(
           Math.ceil(position.tick / snapTicks) * snapTicks,
           startTick + snapTicks,
-          pattern.lengthTicks,
+          editorEndTick,
         );
         durationTicks = endTick - startTick;
         preview.style.width = `${Math.max(10, durationTicks * pixelsPerTick)}px`;
@@ -747,7 +757,7 @@ export function createPianoRollSurface({
         const matches = getPianoMarqueeNoteIds(pattern.notes, {
           fromPitch: origin.pitch,
           fromTick: origin.tick,
-          patternLength: pattern.lengthTicks,
+          patternLength: getPatternEditorEndTick(pattern),
           toPitch: current.pitch,
           toTick: current.tick,
         });
@@ -878,9 +888,10 @@ export function createPianoRollSurface({
     activePointerCancel?.();
     repairSelection();
     const pattern = activePattern();
+    const editorEndTick = getPatternEditorEndTick(pattern);
     canvas.style.setProperty("--v2-pixels-per-tick", String(pixelsPerTick));
     canvas.style.setProperty("--v2-piano-label-width", `${LABEL_WIDTH}px`);
-    canvas.style.width = `${Math.max(640, pattern.lengthTicks * pixelsPerTick + LABEL_WIDTH)}px`;
+    canvas.style.width = `${Math.max(640, editorEndTick * pixelsPerTick + LABEL_WIDTH)}px`;
     canvas.style.height = `${(MAX_PITCH - MIN_PITCH + 1) * ROW_HEIGHT}px`;
     canvas.setAttribute("aria-label", `${pattern.name}, Piano Roll`);
     noteElements.clear();
@@ -1075,17 +1086,6 @@ export function createPianoRollSurface({
       const name = globalThis.prompt?.("Pattern name", pattern.name);
       if (name !== null && name !== undefined) projectState.renamePattern(pattern.id, name);
     });
-    const length = createElement("select", { "aria-label": "Pattern length" });
-    for (let ticks = 96; ticks <= 3072; ticks += 96) {
-      length.append(createElement("option", { textContent: `${ticks / 384} bar${ticks === 384 ? "" : "s"} (${ticks} ticks)`, value: ticks }));
-    }
-    length.value = String(pattern.lengthTicks);
-    length.addEventListener("change", async () => {
-      const next = Number(length.value);
-      const confirmed = await confirmPatternResize(pattern, next);
-      if (confirmed) projectState.resizePattern(pattern.id, next, { confirm: true, confirmTruncate: true });
-      else length.value = String(pattern.lengthTicks);
-    });
     const remove = createElement("button", {
       className: "v2-danger-button",
       disabled: project.patterns.length === 1,
@@ -1095,7 +1095,7 @@ export function createPianoRollSurface({
     remove.addEventListener("click", async () => {
       if (await confirmPatternDelete(pattern)) projectState.deletePattern(pattern.id, { removeReferences: true });
     });
-    actionPanel.append(newPattern, duplicate, rename, length, remove);
+    actionPanel.append(newPattern, duplicate, rename, remove);
     actions.append(actionPanel);
 
     const history = createElement("div", { className: "v2-history-actions" }, [

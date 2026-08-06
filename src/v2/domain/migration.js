@@ -1,7 +1,7 @@
 import { migrateProject as migrateLegacyProject } from "../../state/project-state.js";
 import { normalizeVisualiser } from "../../visualiser/visualiser-config.js";
 import {
-  DEFAULT_PATTERN_LENGTH_TICKS,
+  DEFAULT_TRANSPORT_LOOP_END_TICKS,
   LEGACY_STEP_TICKS,
   MAX_ARRANGEMENT_TICKS,
   MAX_BPM,
@@ -34,6 +34,7 @@ import {
   deepFreeze,
   isRecord,
 } from "./domain-utils.js";
+import { derivePatternLengthTicks } from "./pattern-span.js";
 import { canonicalizeV2Project } from "./project-schema.js";
 
 const LEGACY_PATTERN_LENGTHS = Object.freeze([4, 8, 16, 32]);
@@ -154,11 +155,12 @@ function buildPatternRecords(sourcePatterns) {
     validateLegacySteps(source.steps, `Legacy Pattern ${source.id}`);
     const id = allocateMigratedId(source.id, "pattern", `pattern:${index}:${source.id}`, usedPatternIds);
     if (!patternReferenceMap.has(source.id)) patternReferenceMap.set(source.id, id);
+    const notes = createMigratedNotes(source.steps, id, index);
     return {
       id,
       name: source.name,
-      lengthTicks: source.steps.length * LEGACY_STEP_TICKS,
-      notes: createMigratedNotes(source.steps, id, index),
+      lengthTicks: derivePatternLengthTicks(notes),
+      notes,
     };
   });
   return { patterns, patternReferenceMap };
@@ -224,7 +226,7 @@ function migrateSchemaOne(candidate) {
     metadata: { title: candidate.metadata.title },
     transport: {
       bpm: candidate.transport.bpm,
-      loop: { enabled: false, mode: "custom", startTick: 0, endTick: DEFAULT_PATTERN_LENGTH_TICKS },
+      loop: { enabled: false, mode: "custom", startTick: 0, endTick: DEFAULT_TRANSPORT_LOOP_END_TICKS },
     },
     patterns,
     tracks,

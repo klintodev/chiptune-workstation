@@ -237,7 +237,7 @@ V2 Stable requires all PRD 32 gates, removal of superseded V1 composition UI, do
 - Patterns are project-level and instrument-independent.
 - A Piano Roll has a transient `auditionTrackId`; it is repaired when Tracks change and is never persisted.
 - Tracks own Instrument, Mixer and Playlist-lane state.
-- Clips are linked and fixed to Pattern duration.
+- Clips are linked and automatically follow the Pattern span derived from its notes.
 - Pattern/Song playback mode and the Playlist insertion cursor are session state, not Project data.
 - A Project always contains at least one Pattern and one Track; final-object deletion is unavailable.
 - V2 launch timing is snapped to 1/8, 1/16 or 1/32 at 96 PPQ; off-grid timing and triplets are deferred.

@@ -90,7 +90,7 @@ test("the explicit V7 adapter migrates V1 purely, canonically, and idempotently"
 
   assert.equal(JSON.stringify(source), before);
   assert.equal(migrated.project.schemaVersion, 7);
-  assert.equal(migrated.project.patterns[0].lengthTicks, 384);
+  assert.equal(migrated.project.patterns[0].lengthTicks, 6);
   assert.deepEqual(migrated.project.patterns[0].notes[0], {
     id: migrated.project.patterns[0].notes[0].id,
     pitch: 60,

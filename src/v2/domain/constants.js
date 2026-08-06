@@ -16,10 +16,10 @@ export const DEFAULT_SNAP_TICKS = TICKS_PER_SIXTEENTH;
 
 export const DEFAULT_PATTERN_ID = "pattern-1";
 export const DEFAULT_TRACK_ID = "track-1";
-export const DEFAULT_PATTERN_LENGTH_TICKS = 384;
-export const MIN_PATTERN_LENGTH_TICKS = 96;
-export const MAX_PATTERN_LENGTH_TICKS = 3_072;
-export const PATTERN_LENGTH_INCREMENT_TICKS = 96;
+export const DEFAULT_PATTERN_EDITOR_END_TICKS = 384;
+export const DEFAULT_TRANSPORT_LOOP_END_TICKS = 384;
+export const MIN_PATTERN_CONTENT_TICKS = 1;
+export const MAX_PATTERN_CONTENT_TICKS = 3_072;
 export const MAX_ARRANGEMENT_TICKS = 6_144;
 
 export const MIN_PATTERN_NOTE = 36;
@@ -50,7 +50,7 @@ export const V2_LIMITS = Object.freeze({
   effectsPerChain: MAX_EFFECTS_PER_CHAIN,
   notesPerPattern: MAX_NOTES_PER_PATTERN,
   notesPerProject: MAX_NOTES_PER_PROJECT,
-  patternLengthTicks: Object.freeze([MIN_PATTERN_LENGTH_TICKS, MAX_PATTERN_LENGTH_TICKS]),
+  patternContentTicks: Object.freeze([MIN_PATTERN_CONTENT_TICKS, MAX_PATTERN_CONTENT_TICKS]),
   patterns: MAX_PROJECT_PATTERNS,
   pitch: Object.freeze([MIN_PATTERN_NOTE, MAX_PATTERN_NOTE]),
   songTicks: MAX_ARRANGEMENT_TICKS,

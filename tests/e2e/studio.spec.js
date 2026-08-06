@@ -207,7 +207,7 @@ test("release suite 2: arrange, edit, play and restore linked clips", async ({ p
   await timeline.press("Escape");
   await timeline.press("ArrowRight");
   await timeline.press("s");
-  await expect(page.locator("#transport-status")).toHaveText(/Song.*tick 24/i);
+  await expect(page.locator("#transport-status")).toHaveText(/Song.*tick 23/i);
   await expect(timeline).toHaveAttribute("aria-activedescendant", "v2-playlist-cursor");
 
   await page.getByRole("button", { name: "Piano Roll", exact: true }).click();
@@ -217,13 +217,13 @@ test("release suite 2: arrange, edit, play and restore linked clips", async ({ p
   await expect(page.locator(".v2-playlist-clip")).toHaveCount(2);
   await expect(page.locator(".v2-playlist-clip").nth(1)).toHaveAttribute(
     "aria-label",
-    /Pattern 2.*bar 2, beat 1/,
+    /Pattern 2.*bar 1, beat 1, tick 24/,
   );
 
   await page.getByRole("button", { name: "Move later", exact: true }).click();
   await expect(page.locator(".v2-playlist-clip.is-selected")).toHaveAttribute(
     "aria-label",
-    /bar 2, beat 1, tick 24/,
+    /bar 1, beat 1, tick 48/,
   );
   await page.getByRole("button", { name: "Duplicate", exact: true }).click();
   await expect(page.locator(".v2-playlist-clip")).toHaveCount(3);
@@ -434,8 +434,8 @@ test("release suite 3: migrate, recover, download and import without losing V7",
   expect(wave.readUInt16LE(22)).toBe(2);
   expect(wave.readUInt32LE(24)).toBe(44_100);
   const frameCount = wave.readUInt32LE(40) / (2 * 2);
-  expect(frameCount).toBeGreaterThan(2 * 44_100);
-  expect(frameCount).toBeLessThanOrEqual(Math.ceil(2.04 * 44_100));
+  expect(frameCount).toBeGreaterThan(0.25 * 44_100);
+  expect(frameCount).toBeLessThanOrEqual(Math.ceil(0.29 * 44_100));
   await expect(page.locator("#audio-export-status")).toContainText("WAV ready");
 
   const downloadPath = await projectDownload.path();

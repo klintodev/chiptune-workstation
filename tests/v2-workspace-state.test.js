@@ -188,7 +188,7 @@ test("Pattern and note repair closes only missing Pattern sessions and filters i
   resized.patterns[1].notes = [];
   workspace.repairAfterPatternChange(resized);
   assert.deepEqual(workspace.getState().patternSurfaces["pattern-2"].selection, []);
-  assert.equal(workspace.getState().patternSurfaces["pattern-2"].cursor.tick, 95);
+  assert.equal(workspace.getState().patternSurfaces["pattern-2"].cursor.tick, 180);
 
   const removed = structuredClone(resized);
   removed.patterns = removed.patterns.filter((pattern) => pattern.id !== "pattern-2");

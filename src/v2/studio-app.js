@@ -439,12 +439,6 @@ export async function createV2StudioApp({ document: documentLike = document } = 
         confirmPatternDelete: async (pattern) => globalThis.confirm?.(
           `Delete ${pattern.name} and every Playlist clip that uses it?`,
         ) ?? false,
-        confirmPatternResize: async (pattern, lengthTicks) => {
-          const impact = projectState.getPatternResizeImpact(pattern.id, lengthTicks);
-          return !impact.requiresConfirmation || (globalThis.confirm?.(
-            `Shortening ${pattern.name} will remove or truncate notes. Continue?`,
-          ) ?? false);
-        },
         onAddToPlaylist(patternId, trackId, snapTicks) {
           try {
             const result = projectState.addPatternToPlaylist(

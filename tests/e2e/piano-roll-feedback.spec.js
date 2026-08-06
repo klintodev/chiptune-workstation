@@ -68,7 +68,17 @@ test("Piano Roll owns transport, note drag labels, deletion, geometry, and keybo
   });
 
   await page.locator(".v2-action-menu").getByText("Pattern actions", { exact: true }).click();
-  await page.getByLabel("Pattern length").selectOption("3072");
+  await expect(page.getByLabel("Pattern length")).toHaveCount(0);
+
+  await editor.focus();
+  await editor.press("Escape");
+  for (let index = 0; index < 4; index += 1) await editor.press("ArrowRight");
+  await editor.press("Enter");
+  await expect(page.locator(".v2-piano-note")).toHaveCount(2);
+  await expect(page.locator(".v2-pattern-library-drag small")).toHaveText("120 ticks");
+  await editor.press("Delete");
+  await expect(page.locator(".v2-piano-note")).toHaveCount(1);
+  await expect(page.locator(".v2-pattern-library-drag small")).toHaveText("24 ticks");
 
   await expect(page.getByRole("button", { name: "Open Instrument" })).toHaveCount(0);
   await expect(page.locator("#v2-editor-host").getByRole("button", { name: "Zoom in" })).toHaveCount(0);
@@ -105,6 +115,7 @@ test("Piano Roll owns transport, note drag labels, deletion, geometry, and keybo
       anchorWithinViewport,
       beforePixelsPerTick,
       beforeScrollLeft,
+      scrollable: element.scrollWidth > element.clientWidth,
       ordinaryDefaultPrevented: ordinaryEvent.defaultPrevented,
       ownedDefaultPrevented: ownedEvent.defaultPrevented,
     };
@@ -112,13 +123,15 @@ test("Piano Roll owns transport, note drag labels, deletion, geometry, and keybo
   expect(zoom.ordinaryDefaultPrevented).toBe(false);
   expect(zoom.ownedDefaultPrevented).toBe(true);
   expect(zoom.afterPixelsPerTick).toBeGreaterThan(zoom.beforePixelsPerTick);
-  const anchorTickBefore = (
-    zoom.beforeScrollLeft + zoom.anchorWithinViewport - 88
-  ) / zoom.beforePixelsPerTick;
-  const anchorTickAfter = (
-    zoom.afterScrollLeft + zoom.anchorWithinViewport - 88
-  ) / zoom.afterPixelsPerTick;
-  expect(Math.abs(anchorTickAfter - anchorTickBefore)).toBeLessThan(0.5);
+  if (zoom.scrollable) {
+    const anchorTickBefore = (
+      zoom.beforeScrollLeft + zoom.anchorWithinViewport - 88
+    ) / zoom.beforePixelsPerTick;
+    const anchorTickAfter = (
+      zoom.afterScrollLeft + zoom.anchorWithinViewport - 88
+    ) / zoom.afterPixelsPerTick;
+    expect(Math.abs(anchorTickAfter - anchorTickBefore)).toBeLessThan(0.5);
+  }
   await editor.focus();
   await editor.press("Control+-");
   await expect(editor).toBeFocused();

@@ -1,3 +1,5 @@
+import { getPatternEditorEndTick } from "../domain/pattern-span.js";
+
 const PRIMARY_KIND_SET = new Set(["piano-roll", "playlist", "mixer"]);
 const DEVICE_KIND_SET = new Set(["instrument", "effect"]);
 const PLAYBACK_MODE_SET = new Set(["pattern", "song"]);
@@ -76,14 +78,14 @@ function noteIds(pattern) {
 }
 
 function defaultPatternSurface(pattern, auditionTrackId) {
-  const lengthTicks = patternLength(pattern);
+  const editorEndTick = getPatternEditorEndTick(pattern);
   return {
     selection: [],
     snap: DEFAULT_PLAYLIST_SNAP,
     cursor: { tick: 0, pitch: 60 },
     viewport: {
       startTick: 0,
-      endTick: lengthTicks,
+      endTick: editorEndTick,
       lowPitch: 36,
       highPitch: 112,
     },
@@ -94,15 +96,15 @@ function defaultPatternSurface(pattern, auditionTrackId) {
 function repairPatternSurface(surface, pattern, validTrackIds, fallbackTrackId) {
   const defaults = defaultPatternSurface(pattern, fallbackTrackId);
   const validNotes = noteIds(pattern);
-  const lengthTicks = patternLength(pattern);
-  const maximumCursorTick = Math.max(0, lengthTicks - 1);
+  const editorEndTick = getPatternEditorEndTick(pattern);
+  const maximumCursorTick = Math.max(0, editorEndTick - 1);
   const source = surface && typeof surface === "object" ? surface : defaults;
   const sourceCursor = source.cursor && typeof source.cursor === "object" ? source.cursor : defaults.cursor;
   const sourceViewport = source.viewport && typeof source.viewport === "object"
     ? source.viewport
     : defaults.viewport;
   const startTick = clampInteger(sourceViewport.startTick, 0, maximumCursorTick, 0);
-  const endTick = clampInteger(sourceViewport.endTick, startTick + 1, lengthTicks, lengthTicks);
+  const endTick = clampInteger(sourceViewport.endTick, startTick + 1, editorEndTick, editorEndTick);
   const lowPitch = clampInteger(sourceViewport.lowPitch, 36, 112, 36);
   const highPitch = clampInteger(sourceViewport.highPitch, lowPitch, 112, 112);
   const selection = Array.isArray(source.selection)

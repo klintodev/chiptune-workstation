@@ -76,6 +76,7 @@ test("future scheduled voices count toward the canonical Track cap until retired
   project.patterns[0].notes = Array.from({ length: 17 }, (_, index) => (
     note(`future-${String(index).padStart(2, "0")}`, 60, index, 1)
   ));
+  project.patterns[0].notes.push(note("silent-span", 60, 96, 1, 0));
   const harness = createHarness(project, { lookAheadSeconds: 0.5 });
 
   harness.scheduler.play({ mode: "pattern" });
@@ -165,6 +166,7 @@ test("syncProject retires deleted future Pattern voices while preserving unchang
   project.patterns[0].notes = [
     note("stable", 60, 24, 12),
     note("moving", 64, 48, 12),
+    note("silent-span", 60, 95, 1, 0),
   ];
   const harness = createHarness(project, { lookAheadSeconds: 0.5 });
   harness.scheduler.play({ mode: "pattern" });
@@ -175,6 +177,7 @@ test("syncProject retires deleted future Pattern voices while preserving unchang
   nextProject.patterns[0].notes = [
     note("stable", 60, 24, 12),
     note("moving", 64, 72, 12),
+    note("silent-span", 60, 95, 1, 0),
   ];
   harness.project = nextProject;
   harness.scheduler.syncProject();

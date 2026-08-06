@@ -28,12 +28,12 @@ test("V2 export renders the arrangement once at 44.1 kHz and adds its serial tai
   assert.equal(plan.sampleRate, 44_100);
   assert.equal(plan.sampleRate, V2_EXPORT_SAMPLE_RATE);
   assert.equal(plan.channelCount, 2);
-  assert.equal(plan.toTick, 384);
+  assert.equal(plan.toTick, 24);
   assert.equal(plan.events.length, 1);
-  assert.equal(plan.contentDurationSeconds, 2);
+  assert.equal(plan.contentDurationSeconds, 0.125);
   assert.equal(plan.tailSeconds, 0.03);
-  assert.equal(plan.totalDurationSeconds, 2.03);
-  assert.equal(plan.frameCount, Math.ceil(2.03 * 44_100));
+  assert.equal(plan.totalDurationSeconds, 0.155);
+  assert.equal(plan.frameCount, Math.ceil(0.155 * 44_100));
 });
 
 test("the tail-aware duration guard rejects before constructing OfflineAudioContext", async () => {
@@ -43,7 +43,7 @@ test("the tail-aware duration guard rejects before constructing OfflineAudioCont
   }
   await assert.rejects(renderV2ArrangementOffline(audibleArrangement(), {
     OfflineAudioContextClass: NeverConstructed,
-    maxDurationSeconds: 2.02,
+    maxDurationSeconds: 0.145,
   }), /tail exceeds the render limit/);
   assert.equal(constructions, 0);
 });

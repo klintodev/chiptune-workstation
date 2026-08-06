@@ -1,6 +1,6 @@
 import {
   DEFAULT_PATTERN_ID,
-  DEFAULT_PATTERN_LENGTH_TICKS,
+  DEFAULT_TRANSPORT_LOOP_END_TICKS,
   DEFAULT_TRACK_ID,
   LOOP_MODES,
   MAX_ARRANGEMENT_TICKS,
@@ -9,7 +9,7 @@ import {
   MAX_EFFECTS_PER_CHAIN,
   MAX_NOTES_PER_PATTERN,
   MAX_NOTES_PER_PROJECT,
-  MAX_PATTERN_LENGTH_TICKS,
+  MAX_PATTERN_CONTENT_TICKS,
   MAX_PATTERN_NAME_LENGTH,
   MAX_PATTERN_NOTE,
   MAX_PROJECT_PATTERNS,
@@ -17,9 +17,8 @@ import {
   MAX_PROJECT_TRACKS,
   MAX_TRACK_NAME_LENGTH,
   MIN_BPM,
-  MIN_PATTERN_LENGTH_TICKS,
+  MIN_PATTERN_CONTENT_TICKS,
   MIN_PATTERN_NOTE,
-  PATTERN_LENGTH_INCREMENT_TICKS,
   PROJECT_SCHEMA_VERSION,
 } from "./constants.js";
 import {
@@ -39,6 +38,7 @@ import {
   deepFreeze,
   rangesOverlap,
 } from "./domain-utils.js";
+import { derivePatternLengthTicks, EMPTY_PATTERN_LENGTH_TICKS } from "./pattern-span.js";
 
 function normalizeLoop(candidate) {
   assertExactKeys(candidate, ["enabled", "mode", "startTick", "endTick"], "Transport loop");
@@ -57,16 +57,16 @@ function normalizeLoop(candidate) {
   };
 }
 
-function normalizeNote(candidate, pattern, noteIds) {
-  assertExactKeys(candidate, ["id", "pitch", "startTick", "durationTicks", "velocity"], `Pattern ${pattern.id} note`);
-  assertDomainId(candidate.id, `Pattern ${pattern.id} note id`);
-  if (noteIds.has(candidate.id)) throw new RangeError(`Pattern ${pattern.id} has duplicate note id ${candidate.id}.`);
+function normalizeNote(candidate, patternId, noteIds) {
+  assertExactKeys(candidate, ["id", "pitch", "startTick", "durationTicks", "velocity"], `Pattern ${patternId} note`);
+  assertDomainId(candidate.id, `Pattern ${patternId} note id`);
+  if (noteIds.has(candidate.id)) throw new RangeError(`Pattern ${patternId} has duplicate note id ${candidate.id}.`);
   noteIds.add(candidate.id);
   assertInteger(candidate.pitch, `Note ${candidate.id} pitch`, MIN_PATTERN_NOTE, MAX_PATTERN_NOTE);
-  assertInteger(candidate.startTick, `Note ${candidate.id} startTick`, 0, pattern.lengthTicks - 1);
-  assertInteger(candidate.durationTicks, `Note ${candidate.id} durationTicks`, 1, pattern.lengthTicks);
-  if (candidate.startTick + candidate.durationTicks > pattern.lengthTicks) {
-    throw new RangeError(`Note ${candidate.id} extends beyond Pattern ${pattern.id}.`);
+  assertInteger(candidate.startTick, `Note ${candidate.id} startTick`, 0, MAX_PATTERN_CONTENT_TICKS - 1);
+  assertInteger(candidate.durationTicks, `Note ${candidate.id} durationTicks`, 1, MAX_PATTERN_CONTENT_TICKS);
+  if (candidate.startTick + candidate.durationTicks > MAX_PATTERN_CONTENT_TICKS) {
+    throw new RangeError(`Note ${candidate.id} extends beyond the Pattern content limit.`);
   }
   assertFiniteNumber(candidate.velocity, `Note ${candidate.id} velocity`, 0, 1);
   return {
@@ -91,22 +91,18 @@ function normalizePattern(candidate) {
   assertInteger(
     candidate.lengthTicks,
     `Pattern ${candidate.id} lengthTicks`,
-    MIN_PATTERN_LENGTH_TICKS,
-    MAX_PATTERN_LENGTH_TICKS,
+    MIN_PATTERN_CONTENT_TICKS,
+    MAX_PATTERN_CONTENT_TICKS,
   );
-  if (candidate.lengthTicks % PATTERN_LENGTH_INCREMENT_TICKS !== 0) {
-    throw new RangeError(`Pattern ${candidate.id} lengthTicks must use 96-tick increments.`);
-  }
   if (!Array.isArray(candidate.notes) || candidate.notes.length > MAX_NOTES_PER_PATTERN) {
     throw new RangeError(`Pattern ${candidate.id} supports at most ${MAX_NOTES_PER_PATTERN} notes.`);
   }
   const noteIds = new Set();
-  const pattern = { id: candidate.id, lengthTicks: candidate.lengthTicks };
-  const notes = candidate.notes.map((note) => normalizeNote(note, pattern, noteIds)).sort(compareNotes);
+  const notes = candidate.notes.map((note) => normalizeNote(note, candidate.id, noteIds)).sort(compareNotes);
   return {
     id: candidate.id,
     name: candidate.name,
-    lengthTicks: candidate.lengthTicks,
+    lengthTicks: derivePatternLengthTicks(notes),
     notes,
   };
 }
@@ -255,9 +251,9 @@ export function createDefaultV2Project() {
     metadata: { title: "Untitled chiptune" },
     transport: {
       bpm: 120,
-      loop: { enabled: false, mode: "custom", startTick: 0, endTick: DEFAULT_PATTERN_LENGTH_TICKS },
+      loop: { enabled: false, mode: "custom", startTick: 0, endTick: DEFAULT_TRANSPORT_LOOP_END_TICKS },
     },
-    patterns: [{ id: DEFAULT_PATTERN_ID, name: "Pattern 1", lengthTicks: DEFAULT_PATTERN_LENGTH_TICKS, notes: [] }],
+    patterns: [{ id: DEFAULT_PATTERN_ID, name: "Pattern 1", lengthTicks: EMPTY_PATTERN_LENGTH_TICKS, notes: [] }],
     tracks: [{
       id: DEFAULT_TRACK_ID,
       name: "Pulse 1",

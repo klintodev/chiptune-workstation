@@ -91,7 +91,7 @@ schemaVersion, metadata, transport, patterns, tracks, mixer
 {
   "id": "pattern-1",
   "name": "Pattern 1",
-  "lengthTicks": 384,
+  "lengthTicks": 18,
   "notes": [
     {
       "id": "note-1",
@@ -105,13 +105,13 @@ schemaVersion, metadata, transport, patterns, tracks, mixer
 ```
 
 - Object keys are exactly `id, name, lengthTicks, notes`.
-- `lengthTicks`: 96â€¦3,072 in 96-tick increments.
+- `lengthTicks`: canonical derived value `max(1, max(note.startTick + note.durationTicks))`, bounded to 1â€¦3,072. It is never user-selected; normalization rewrites stale supplied values.
 - `notes`: 0â€“1,024 per Pattern and 0â€“8,192 across the Project.
 - Note keys are exactly `id, pitch, startTick, durationTicks, velocity`.
 - `pitch`: integer MIDI 36â€¦112.
 - `startTick`: integer â‰¥ 0.
 - `durationTicks`: integer â‰¥ 1.
-- `startTick + durationTicks <= lengthTicks`.
+- `startTick + durationTicks <= 3,072`; the greatest note end equals `lengthTicks` for a non-empty Pattern.
 - `velocity`: 0â€¦1; zero is persisted but schedules no voice.
 - Notes are canonically serialized by `startTick`, then `pitch`, then `id`. Same-pitch overlap is valid.
 - Pattern array order is user-visible. The final Pattern cannot be deleted.
@@ -177,7 +177,7 @@ The 18-tick duration is intentionally valid: exact V1 Â¼/Â¾ gate endpoints n
 - Clip keys: `id, patternId, startTick`.
 - `patternId` must resolve.
 - `startTick`: integer 0â€¦6,143.
-- Derived end is `startTick + referencedPattern.lengthTicks` and must be â‰¤ 6,144.
+- Derived end is `startTick + referencedPattern.lengthTicks` and must be â‰¤ 6,144; linked clip width changes automatically when note content changes.
 - Clips on the same Track may touch but may not overlap.
 
 ## Master Mixer
@@ -253,7 +253,7 @@ Schemas 1â€“6 first use the existing production migration chain to normaliz
 ## Default V7 Project
 
 - Title `Untitled chiptune`; BPM 120; custom loop disabled at 0â€¦384.
-- Pattern `pattern-1`, name `Pattern 1`, length 384, no notes.
+- Pattern `pattern-1`, name `Pattern 1`, derived technical length 1, no notes; the editor still exposes a normal writable grid.
 - Track `track-1`, name `Pulse 1`, Klinto Chip defaults above, Mixer volume 1/pan 0/not muted/not solo/no Effects, no clips.
 - Master volume 0.35, no Effects.
 - Session opens Pattern 1 Piano Roll in Pattern mode with Track 1 as `auditionTrackId`; session state is not serialized.
