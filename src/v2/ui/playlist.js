@@ -664,7 +664,7 @@ export function createPlaylistSurface({
         workspaceState.setActivePattern?.(id);
         announce(`Created ${projectState.getPattern(id).name}.`);
         render();
-        focusPatternLibraryItem(id);
+        onOpenPattern(id, destination.id);
       } catch (error) {
         announce(error.message);
       }

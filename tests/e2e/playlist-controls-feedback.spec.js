@@ -259,12 +259,15 @@ test("Playlist Pattern Library drag-drop snaps exactly and right-click deletes w
 
 test("clicking an empty Playlist lane adds the selected Pattern at the snapped position", async ({ page }) => {
   await createCursorNote(page);
-  await createNewPattern(page);
-  await createCursorNote(page);
   await page.getByRole("button", { name: "Playlist", exact: true }).click();
 
   const closePiano = page.getByRole("button", { name: "Close Piano Roll", exact: true });
   if (await closePiano.isVisible()) await closePiano.click();
+
+  await page.locator(".v2-playlist-pattern-library").getByRole("button", { name: "New Pattern", exact: true }).click();
+  await expect(page.locator("#v2-editor-host .v2-floating-window-title")).toHaveText("Pattern 2, Piano Roll");
+  await createCursorNote(page);
+  await closePiano.click();
 
   const pattern1 = page.locator('.v2-pattern-library-drag[data-pattern-id="pattern-1"]');
   const pattern2 = page.locator('.v2-pattern-library-drag[data-pattern-id="pattern-2"]');
