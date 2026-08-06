@@ -28,7 +28,7 @@ The Pattern editor, Instrument parameters and Mixer strips are not rendered insi
 
 Playlist opens with the Pattern library expanded as an inline `<details>` section above the lanes. Its labelled summary toggles the section without changing Project data; it remains ordinary Playlist content with no independent geometry, and reload restores it expanded.
 
-The library lists every Pattern in Project order, exposes Open/Add context, opens a Pattern for editing when its card is double-clicked, and gives each Pattern a labelled cog action menu for Rename, Duplicate, Length and Delete. Its New Pattern action creates and selects the Pattern, then immediately opens that new Pattern in the reusable Piano Roll. Disabled cap/final-Pattern actions retain their reasons. Opening a Pattern focuses/reuses the one Piano Roll window; library actions use the same atomic commands and focus repair as PRD 28.
+The library uses one compact dropdown containing every Pattern in Project order and renders one draggable card for the selected Pattern only, so its height does not grow with the Pattern count. The selected card exposes Add context, opens for editing when double-clicked, and has a labelled cog action menu for Open, Rename, Duplicate, Length and Delete. Its New Pattern action creates and selects the Pattern, then immediately opens that new Pattern in the reusable Piano Roll. Disabled cap/final-Pattern actions retain their reasons. Opening a Pattern focuses/reuses the one Piano Roll window; library actions use the same atomic commands and focus repair as PRD 28.
 
 At narrow widths, Pattern library remains the same collapsible section inside fullscreen Playlist, so exactly one surface remains mounted/exposed.
 
@@ -168,6 +168,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 
 - On desktop, Playlist and its inline Pattern-library details remain beneath the Piano Roll and one device, but are never co-displayed with exclusive Mixer.
 - At 1366Ã—768 there is no page scroll; bounded Piano/device dragging keeps both windows onscreen, and at 200% zoom all Tracks and Pattern-library controls remain reachable.
+- The Pattern library stays compact with one dropdown and one selected card at the 64-Pattern project limit; it never expands into a card grid.
 - Keyboard-only add/select/move/delete/undo/open-Pattern plus labelled cog-action journeys pass with contextual announcements.
 - The 390Ã—844 reduced journey exposes one fullscreen surface, can view/select/open a clip and return with transport accessible.
 
@@ -178,14 +179,14 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Shared scheduler projection tests for Pattern/Song/loop/seek/tempo
 - Playwright desktop compose â†’ Add â†’ arrange â†’ open Pattern journey with focus/announcement checkpoints
 - Final-clip/final-Track focus fallback and exclusive-Mixer/narrow-width hidden-tree tests
-- Pattern-library default-expanded/collapse/cog-action and clip/empty-lane right-click browser tests
+- Pattern-library default-expanded/collapse/dropdown/scalable selected-card/cog-action and clip/empty-lane right-click browser tests
 - 1366Ã—768 layout plus 390Ã—844 reduced mobile smoke
 - Save/reload/import/export fixtures after PRD 32 activation
 
 ## Delivery slices
 
 1. **Playlist command adoption:** consume PRD 28 tick clips/loop plus session cursor/playheads; overlap, boundary and scan-forward Add commands.
-2. **Read-only Playlist:** Track lanes, linked clips, ruler, viewport, managed semantic selection and the default-expanded collapsible Pattern-library `<details>` with labelled cog menus.
+2. **Read-only Playlist:** Track lanes, linked clips, ruler, viewport, managed semantic selection and the default-expanded collapsible Pattern-library `<details>` with one scalable dropdown, one selected card and a labelled cog menu.
 3. **Editing/history:** single-clip move, duplicate, delete, Track add/reorder/remove and atomic undo/redo.
 4. **Transport/navigation:** Pattern/Song projection, loop/seek and open-Pattern audition context.
 5. **Lifecycle/accessibility:** final-object focus, project switching, 200% zoom and reduced mobile smoke.
@@ -211,7 +212,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Only Patterns with an audible note may be added.
 - Removing a Track never closes project-level Pattern surfaces; it repairs their audition context.
 - Removing the final clip leaves an intentional Playlist empty state with deterministic visible focus.
-- Pattern library is a default-expanded inline `<details>` section with labelled cog actions; clip right-click deletes, while empty-lane right-click is suppressed/no-op.
+- Pattern library is a default-expanded inline `<details>` section with one dropdown for all Patterns and one draggable selected-Pattern card with labelled cog actions; clip right-click deletes, while empty-lane right-click is suppressed/no-op.
 
 
 

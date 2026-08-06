@@ -647,11 +647,32 @@ export function createPlaylistSurface({
       textContent: `Patterns (${state.patterns.length})`,
     }));
 
+    const selectedPatternId = patternToAddId();
+    const pattern = state.patterns.find(({ id }) => id === selectedPatternId) ?? state.patterns[0];
+    const picker = createElement("select", {
+      "aria-label": "Playlist Pattern",
+      "aria-describedby": "v2-pattern-library-help",
+      className: "v2-pattern-library-select",
+    });
+    for (const candidate of state.patterns) {
+      picker.append(createElement("option", {
+        textContent: candidate.name,
+        value: candidate.id,
+      }));
+    }
+    picker.value = pattern.id;
+    picker.addEventListener("change", () => {
+      const selected = state.patterns.find(({ id }) => id === picker.value);
+      if (!selected) return;
+      workspaceState.setActivePattern?.(selected.id);
+      announce(`${selected.name} selected in the Pattern Library.`);
+      node.querySelector(".v2-pattern-library-select")?.focus({ preventScroll: true });
+    });
     const libraryHeader = createElement("div", { className: "v2-pattern-library-header" }, [
-      createElement("p", {
-        id: "v2-pattern-library-help",
-        textContent: `Double-click a Pattern to edit it. Select one, then click or drag it into a Track. Add places it at the ${destination.name} cursor.`,
-      }),
+      createElement("label", { className: "v2-pattern-library-picker" }, [
+        createElement("span", { textContent: "Pattern" }),
+        picker,
+      ]),
     ]);
     const createPattern = createElement("button", {
       disabled: state.patterns.length >= 64,
@@ -671,17 +692,22 @@ export function createPlaylistSurface({
     });
     libraryHeader.append(createPattern);
 
+    const help = createElement("p", {
+      className: "visually-hidden",
+      id: "v2-pattern-library-help",
+      textContent: `Choose a Pattern, then double-click the selected card to edit it, drag it into a Track, or use Add to place it at the ${destination.name} cursor.`,
+    });
     const list = createElement("div", {
       "aria-describedby": "v2-pattern-library-help",
       className: "v2-pattern-library-list",
-      role: "list",
+      "aria-label": "Selected Pattern",
+      role: "group",
     });
-    for (const pattern of state.patterns) {
+    function createSelectedPatternCard() {
       const audible = pattern.notes.some(({ velocity }) => velocity > 0);
       const item = createElement("div", {
         className: "v2-pattern-library-item",
         dataset: { patternLibraryId: pattern.id },
-        role: "listitem",
       });
       const dragPattern = createElement("button", {
         "aria-label": `${pattern.name}, ${formatDurationTicks(pattern.lengthTicks)}. Double-click to edit or drag to a Playlist Track`,
@@ -855,9 +881,10 @@ export function createPlaylistSurface({
       }));
       actions.append(panel);
       item.append(dragPattern, add, actions);
-      list.append(item);
+      return item;
     }
-    patternLibrary.append(libraryHeader, list);
+    list.append(createSelectedPatternCard());
+    patternLibrary.append(libraryHeader, help, list);
   }
 
   function renderInspector() {
@@ -1184,6 +1211,11 @@ export function createPlaylistSurface({
   };
   const handleWorkspaceChange = (event) => {
     if (localWorkspaceMutationDepth > 0 || localProjectMutationDepth > 0) return;
+    const renderedPatternId = patternLibrary.querySelector(".v2-pattern-library-item")?.dataset.patternLibraryId;
+    if (renderedPatternId !== patternToAddId()) {
+      renderPatternLibrary();
+      return;
+    }
     const type = event?.detail?.action?.type ?? "";
     if (type === "playlist/update" || type.startsWith("project/") || type.endsWith("/repair")) {
       render();

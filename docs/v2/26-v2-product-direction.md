@@ -43,7 +43,7 @@ On desktop it adopts FL Studio's separation of Patterns, Playlist, Mixer and dev
 - On desktop, Playlist is the persistent base beneath one draggable modeless Piano Roll and at most one draggable modeless Instrument or Effect window.
 - Mixer remains the exclusive primary surface: while it is active, Playlist and all modeless composition/device windows are hidden from layout, focus and the accessibility tree.
 - The Piano Roll and device windows have approved fixed sizes and bounded drag movement. They are not user-resizable, and their geometry is never persisted.
-- Pattern library is an inline collapsible part of Playlist and has no independent geometry.
+- Pattern library is an inline collapsible part of Playlist with one compact all-Pattern dropdown and one draggable selected-Pattern card; it has no independent geometry and does not grow into a card grid.
 - Windows open, focus and close. V2 does not add pinning, minimizing, maximizing or saved layouts.
 - At narrow widths, exactly one fullscreen surface is mounted and exposed at a time.
 - Blocking confirmations are true modals; musical work surfaces are not.
@@ -139,7 +139,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 - Persistent desktop Playlist with up to eight Track lanes and the existing bounded song length; Mixer alone replaces it as an exclusive primary.
 - Linked, fixed-duration Pattern clips.
 - Add at the first valid snapped position at or after the session-local Playlist insertion cursor; advance the cursor to the new clip end and fail atomically only when no position fits.
-- Select a Pattern in the Playlist library and click an empty Track position to place it exactly on the snapped click; occupied positions reject without scanning forward.
+- Select a Pattern from the Playlist library dropdown and click an empty Track position to place it exactly on the snapped click; occupied positions reject without scanning forward.
 - Song mode, loop and single-clip select, duplicate, move and delete.
 
 ### Persistence and output

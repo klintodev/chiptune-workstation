@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { createV2ProjectState } from "../../src/v2/domain/project-state.js";
+import { createV2ProjectDocument } from "../../src/v2/persistence/project-document.js";
 import { startProductionServer } from "./serve-dist.mjs";
 
 let productionServer;
@@ -65,10 +67,16 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
 
   const library = page.locator(".v2-playlist-pattern-library");
   await expect(library).toHaveAttribute("open", "");
-  await expect(library.getByRole("listitem")).toHaveCount(2);
   await expect(page.getByLabel("Pattern to add")).toHaveCount(0);
+  const patternPicker = library.getByLabel("Playlist Pattern", { exact: true });
+  await expect(patternPicker.locator("option")).toHaveCount(2);
+  await expect(patternPicker).toHaveValue("pattern-2");
+  await expect(library.locator(".v2-pattern-library-item")).toHaveCount(1);
+  await expect(library.locator(".v2-pattern-library-item")).toHaveAttribute("data-pattern-library-id", "pattern-2");
+  await patternPicker.selectOption("pattern-1");
+  await expect(library.locator(".v2-pattern-library-item")).toHaveAttribute("data-pattern-library-id", "pattern-1");
   const patternItems = library.locator(".v2-pattern-library-drag");
-  await expect(patternItems).toHaveCount(2);
+  await expect(patternItems).toHaveCount(1);
   await expect(patternItems.first()).toHaveAttribute("draggable", "true");
   await patternItems.first().dblclick();
   await expect(page.locator("#v2-editor-host .v2-floating-window-title")).toHaveText("Pattern 1, Piano Roll");
@@ -96,9 +104,15 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await addPattern1.click();
   await expect(page.locator(".v2-playlist-clip")).toHaveCount(1);
 
+  await patternPicker.selectOption("pattern-2");
   await page.getByRole("button", { name: /Add Pattern 2 to Pulse 1/ }).click();
   await expect(page.locator(".v2-playlist-clip")).toHaveCount(2);
   await expect(page.locator("#playback-mode")).toHaveValue("song");
+  await patternPicker.selectOption("pattern-1");
+  await page.locator(".v2-playlist-clip", { hasText: "Pattern 2" }).dblclick();
+  await expect(page.locator("#v2-editor-host .v2-floating-window-title")).toHaveText("Pattern 2, Piano Roll");
+  await expect(patternPicker).toHaveValue("pattern-2");
+  await page.getByRole("button", { name: "Close Piano Roll", exact: true }).click();
 
   await page.getByRole("button", { name: "Add Track", exact: true }).click();
   const destinations = page.locator(".v2-playlist-track-focus");
@@ -110,6 +124,7 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await expect(destinations.last()).toHaveAttribute("aria-pressed", "false");
 
   await destinations.last().click();
+  await patternPicker.selectOption("pattern-1");
   await page.getByRole("button", { name: /Add Pattern 1 to Track 2/ }).click();
   const routedClip = page.locator('.v2-playlist-lane[data-track-id="track-2"] .v2-playlist-clip');
   await expect(routedClip).toHaveCount(1);
@@ -192,6 +207,52 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await expect(masterVolume).toBeFocused();
 });
 
+test("Pattern Library stays compact with 25 Patterns", async ({ page }) => {
+  const projectState = createV2ProjectState();
+  for (let index = 1; index < 25; index += 1) {
+    projectState.createPattern();
+  }
+  const projectDocument = createV2ProjectDocument(projectState.getState(), {
+    id: "project-pattern-library-scale",
+    now: "2026-08-06T09:00:00.000Z",
+  });
+  await page.goto("/robots.txt");
+  await page.evaluate(async (document) => new Promise((resolve, reject) => {
+    const request = indexedDB.open("chiptune-workstation", 1);
+    request.addEventListener("error", () => reject(request.error), { once: true });
+    request.addEventListener("success", () => {
+      const database = request.result;
+      const transaction = database.transaction("projects", "readwrite");
+      transaction.objectStore("projects").put(document);
+      transaction.addEventListener("complete", () => {
+        database.close();
+        localStorage.setItem("chiptune-workstation:last-project-id", document.id);
+        resolve();
+      }, { once: true });
+      transaction.addEventListener("error", () => reject(transaction.error), { once: true });
+    }, { once: true });
+  }), projectDocument);
+  await page.goto("/");
+  const setup = page.getByRole("dialog", { name: "Klinto Studio" });
+  if (await setup.isVisible()) await setup.getByRole("button", { name: "Continue without sound" }).click();
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+  const closePiano = page.getByRole("button", { name: "Close Piano Roll", exact: true });
+  if (await closePiano.isVisible()) await closePiano.click();
+
+  const library = page.locator(".v2-playlist-pattern-library");
+  const picker = library.getByLabel("Playlist Pattern", { exact: true });
+  const selectedCard = library.locator(".v2-pattern-library-item");
+  await expect(picker.locator("option")).toHaveCount(25);
+  await expect(picker).toHaveValue("pattern-1");
+  await expect(selectedCard).toHaveCount(1);
+  await expect(selectedCard).toHaveAttribute("data-pattern-library-id", "pattern-1");
+  expect(await library.evaluate((element) => element.getBoundingClientRect().height)).toBeLessThan(170);
+
+  await picker.selectOption("pattern-25");
+  await expect(selectedCard).toHaveAttribute("data-pattern-library-id", "pattern-25");
+  await expect(library.locator(".v2-pattern-library-drag")).toHaveCount(1);
+});
+
 test("Playlist Pattern Library drag-drop snaps exactly and right-click deletes with undo-safe focus", async ({ page }) => {
   await createCursorNote(page);
   await page.getByRole("button", { name: "Playlist", exact: true }).click();
@@ -271,12 +332,14 @@ test("clicking an empty Playlist lane adds the selected Pattern at the snapped p
 
   const pattern1 = page.locator('.v2-pattern-library-drag[data-pattern-id="pattern-1"]');
   const pattern2 = page.locator('.v2-pattern-library-drag[data-pattern-id="pattern-2"]');
+  const patternPicker = page.locator(".v2-playlist-pattern-library").getByLabel("Playlist Pattern", { exact: true });
   const lane = page.locator('.v2-playlist-lane[data-track-id="track-1"]');
   const timeline = page.locator(".v2-playlist-timeline");
   const bounds = await timeline.boundingBox();
   expect(bounds).not.toBeNull();
   const laneY = bounds.y + 46 + 33;
 
+  await patternPicker.selectOption("pattern-1");
   await pattern1.click();
   await page.mouse.click(bounds.x + 320 + 192 * 0.36, laneY);
 
@@ -286,6 +349,7 @@ test("clicking an empty Playlist lane adds the selected Pattern at the snapped p
   await expect(clips.first()).toBeFocused();
   await expect(page.locator("#playback-mode")).toHaveValue("song");
 
+  await patternPicker.selectOption("pattern-2");
   await pattern2.click();
   await page.mouse.click(bounds.x + 323, laneY);
   await expect(clips).toHaveCount(1);
