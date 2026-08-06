@@ -114,7 +114,7 @@ export function createPlaylistSurface({
   const help = createElement("p", {
     className: "v2-editor-help",
     id: "v2-playlist-help",
-    textContent: "Arrow keys move the insertion cursor. Press S or click an empty timeline position to move the Song playhead. Enter selects or opens a clip. Alt with arrows moves a selected clip. Home enters Track actions; Escape returns to the timeline.",
+    textContent: "Click an empty Track position to add the selected Pattern. Arrow keys move the insertion cursor; press S to move the Song playhead there. Enter selects or opens a clip. Alt with arrows moves a selected clip. Home enters Track actions; Escape returns to the timeline.",
   });
   const node = createElement("section", {
     className: "v2-primary-surface v2-playlist",
@@ -650,7 +650,7 @@ export function createPlaylistSurface({
     const libraryHeader = createElement("div", { className: "v2-pattern-library-header" }, [
       createElement("p", {
         id: "v2-pattern-library-help",
-        textContent: `Drag a Pattern into a Track, or use Add to place it at the ${destination.name} cursor.`,
+        textContent: `Select a Pattern, then click or drag it into a Track. Add places it at the ${destination.name} cursor.`,
       }),
     ]);
     const createPattern = createElement("button", {
@@ -1152,16 +1152,21 @@ export function createPlaylistSurface({
 
   timeline.addEventListener("keydown", handleTimelineKeyDown, { signal: lifecycle.signal });
   timeline.addEventListener("click", (event) => {
-    if (event.target.closest?.("button, input, select, textarea")) return;
-    const bounds = timeline.getBoundingClientRect();
-    const horizontal = event.clientX - bounds.left - TRACK_HEADER_WIDTH;
-    if (horizontal < 0) return;
-    const rawTick = Math.round(horizontal / pixelsPerTick / snapTicks) * snapTicks;
+    if (event.button !== 0 || event.target.closest?.("button, input, select, textarea")) return;
     const lane = event.target.closest?.(".v2-playlist-lane");
-    seekSong(
-      Math.max(0, Math.min(MAX_SONG_TICKS - snapTicks, rawTick)),
-      lane?.dataset.trackId ?? destinationTrackId(),
-    );
+    if (!lane?.dataset.trackId) return;
+    const dropTick = getSnappedPlaylistDropTick({
+      clientX: event.clientX,
+      pixelsPerTick,
+      snapTicks,
+      timelineLeft: timeline.getBoundingClientRect().left,
+    });
+    if (dropTick === null) return;
+    addPatternToTrack(patternToAddId(), lane.dataset.trackId, dropTick, { exact: true });
+  }, { signal: lifecycle.signal });
+  timeline.addEventListener("contextmenu", (event) => {
+    if (!event.target.closest?.(".v2-playlist-lane") || event.target.closest?.("button")) return;
+    event.preventDefault();
   }, { signal: lifecycle.signal });
   node.ownerDocument?.addEventListener?.("pointerdown", (event) => {
     if (event.target.closest?.(".v2-pattern-library-actions")) return;

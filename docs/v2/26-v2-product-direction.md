@@ -139,6 +139,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 - Persistent desktop Playlist with up to eight Track lanes and the existing bounded song length; Mixer alone replaces it as an exclusive primary.
 - Linked, fixed-duration Pattern clips.
 - Add at the first valid snapped position at or after the session-local Playlist insertion cursor; advance the cursor to the new clip end and fail atomically only when no position fits.
+- Select a Pattern in the Playlist library and click an empty Track position to place it exactly on the snapped click; occupied positions reject without scanning forward.
 - Song mode, loop and single-clip select, duplicate, move and delete.
 
 ### Persistence and output

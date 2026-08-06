@@ -71,6 +71,8 @@ Placement is deterministic and atomic:
 3. On success, create one clip, set Song playhead to its start, advance `playlistCursorTick` to its end, switch session playback to Song, select/reveal the clip in the persistent desktop Playlist and focus its context; at narrow widths, switch from Piano Roll to fullscreen Playlist.
 4. If no position fits, create nothing, remain in Piano Roll and explain that the Track has no valid remaining space.
 
+In Playlist, selecting a Pattern in the expanded library and left-clicking an empty Track position places that active Pattern at the exact snapped position on the clicked Track. It does not scan forward when the position is occupied: an invalid placement creates nothing and announces why. Drag-and-drop retains the same exact-placement semantics, while `S` remains the explicit command for moving the Song playhead to the Playlist cursor.
+
 It creates one undo history entry and one autosave revision. A tested two-Pattern journey must place both sequentially without the user manually moving the cursor.
 
 ## Clip editing
@@ -86,6 +88,8 @@ Desktop pointer and keyboard commands support one selected clip at launch:
 Multi-select, repeat-count and Playlist clipboard operations are post-V2.
 
 Drag previews never mutate the Project until drop. Invalid drops restore the original position and announce why. Pointer cancellation commits nothing. Reorder/move keeps focus tied to stable clip identity, not its old lane/cell. Clip right-click suppresses the browser context menu and deletes exactly that clip as one undoable command; empty-lane right-click is suppressed and makes no change.
+
+Empty-lane left-click adds the active Pattern at the exact snapped position on that Track. Clicking a clip continues to select it and never creates another clip.
 
 ## Timeline, playhead and transport
 
@@ -151,6 +155,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 ### Editing/lifecycle
 
 - Single-clip move, duplicate, action/keyboard/right-click delete and undo preserve stable identities/links and enforce overlap/boundary rules atomically.
+- Selecting a Pattern in the library and clicking an empty Track position adds that Pattern exactly at the snapped click position without changing existing clip-click behavior.
 - Pattern-library cog Rename/Duplicate/Length/Delete actions obey caps, final-Pattern rules, atomic history and focus repair.
 - Increasing Pattern length rejects when any linked clip would become invalid; decreasing shortens all clips.
 - Track removal closes its devices, keeps Pattern surfaces and repairs audition Track.

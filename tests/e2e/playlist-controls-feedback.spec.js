@@ -253,6 +253,60 @@ test("Playlist Pattern Library drag-drop snaps exactly and right-click deletes w
   await expect(lane.locator(".v2-playlist-clip")).toHaveAccessibleName(/starts bar 1, beat 3/);
 });
 
+test("clicking an empty Playlist lane adds the selected Pattern at the snapped position", async ({ page }) => {
+  await createCursorNote(page);
+  await createNewPattern(page);
+  await createCursorNote(page);
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+
+  const closePiano = page.getByRole("button", { name: "Close Piano Roll", exact: true });
+  if (await closePiano.isVisible()) await closePiano.click();
+
+  const pattern1 = page.locator('.v2-pattern-library-drag[data-pattern-id="pattern-1"]');
+  const pattern2 = page.locator('.v2-pattern-library-drag[data-pattern-id="pattern-2"]');
+  const lane = page.locator('.v2-playlist-lane[data-track-id="track-1"]');
+  const timeline = page.locator(".v2-playlist-timeline");
+  const bounds = await timeline.boundingBox();
+  expect(bounds).not.toBeNull();
+  const laneY = bounds.y + 46 + 33;
+
+  await pattern1.click();
+  await page.mouse.click(bounds.x + 320 + 192 * 0.36, laneY);
+
+  const clips = lane.locator(".v2-playlist-clip");
+  await expect(clips).toHaveCount(1);
+  await expect(clips.first()).toHaveAccessibleName(/Pattern 1, Pulse 1, starts bar 1, beat 3/);
+  await expect(clips.first()).toBeFocused();
+  await expect(page.locator("#playback-mode")).toHaveValue("song");
+
+  await pattern2.click();
+  await page.mouse.click(bounds.x + 323, laneY);
+  await expect(clips).toHaveCount(1);
+  await expect(page.locator("#workstation-status")).toContainText("Pattern 2 does not fit at bar 1, beat 1 on Pulse 1");
+
+  await page.mouse.click(bounds.x + 320 + 768 * 0.36, laneY);
+  await expect(clips).toHaveCount(2);
+  await expect(clips.last()).toHaveAccessibleName(/Pattern 2, Pulse 1, starts bar 3, beat 1/);
+  await expect(clips.last()).toBeFocused();
+
+  await clips.first().click();
+  await expect(clips).toHaveCount(2);
+  await expect(clips.first()).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#v2-playlist-help")).toContainText("Click an empty Track position to add the selected Pattern");
+
+  const contextMenuPrevented = await lane.evaluate((element) => {
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true,
+      button: 2,
+      cancelable: true,
+    });
+    element.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(contextMenuPrevented).toBe(true);
+  await expect(clips).toHaveCount(2);
+});
+
 test("default desktop keeps the Pattern Library actionable beneath the raised Piano", async ({ page }) => {
   const content = page.locator(".v2-workspace-content");
   const editor = page.locator("#v2-editor-host");
