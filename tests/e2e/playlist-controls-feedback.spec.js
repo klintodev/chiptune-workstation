@@ -458,7 +458,8 @@ test("clicking an empty Playlist lane adds the selected Pattern at the snapped p
   await clips.first().click();
   await expect(clips).toHaveCount(2);
   await expect(clips.first()).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator("#v2-playlist-help")).toContainText("Click an empty Track position to add the selected Pattern");
+  await expect(page.locator("#v2-playlist-help")).toHaveCount(0);
+  await expect(page.locator(".v2-playlist > .v2-editor-help")).toHaveCount(0);
 
   const contextMenuPrevented = await lane.evaluate((element) => {
     const event = new MouseEvent("contextmenu", {

@@ -110,7 +110,6 @@ export function createPlaylistSurface({
     role: "grid",
     tabIndex: 0,
     "aria-label": "Playlist timeline",
-    "aria-describedby": "v2-playlist-help",
     "aria-keyshortcuts": "Home S",
   });
   const scroller = createElement("div", { className: "v2-playlist-scroll" }, [timeline]);
@@ -119,16 +118,11 @@ export function createPlaylistSurface({
     open: true,
   });
   const inspector = createElement("aside", { className: "v2-clip-inspector", "aria-label": "Playlist selection" });
-  const help = createElement("p", {
-    className: "v2-editor-help",
-    id: "v2-playlist-help",
-    textContent: "Click an empty Track position to add the selected Pattern. Control or Command with the wheel scrolls the timeline horizontally. Arrow keys move the insertion cursor; press S to move the Song playhead there. Enter selects or opens a clip. Alt with arrows moves a selected clip. Home enters Track actions; Escape returns to the timeline.",
-  });
   const node = createElement("section", {
     className: "v2-primary-surface v2-playlist",
     "aria-labelledby": title.id,
     dataset: { primarySurface: "playlist" },
-  }, [header, patternLibrary, scroller, inspector, help]);
+  }, [header, patternLibrary, scroller, inspector]);
 
   node.addEventListener("wheel", (event) => {
     if (!event.ctrlKey && !event.metaKey) return;

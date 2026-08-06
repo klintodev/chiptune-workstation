@@ -657,7 +657,7 @@ body {
 
 /* Playlist */
 .v2-playlist {
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .v2-playlist-header-leading {
