@@ -28,7 +28,7 @@ The Pattern editor, Instrument parameters and Mixer strips are not rendered insi
 
 Playlist opens with the Pattern library expanded as an inline `<details>` section above the lanes. Its labelled summary toggles the section without changing Project data; it remains ordinary Playlist content with no independent geometry, and reload restores it expanded.
 
-The library lists every Pattern in Project order, exposes Open/Add context, and gives each Pattern a labelled cog action menu for Rename, Duplicate, Length and Delete. Disabled cap/final-Pattern actions retain their reasons. Opening a Pattern focuses/reuses the one Piano Roll window; library actions use the same atomic commands and focus repair as PRD 28.
+The library lists every Pattern in Project order, exposes Open/Add context, opens a Pattern for editing when its card is double-clicked, and gives each Pattern a labelled cog action menu for Rename, Duplicate, Length and Delete. Disabled cap/final-Pattern actions retain their reasons. Opening a Pattern focuses/reuses the one Piano Roll window; library actions use the same atomic commands and focus repair as PRD 28.
 
 At narrow widths, Pattern library remains the same collapsible section inside fullscreen Playlist, so exactly one surface remains mounted/exposed.
 
@@ -156,6 +156,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 
 - Single-clip move, duplicate, action/keyboard/right-click delete and undo preserve stable identities/links and enforce overlap/boundary rules atomically.
 - Selecting a Pattern in the library and clicking an empty Track position adds that Pattern exactly at the snapped click position without changing existing clip-click behavior.
+- Double-clicking a Pattern card in the library opens that Pattern in the reusable Piano Roll for editing.
 - Pattern-library cog Rename/Duplicate/Length/Delete actions obey caps, final-Pattern rules, atomic history and focus repair.
 - Increasing Pattern length rejects when any linked clip would become invalid; decreasing shortens all clips.
 - Track removal closes its devices, keeps Pattern surfaces and repairs audition Track.

@@ -70,6 +70,10 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   const patternItems = library.locator(".v2-pattern-library-drag");
   await expect(patternItems).toHaveCount(2);
   await expect(patternItems.first()).toHaveAttribute("draggable", "true");
+  await patternItems.first().dblclick();
+  await expect(page.locator("#v2-editor-host .v2-floating-window-title")).toHaveText("Pattern 1, Piano Roll");
+  await expect(page.locator("#v2-editor-host .v2-piano-window")).toBeVisible();
+  await page.getByRole("button", { name: "Close Piano Roll", exact: true }).click();
 
   const patternActions = library.locator(".v2-pattern-library-actions").first();
   await patternActions.getByLabel("Actions for Pattern 1").click();

@@ -650,7 +650,7 @@ export function createPlaylistSurface({
     const libraryHeader = createElement("div", { className: "v2-pattern-library-header" }, [
       createElement("p", {
         id: "v2-pattern-library-help",
-        textContent: `Select a Pattern, then click or drag it into a Track. Add places it at the ${destination.name} cursor.`,
+        textContent: `Double-click a Pattern to edit it. Select one, then click or drag it into a Track. Add places it at the ${destination.name} cursor.`,
       }),
     ]);
     const createPattern = createElement("button", {
@@ -684,11 +684,11 @@ export function createPlaylistSurface({
         role: "listitem",
       });
       const dragPattern = createElement("button", {
-        "aria-label": `${pattern.name}, ${formatDurationTicks(pattern.lengthTicks)}. Drag to a Playlist Track`,
+        "aria-label": `${pattern.name}, ${formatDurationTicks(pattern.lengthTicks)}. Double-click to edit or drag to a Playlist Track`,
         className: "v2-pattern-library-drag",
         dataset: { patternId: pattern.id },
         draggable: true,
-        title: `Drag ${pattern.name} to a Playlist Track`,
+        title: `Double-click to edit ${pattern.name}, or drag it to a Playlist Track`,
         type: "button",
       }, [
         createElement("strong", { textContent: pattern.name }),
@@ -697,6 +697,9 @@ export function createPlaylistSurface({
       dragPattern.addEventListener("click", () => {
         workspaceState.setActivePattern?.(pattern.id);
         announce(`${pattern.name} selected in the Pattern Library.`);
+      });
+      dragPattern.addEventListener("dblclick", () => {
+        onOpenPattern(pattern.id, destination.id);
       });
       dragPattern.addEventListener("dragstart", (event) => {
         draggedPatternId = pattern.id;
