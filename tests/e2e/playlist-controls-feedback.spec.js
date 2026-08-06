@@ -166,10 +166,12 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await page.getByRole("button", { name: "Playlist", exact: true }).click();
   const selectedClip = page.locator(".v2-playlist-clip").last();
   await selectedClip.click();
-  await expect(page.getByRole("button", { name: /Move Song playhead to the selected clip/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Move Song playhead/ })).toHaveCount(0);
+  await expect(page.getByText(/Move playhead/i)).toHaveCount(0);
   await selectedClip.focus();
   await selectedClip.press("Escape");
-  await expect(page.getByRole("button", { name: /Move Song playhead to the Playlist cursor/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Move Song playhead/ })).toHaveCount(0);
+  await expect(page.getByText(/Move playhead/i)).toHaveCount(0);
   await expect(page.getByText("Seek Song here", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/seeks the Song/i)).toHaveCount(0);
   await expect(page.getByTitle(/Start Song playback/)).toHaveCount(0);

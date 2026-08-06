@@ -921,13 +921,6 @@ export function createPlaylistSurface({
     if (!found) {
       const track = destination;
       inspector.append(createElement("p", { textContent: `${track.name} · insertion cursor ${formatTickPosition(cursorTick())}` }));
-      inspector.append(createElement("button", {
-        "aria-label": `Move Song playhead to the Playlist cursor at ${formatTickPosition(cursorTick())}`,
-        textContent: "Move playhead here",
-        title: "Move the Song playhead to the Playlist cursor",
-        type: "button",
-        onClick: () => seekSong(cursorTick(), track.id),
-      }));
       if (state.tracks.every(({ clips }) => clips.length === 0)) {
         inspector.append(createElement("button", {
           className: "v2-primary-action",
@@ -960,13 +953,6 @@ export function createPlaylistSurface({
       render();
     });
     inspector.append(createElement("label", {}, ["Track", trackSelect]));
-    inspector.append(createElement("button", {
-      "aria-label": `Move Song playhead to the selected clip at ${formatTickPosition(found.clip.startTick)}`,
-      textContent: "Move playhead to clip",
-      title: "Move the Song playhead to the selected clip",
-      type: "button",
-      onClick: () => seekSong(found.clip.startTick, found.track.id),
-    }));
     inspector.append(
       createElement("button", { textContent: "Open Pattern", type: "button", onClick: openSelected }),
       createElement("button", { textContent: "Move earlier", type: "button", onClick: () => moveSelected(-snapTicks, 0) }),
