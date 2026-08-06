@@ -256,6 +256,50 @@ test("Space toggles transport from controls anywhere in Studio without activatin
   }))).toEqual(initialScroll);
 });
 
+test("Control-wheel scrolls the Playlist timeline instead of the browser", async ({ page }) => {
+  await page.getByRole("button", { name: "Playlist", exact: true }).click();
+  const scroller = page.locator(".v2-playlist-scroll");
+  await expect(scroller).toBeVisible();
+  await expect.poll(() => scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+  const synthetic = await scroller.evaluate((element) => {
+    element.scrollLeft = 0;
+    const event = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+      deltaY: 180,
+    });
+    element.dispatchEvent(event);
+    return {
+      defaultPrevented: event.defaultPrevented,
+      scrollLeft: element.scrollLeft,
+    };
+  });
+  expect(synthetic.defaultPrevented).toBe(true);
+  expect(synthetic.scrollLeft).toBe(180);
+
+  await scroller.evaluate((element) => { element.scrollLeft = 0; });
+  const bounds = await scroller.boundingBox();
+  expect(bounds).not.toBeNull();
+  const browserBefore = await page.evaluate(() => ({
+    innerWidth: window.innerWidth,
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+  }));
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, 240);
+  await page.keyboard.up("Control");
+
+  await expect.poll(() => scroller.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => ({
+    innerWidth: window.innerWidth,
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+  }))).toEqual(browserBefore);
+});
+
 test("Pattern Library stays compact with 25 Patterns", async ({ page }) => {
   const projectState = createV2ProjectState();
   for (let index = 1; index < 25; index += 1) {

@@ -7,6 +7,7 @@ import {
   getPianoMarqueeNoteIds,
 } from "../src/v2/ui/piano-roll.js";
 import {
+  getPlaylistWheelScrollDelta,
   getSnappedPlaylistDropTick,
   resolvePlaylistFocusTarget,
 } from "../src/v2/ui/playlist.js";import {
@@ -462,6 +463,14 @@ test("Piano pointer geometry bounds moves and marquee selection to the Pattern g
     }),
     ["left"],
   );
+});
+
+test("Playlist modifier-wheel scrolling follows the dominant axis and normalizes delta modes", () => {
+  assert.equal(getPlaylistWheelScrollDelta({ deltaX: 20, deltaY: 120 }), 120);
+  assert.equal(getPlaylistWheelScrollDelta({ deltaX: -160, deltaY: 40 }), -160);
+  assert.equal(getPlaylistWheelScrollDelta({ deltaMode: 1, deltaY: 3 }), 120);
+  assert.equal(getPlaylistWheelScrollDelta({ clientWidth: 800, deltaMode: 2, deltaY: -1 }), -800);
+  assert.equal(getPlaylistWheelScrollDelta({ deltaY: Number.NaN }), 0);
 });
 
 test("Playlist Pattern drops snap to the visible Track grid and reject Track headers", () => {

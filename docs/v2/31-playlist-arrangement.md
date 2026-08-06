@@ -114,6 +114,7 @@ Deleting a non-final Pattern discloses and removes all linked clips as one undoa
 
 Playlist exposes one named timeline/grid entry point with managed selection; empty tick cells are not individual Tab stops.
 
+- Control/Command + wheel anywhere over Playlist scrolls its timeline horizontally and suppresses browser zoom and page scrolling; Piano Roll retains its separate Control/Command + wheel zoom gesture.
 - Tab enters/exits the timeline in Navigation mode. Left/Right move `playlistCursorTick` by snap; Up/Down change the destination Track; none mutates a clip.
 - Enter selects the clip under the cursor, or announces the empty position. With a clip selected, Enter opens its Pattern and Escape clears selection back to Navigation mode at the clip start.
 - With a clip selected, Alt+Left/Right moves it by snap and Alt+Up/Down moves it one Track after atomic validation. Delete/Backspace deletes it and never triggers browser navigation. The explicit Duplicate action (shortcut shown as platform `Mod+D`) duplicates once.

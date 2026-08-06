@@ -20,6 +20,14 @@ export function getSnappedPlaylistDropTick({ clientX, pixelsPerTick, snapTicks, 
   ));
 }
 
+export function getPlaylistWheelScrollDelta({ clientWidth = 0, deltaMode = 0, deltaX = 0, deltaY = 0 } = {}) {
+  const dominantDelta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+  if (!Number.isFinite(dominantDelta)) return 0;
+  if (deltaMode === 1) return dominantDelta * 40;
+  if (deltaMode === 2) return dominantDelta * Math.max(1, Number(clientWidth) || 0);
+  return dominantDelta;
+}
+
 function findClip(project, clipId) {
   for (const track of project.tracks) {
     const clip = track.clips.find(({ id }) => id === clipId);
@@ -114,13 +122,25 @@ export function createPlaylistSurface({
   const help = createElement("p", {
     className: "v2-editor-help",
     id: "v2-playlist-help",
-    textContent: "Click an empty Track position to add the selected Pattern. Arrow keys move the insertion cursor; press S to move the Song playhead there. Enter selects or opens a clip. Alt with arrows moves a selected clip. Home enters Track actions; Escape returns to the timeline.",
+    textContent: "Click an empty Track position to add the selected Pattern. Control or Command with the wheel scrolls the timeline horizontally. Arrow keys move the insertion cursor; press S to move the Song playhead there. Enter selects or opens a clip. Alt with arrows moves a selected clip. Home enters Track actions; Escape returns to the timeline.",
   });
   const node = createElement("section", {
     className: "v2-primary-surface v2-playlist",
     "aria-labelledby": title.id,
     dataset: { primarySurface: "playlist" },
   }, [header, patternLibrary, scroller, inspector, help]);
+
+  node.addEventListener("wheel", (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    scroller.scrollLeft += getPlaylistWheelScrollDelta({
+      clientWidth: scroller.clientWidth,
+      deltaMode: event.deltaMode,
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+    });
+  }, { passive: false, signal: lifecycle.signal });
 
   function project() {
     return projectState.getState();
