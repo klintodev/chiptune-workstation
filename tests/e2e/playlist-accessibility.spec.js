@@ -79,7 +79,7 @@ test("Playlist is one managed grid Tab stop and Escape restores its navigation c
     };
   })).toEqual({ directGridCells: 0, everyCellOwnedByRow: true, rowCount: 1 });
 
-  await page.getByRole("button", { name: "Add Track" }).click();
+  await page.getByRole("button", { name: "+ Add Instrument" }).click();
   const trackFocus = page.locator(".v2-playlist-track-focus");
   await expect(trackFocus).toHaveCount(2);
   await expect(trackFocus.last()).toBeFocused();

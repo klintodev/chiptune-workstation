@@ -41,7 +41,7 @@ V2 retains one-to-one Track ownership:
 - one Mixer channel/effect chain;
 - stable Track ID, name and order.
 
-Limits remain one to eight Tracks. A compact Add Track action in Playlist and Mixer creates the next uniquely named Track with PRD 29's default Klinto Chip, default Mixer state and empty clips/effects, focuses its Track header, and commits one undo entry. At eight Tracks it is disabled with a reason. Reordering changes Playlist and Mixer order together as one command. Removing a Track discloses/removes its clips and disposes its Instrument/effects as one undoable command; the final Track's Remove action is disabled because a Project always retains one Track.
+Limits remain one to eight Tracks. A prominent Add Instrument action in Playlist and Mixer creates the next uniquely named Track with PRD 29's default Klinto Chip, default Mixer state and empty clips/effects, focuses its Track header, and commits one undo entry. The Playlist action stays pinned beside its title and visible while Piano Roll is raised. At eight Tracks it is disabled with a reason. Reordering changes Playlist and Mixer order together as one command. Removing a Track discloses/removes its clips and disposes its Instrument/effects as one undoable command; the final Track's Remove action is disabled because a Project always retains one Track.
 
 Track removal closes only device presentations owned by that Track. Pattern surfaces remain open because Patterns are project-level. Any Pattern whose `auditionTrackId` referenced the removed Track rebinds to the first surviving Track while preserving Pattern selection and viewport.
 

@@ -88,6 +88,7 @@ async function expectMobileOwner(page, expected) {
 }
 
 test("Mixer preserves live controls and stable effect focus through every insert mutation", async ({ page }) => {
+  await expect(page.getByRole("button", { name: "+ Add Instrument", exact: true })).toBeVisible();
   const volume = page.locator('[data-channel-id="track-1"][data-mixer-control="volume"]');
   await volume.focus();
   await volume.press("ArrowLeft");

@@ -660,6 +660,28 @@ body {
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
 }
 
+.v2-playlist-header-leading {
+  position: sticky;
+  z-index: 6;
+  left: 0;
+  display: flex;
+  width: min(280px, calc(100vw - 24px));
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+  background: var(--v2-panel-raised);
+}
+
+.v2-playlist-header-leading .v2-surface-title {
+  margin-right: auto;
+}
+
+.v2-playlist-add-instrument {
+  min-width: 154px;
+  white-space: nowrap;
+}
+
 .v2-playlist-pattern-library {
   position: relative;
   min-width: 0;

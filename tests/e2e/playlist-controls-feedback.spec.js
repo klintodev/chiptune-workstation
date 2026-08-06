@@ -114,7 +114,7 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await expect(patternPicker).toHaveValue("pattern-2");
   await page.getByRole("button", { name: "Close Piano Roll", exact: true }).click();
 
-  await page.getByRole("button", { name: "Add Track", exact: true }).click();
+  await page.getByRole("button", { name: "+ Add Instrument", exact: true }).click();
   const destinations = page.locator(".v2-playlist-track-focus");
   await expect(destinations).toHaveCount(2);
   await expect(destinations.first()).toHaveAttribute("aria-pressed", "false");
@@ -475,30 +475,45 @@ test("default desktop keeps the Pattern Library actionable beneath the raised Pi
   const content = page.locator(".v2-workspace-content");
   const editor = page.locator("#v2-editor-host");
   const library = page.locator(".v2-playlist-pattern-library");
+  const addInstrument = page.getByRole("button", { name: "+ Add Instrument", exact: true });
   const patternCard = library.locator(".v2-pattern-library-item").first();
   const patternActions = patternCard.locator(".v2-pattern-library-actions");
 
   await expect(editor).toBeVisible();
   await expect(editor).toHaveCSS("z-index", "11");
   await expect(library).toHaveCSS("z-index", "auto");
+  await expect(addInstrument).toBeVisible();
   await expect(patternCard).toBeVisible();
 
-  const [contentBox, editorBox, cardBox] = await Promise.all([
+  const [contentBox, editorBox, addInstrumentBox, cardBox] = await Promise.all([
     content.boundingBox(),
     editor.boundingBox(),
+    addInstrument.boundingBox(),
     patternCard.boundingBox(),
   ]);
   expect(contentBox).not.toBeNull();
   expect(editorBox).not.toBeNull();
+  expect(addInstrumentBox).not.toBeNull();
   expect(cardBox).not.toBeNull();
   expect(editorBox.x).toBeGreaterThanOrEqual(contentBox.x);
   expect(editorBox.x + editorBox.width).toBeLessThanOrEqual(contentBox.x + contentBox.width + 0.5);
+  expect(addInstrumentBox.x + addInstrumentBox.width).toBeLessThanOrEqual(editorBox.x + 0.5);
   expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(editorBox.x + 0.5);
+  expect(await addInstrument.evaluate((button) => {
+    const bounds = button.getBoundingClientRect();
+    return document.elementFromPoint(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    ) === button;
+  })).toBe(true);
   expect(await patternCard.evaluate((item) => {
     const bounds = item.getBoundingClientRect();
     const hit = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
     return hit?.closest(".v2-pattern-library-item") === item;
   })).toBe(true);
+
+  await addInstrument.click();
+  await expect(page.locator(".v2-playlist-instrument")).toHaveCount(2);
 
   await patternActions.getByLabel("Actions for Pattern 1").click();
   await expect(patternActions).toHaveCSS("z-index", "60");

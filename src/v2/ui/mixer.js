@@ -420,10 +420,13 @@ export function createMixerSurface({
       focusDescriptor({ channelId: selector.value, control: "heading", kind: "channel" });
     }, { signal: lifecycle.signal });
     const addTrack = createElement("button", {
+      className: "v2-primary-action v2-mixer-add-instrument",
       dataset: { mixerControl: "add-track" },
       disabled: project().tracks.length >= 8,
-      textContent: "Add Track",
-      title: project().tracks.length >= 8 ? "A Project supports at most eight Tracks" : "Add Track",
+      textContent: "+ Add Instrument",
+      title: project().tracks.length >= 8
+        ? "A Project supports at most eight Instruments"
+        : "Create a Track with a Klinto Chip instrument",
       type: "button",
       onClick: () => {
         const id = projectState.addTrack();

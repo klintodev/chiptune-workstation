@@ -632,10 +632,13 @@ export function createPlaylistSurface({
       renderTimeline();
     });
     const tracks = project().tracks;
-    const addTrack = createElement("button", {
+    const addInstrument = createElement("button", {
+      className: "v2-primary-action v2-playlist-add-instrument",
       disabled: tracks.length >= 8,
-      textContent: "Add Track",
-      title: tracks.length >= 8 ? "A Project supports at most eight Tracks" : "Add Track",
+      textContent: "+ Add Instrument",
+      title: tracks.length >= 8
+        ? "A Project supports at most eight Instruments"
+        : "Create a Track with a Klinto Chip instrument",
       type: "button",
       onClick: () => {
         const id = mutateProject(() => projectState.addTrack());
@@ -644,12 +647,15 @@ export function createPlaylistSurface({
         render();
       },
     });
+    const leadingActions = createElement("div", {
+      className: "v2-playlist-header-leading",
+    }, [title, addInstrument]);
     header.append(
+      leadingActions,
       createElement("label", {}, ["Snap", snap]),
       createElement("button", { textContent: "Zoom out", type: "button", onClick: () => { pixelsPerTick = Math.max(0.12, pixelsPerTick - 0.06); renderTimeline(); } }),
       createElement("button", { textContent: "Zoom in", type: "button", onClick: () => { pixelsPerTick = Math.min(1.1, pixelsPerTick + 0.06); renderTimeline(); } }),
       createElement("button", { textContent: "Fit song", type: "button", onClick: () => { pixelsPerTick = Math.max(0.12, (scroller.clientWidth - TRACK_HEADER_WIDTH) / Math.max(384, projectState.getArrangementEndTick?.() ?? MAX_SONG_TICKS)); renderTimeline(); } }),
-      addTrack,
     );
   }
 
