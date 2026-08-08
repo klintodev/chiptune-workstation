@@ -342,7 +342,12 @@ test("shell owns one direct transport frame stream plus retained loop and histor
   });
   assert.equal(loopEnabled.disabled, false);
   loopToggle.click();
-  assert.deepEqual(harness.loopCalls.at(-1), { enabled: true });
+  assert.deepEqual(harness.loopCalls.at(-1), {
+    enabled: true,
+    endTick: 384,
+    mode: "arrangement",
+    startTick: 0,
+  });
   assert.equal(loopToggle.getAttribute("aria-pressed"), "true");
 
   harness.workspace.setPlayback({ mode: "pattern" });
@@ -358,6 +363,15 @@ test("shell owns one direct transport frame stream plus retained loop and histor
     mode: "custom",
     startTick: 24,
   });
+  assert.equal(loopToggle.getAttribute("aria-pressed"), "false");
+  loopToggle.click();
+  assert.deepEqual(harness.loopCalls.at(-1), {
+    enabled: true,
+    endTick: 384,
+    mode: "arrangement",
+    startTick: 0,
+  });
+  assert.equal(loopToggle.getAttribute("aria-pressed"), "true");
   const master = harness.root.querySelector("#master-volume");
   const masterValue = harness.root.querySelector("#master-volume-value");
   master.value = "62";

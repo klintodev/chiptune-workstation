@@ -191,6 +191,9 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await loopSummary.click();
   await expect(page.getByText("Pattern playback always repeats. These settings control Song playback only.")).toBeVisible();
   const loopEnabled = page.getByLabel("Enable Song loop");
+  await expect(page.getByLabel("Song loop range")).toHaveValue("arrangement");
+  await expect(page.getByLabel("Song loop start tick")).toHaveValue("0");
+  await expect(page.getByLabel("Song loop end tick")).toHaveValue("48");
   await expect(loopEnabled).toBeChecked();
   await loopEnabled.uncheck();
   await expect(loopToggle).toHaveAttribute("aria-pressed", "false");

@@ -410,6 +410,7 @@ export function createStudioShell({
       startTick: 0,
     };
     const songEnd = arrangementEndTick(project);
+    const wholeSongLoopEnabled = loop.enabled && loop.mode === "arrangement";
     loopEnabled.checked = loop.enabled;
     loopEnabled.disabled = songEnd <= 0 && !loop.enabled;
     loopMode.value = loop.mode;
@@ -419,12 +420,12 @@ export function createStudioShell({
     loopEnd.value = String(loop.endTick);
     loopEnd.min = String(Math.min(MAX_SONG_TICKS, loop.startTick + 1));
     loopEnd.disabled = loop.mode === "arrangement";
-    setPressed(loopToggle, loop.enabled);
-    loopToggle.disabled = songEnd <= 0 && !loop.enabled;
-    loopToggle.setAttribute("aria-label", `Song loop ${loop.enabled ? "on" : "off"}`);
+    setPressed(loopToggle, wholeSongLoopEnabled);
+    loopToggle.disabled = songEnd <= 0 && !wholeSongLoopEnabled;
+    loopToggle.setAttribute("aria-label", `Song loop ${wholeSongLoopEnabled ? "on" : "off"}`);
     loopToggle.title = loopToggle.disabled
       ? "Add a Playlist clip to use Song loop. Pattern playback repeats automatically."
-      : `Song loop ${loop.enabled ? "on" : "off"}. Pattern playback repeats automatically.`;
+      : `Whole Song loop ${wholeSongLoopEnabled ? "on" : "off"}. Pattern playback repeats automatically.`;
     const history = projectState.getHistoryState?.() ?? {};
     globalUndo.disabled = history.canUndo !== true;
     globalRedo.disabled = history.canRedo !== true;
@@ -486,9 +487,26 @@ export function createStudioShell({
     }
     return false;
   }
+  function setWholeSongLoopEnabled(enabled) {
+    const songEnd = arrangementEndTick();
+    if (enabled && songEnd <= 0) {
+      announcer.textContent = "Add a Playlist clip before enabling a Song loop.";
+      render();
+      return false;
+    }
+    const patch = enabled
+      ? { enabled: true, endTick: songEnd, mode: "arrangement", startTick: 0 }
+      : { enabled: false };
+    if (updateLoop(patch) !== false) {
+      announcer.textContent = `Whole Song loop ${enabled ? "on" : "off"}.`;
+      return true;
+    }
+    return false;
+  }
   loopToggle.addEventListener("click", () => {
-    const enabled = projectState.getState().transport.loop?.enabled === true;
-    setLoopEnabled(!enabled);
+    const loop = projectState.getState().transport.loop;
+    const enabled = loop?.enabled === true && loop.mode === "arrangement";
+    setWholeSongLoopEnabled(!enabled);
   }, { signal: lifecycle.signal });
   loopEnabled.addEventListener("change", () => {
     setLoopEnabled(loopEnabled.checked);
