@@ -187,7 +187,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 
 - Project create, rename, switch, delete and local autosave
 - JSON download/import and project validation
-- Pattern and Song playback, constant tempo and direct V1 `↻` whole-Song loop control
+- Pattern and Song playback, constant tempo and a direct contextual V1 `↻` control that loops the whole current Pattern or Song
 - Up to 64 Patterns, eight Tracks and the existing bounded arrangement duration
 - Existing waveform and envelope behaviour
 - Track volume, pan, mute and solo; the V1 inline Master slider/readout

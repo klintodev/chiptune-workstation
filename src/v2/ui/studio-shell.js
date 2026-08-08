@@ -135,7 +135,7 @@ export function createStudioShell({
   });
   const loopHelp = createElement("p", {
     className: "v2-loop-help",
-    textContent: "Pattern playback always repeats. These settings control Song playback only.",
+    textContent: "These settings control Song playback. In Pattern mode, ↻ loops the whole Pattern.",
   });
   const loopControls = createElement("details", { className: "v2-loop-controls" }, [
     createElement("summary", {
@@ -411,6 +411,11 @@ export function createStudioShell({
     };
     const songEnd = arrangementEndTick(project);
     const wholeSongLoopEnabled = loop.enabled && loop.mode === "arrangement";
+    const patternLoopEnabled = workspace.playback?.patternLoopEnabled !== false;
+    const showingPatternLoop = frame.mode === "pattern";
+    const contextualLoopEnabled = showingPatternLoop
+      ? patternLoopEnabled
+      : wholeSongLoopEnabled;
     loopEnabled.checked = loop.enabled;
     loopEnabled.disabled = songEnd <= 0 && !loop.enabled;
     loopMode.value = loop.mode;
@@ -420,12 +425,13 @@ export function createStudioShell({
     loopEnd.value = String(loop.endTick);
     loopEnd.min = String(Math.min(MAX_SONG_TICKS, loop.startTick + 1));
     loopEnd.disabled = loop.mode === "arrangement";
-    setPressed(loopToggle, wholeSongLoopEnabled);
-    loopToggle.disabled = songEnd <= 0 && !wholeSongLoopEnabled;
-    loopToggle.setAttribute("aria-label", `Song loop ${wholeSongLoopEnabled ? "on" : "off"}`);
+    setPressed(loopToggle, contextualLoopEnabled);
+    loopToggle.disabled = !showingPatternLoop && songEnd <= 0 && !wholeSongLoopEnabled;
+    const loopContext = showingPatternLoop ? "Pattern" : "Song";
+    loopToggle.setAttribute("aria-label", `${loopContext} loop ${contextualLoopEnabled ? "on" : "off"}`);
     loopToggle.title = loopToggle.disabled
-      ? "Add a Playlist clip to use Song loop. Pattern playback repeats automatically."
-      : `Whole Song loop ${wholeSongLoopEnabled ? "on" : "off"}. Pattern playback repeats automatically.`;
+      ? "Add a Playlist clip to use Song loop."
+      : `Whole ${loopContext} loop ${contextualLoopEnabled ? "on" : "off"}.`;
     const history = projectState.getHistoryState?.() ?? {};
     globalUndo.disabled = history.canUndo !== true;
     globalRedo.disabled = history.canRedo !== true;
@@ -482,7 +488,7 @@ export function createStudioShell({
       return false;
     }
     if (updateLoop({ enabled }) !== false) {
-      announcer.textContent = `Song loop ${enabled ? "on" : "off"}. Pattern playback always repeats.`;
+      announcer.textContent = `Song loop ${enabled ? "on" : "off"}.`;
       return true;
     }
     return false;
@@ -504,6 +510,13 @@ export function createStudioShell({
     return false;
   }
   loopToggle.addEventListener("click", () => {
+    if ((workspaceState.getState().playback?.mode ?? "pattern") === "pattern") {
+      const enabled = workspaceState.getState().playback?.patternLoopEnabled !== false;
+      workspaceState.setPlayback?.({ patternLoopEnabled: !enabled });
+      scheduler?.syncProject?.();
+      announcer.textContent = `Whole Pattern loop ${enabled ? "off" : "on"}.`;
+      return;
+    }
     const loop = projectState.getState().transport.loop;
     const enabled = loop?.enabled === true && loop.mode === "arrangement";
     setWholeSongLoopEnabled(!enabled);

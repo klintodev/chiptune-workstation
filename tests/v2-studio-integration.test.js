@@ -351,8 +351,18 @@ test("shell owns one direct transport frame stream plus retained loop and histor
   assert.equal(loopToggle.getAttribute("aria-pressed"), "true");
 
   harness.workspace.setPlayback({ mode: "pattern" });
-  assert.equal(loopToggle.getAttribute("aria-label"), "Song loop on");
+  assert.equal(loopToggle.getAttribute("aria-label"), "Pattern loop on");
+  assert.equal(loopToggle.getAttribute("aria-pressed"), "true");
+  const loopCallCount = harness.loopCalls.length;
+  loopToggle.click();
+  assert.equal(harness.workspace.getState().playback.patternLoopEnabled, false);
+  assert.equal(loopToggle.getAttribute("aria-label"), "Pattern loop off");
+  assert.equal(loopToggle.getAttribute("aria-pressed"), "false");
+  assert.equal(harness.loopCalls.length, loopCallCount);
+  loopToggle.click();
+  assert.equal(harness.workspace.getState().playback.patternLoopEnabled, true);
   harness.workspace.setPlayback({ mode: "song" });
+  assert.equal(loopToggle.getAttribute("aria-label"), "Song loop on");
   assert.equal(loopToggle.getAttribute("aria-pressed"), "true");
 
   loopStart.value = "24";

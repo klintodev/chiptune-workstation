@@ -32,11 +32,15 @@ function loopSignature(bounds) {
   return `${bounds.looping}:${bounds.startTick}:${bounds.endTick}`;
 }
 
-function getPlaybackBounds(project, mode, patternId) {
+function getPlaybackBounds(project, mode, patternId, patternLoopEnabled = true) {
   if (mode === "pattern") {
     const pattern = project.patterns.find((candidate) => candidate.id === patternId);
     if (!pattern) throw new RangeError(`Unknown Pattern: ${patternId}.`);
-    return Object.freeze({ endTick: pattern.lengthTicks, looping: true, startTick: 0 });
+    return Object.freeze({
+      endTick: pattern.lengthTicks,
+      looping: patternLoopEnabled,
+      startTick: 0,
+    });
   }
   const arrangementEnd = getV2ArrangementEndTick(project);
   if (arrangementEnd === 0) {
@@ -70,6 +74,7 @@ export function createOccurrenceScheduler({
   bpm,
   clearIntervalFn = defaultClearInterval,
   getAudioTime,
+  getPatternLoopEnabled = () => true,
   getPatternId = () => null,
   getProject,
   getSynthRuntime,
@@ -86,6 +91,9 @@ export function createOccurrenceScheduler({
   }
   if (typeof getSynthRuntime !== "function") {
     throw new TypeError("A per-Track synth runtime provider is required.");
+  }
+  if (typeof getPatternLoopEnabled !== "function") {
+    throw new TypeError("Pattern loop state provider must be a function.");
   }
   if (!Number.isFinite(lookAheadSeconds) || lookAheadSeconds <= 0 || lookAheadSeconds > 0.5) {
     throw new RangeError("Look-ahead must be greater than zero and no more than 0.5 seconds.");
@@ -310,7 +318,7 @@ export function createOccurrenceScheduler({
     if (nextMode === "pattern" && !project.tracks.some((track) => track.id === trackId)) {
       throw new RangeError(`Unknown Track: ${trackId}.`);
     }
-    const bounds = getPlaybackBounds(project, nextMode, patternId);
+    const bounds = getPlaybackBounds(project, nextMode, patternId, getPatternLoopEnabled());
     if (nextMode === "song" && bounds.endTick <= bounds.startTick) {
       throw new RangeError("Place an audible Pattern in Playlist before playing Song mode.");
     }
@@ -387,7 +395,7 @@ export function createOccurrenceScheduler({
     }
     const project = session?.project ?? normalizeV2Project(getProject());
     const patternId = session?.patternId ?? (mode === "pattern" ? getPatternId() : null);
-    const bounds = getPlaybackBounds(project, mode, patternId);
+    const bounds = getPlaybackBounds(project, mode, patternId, getPatternLoopEnabled());
     if (nextTick >= bounds.endTick || (bounds.looping && nextTick < bounds.startTick)) {
       throw new RangeError("Seek tick is outside the playback range.");
     }
@@ -491,7 +499,12 @@ export function createOccurrenceScheduler({
       stop();
       return true;
     }
-    const nextBounds = getPlaybackBounds(project, activeSession.mode, activeSession.patternId);
+    const nextBounds = getPlaybackBounds(
+      project,
+      activeSession.mode,
+      activeSession.patternId,
+      getPatternLoopEnabled(),
+    );
     const boundsChanged = loopSignature(nextBounds) !== loopSignature(activeSession.bounds);
     const scannedThroughTick = activeSession.nextScanTick;
     releaseVoices(activeSession, now, (record) => !isRecordStillOwned(record, project));

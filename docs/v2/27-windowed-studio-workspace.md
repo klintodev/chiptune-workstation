@@ -21,7 +21,7 @@ A new desktop project opens Playlist with its inline Pattern-library `<details>`
 On desktop the shell is one row with a maximum height of 72 CSS pixels. It contains only:
 
 - compact project identity and save status;
-- Return to start, Play/Pause, Stop and the direct V1 `↻` whole-Song loop toggle;
+- Return to start, Play/Pause, Stop and the direct contextual V1 `↻` whole-Pattern/whole-Song loop toggle;
 - Pattern/Song mode;
 - compact tempo control plus the always-inline V1 Master slider and readout;
 - audio-enable/state control;

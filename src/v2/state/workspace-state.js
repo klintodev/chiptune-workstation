@@ -216,6 +216,7 @@ export function createInitialWorkspaceState(project, {
     mixer: { channelId: track.id },
     playback: {
       mode: "pattern",
+      patternLoopEnabled: true,
       patternPlayheadTick: 0,
       songPlayheadTick: 0,
     },
@@ -288,6 +289,7 @@ export function repairWorkspaceState(state, project, {
     playback: {
       ...cloneValue(sourcePlayback),
       mode: PLAYBACK_MODE_SET.has(sourcePlayback.mode) ? sourcePlayback.mode : "pattern",
+      patternLoopEnabled: sourcePlayback.patternLoopEnabled !== false,
       patternPlayheadTick: clampInteger(
         sourcePlayback.patternPlayheadTick,
         0,

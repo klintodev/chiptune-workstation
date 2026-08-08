@@ -70,6 +70,7 @@ test("initial workspace is deeply immutable, safe, and separate from Project JSO
   assert.deepEqual(state.mixer, { channelId: "track-1" });
   assert.deepEqual(state.playback, {
     mode: "pattern",
+    patternLoopEnabled: true,
     patternPlayheadTick: 0,
     songPlayheadTick: 0,
   });
@@ -206,7 +207,12 @@ test("clip, Effect, Mixer, and transport state repair by stable identity", () =>
   const workspace = createWorkspaceState(project);
   workspace.setPlaylist({ cursorTick: 500, selectedClipId: "clip-2", snap: "1/8" });
   workspace.selectMixerChannel("master");
-  workspace.setPlayback({ mode: "song", patternPlayheadTick: 999, songPlayheadTick: 7_000 });
+  workspace.setPlayback({
+    mode: "song",
+    patternLoopEnabled: false,
+    patternPlayheadTick: 999,
+    songPlayheadTick: 7_000,
+  });
   workspace.openDevice("effect", "effect-3");
 
   const reordered = structuredClone(project);
@@ -216,6 +222,7 @@ test("clip, Effect, Mixer, and transport state repair by stable identity", () =>
   assert.equal(workspace.getState().device.slotIndex, 0);
   assert.equal(workspace.getState().mixer.channelId, "master");
   assert.equal(workspace.getState().playback.patternPlayheadTick, 384);
+  assert.equal(workspace.getState().playback.patternLoopEnabled, false);
   assert.equal(workspace.getState().playback.songPlayheadTick, 6_144);
 
   reordered.tracks[1].mixer.effects = reordered.tracks[1].mixer.effects

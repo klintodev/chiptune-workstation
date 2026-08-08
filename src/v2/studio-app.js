@@ -262,6 +262,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     getAudioTime: () => audioEngine.isReady()
       ? audioEngine.getCurrentTime()
       : ((globalThis.performance?.now?.() ?? Date.now()) - silentClockOrigin) / 1000,
+    getPatternLoopEnabled: () => workspaceState.getState().playback.patternLoopEnabled !== false,
     getPatternId: () => workspaceState.getState().activePatternId,
     getProject: projectState.getState,
     getSynthRuntime: () => synthRuntime ?? silentSynth,

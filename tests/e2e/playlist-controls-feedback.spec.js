@@ -189,7 +189,7 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await page.getByLabel("Open Studio menu").click();
   await expect(loopSummary).toHaveText("Song loop range");
   await loopSummary.click();
-  await expect(page.getByText("Pattern playback always repeats. These settings control Song playback only.")).toBeVisible();
+  await expect(page.getByText("These settings control Song playback. In Pattern mode, ↻ loops the whole Pattern.")).toBeVisible();
   const loopEnabled = page.getByLabel("Enable Song loop");
   await expect(page.getByLabel("Song loop range")).toHaveValue("arrangement");
   await expect(page.getByLabel("Song loop start tick")).toHaveValue("0");
@@ -201,6 +201,42 @@ test("Playlist exposes Pattern adding, instrument routes, direct Song loop and m
   await page.getByLabel("Open Studio menu").click();
   await page.locator("#playback-mode").selectOption("pattern");
   await expect(loopSummary).toHaveText("Song loop range");
+  await expect(loopToggle).toHaveAccessibleName("Pattern loop on");
+  await expect(loopToggle).toHaveAttribute("aria-pressed", "true");
+  await loopToggle.click();
+  await expect(loopToggle).toHaveAccessibleName("Pattern loop off");
+  await expect(loopToggle).toHaveAttribute("aria-pressed", "false");
+  const tempo = page.getByLabel("Tempo in BPM");
+  await tempo.fill("40");
+  await tempo.press("Enter");
+  const play = page.locator("#transport-play");
+  await play.evaluate((button) => {
+    globalThis.__patternPlayLabels = [button.getAttribute("aria-label")];
+    globalThis.__patternPlayObserver = new MutationObserver(() => {
+      globalThis.__patternPlayLabels.push(button.getAttribute("aria-label"));
+    });
+    globalThis.__patternPlayObserver.observe(button, {
+      attributeFilter: ["aria-label"],
+      attributes: true,
+    });
+  });
+  await play.click();
+  const audioSetup = page.getByRole("dialog", { name: "Klinto Studio" });
+  if (await audioSetup.isVisible()) {
+    await audioSetup.getByRole("button", { name: "Start making music" }).click();
+    await play.click();
+  }
+  await expect.poll(() => page.evaluate(() => globalThis.__patternPlayLabels))
+    .toContain("Pause pattern");
+  await expect(play).toHaveAccessibleName("Play pattern", { timeout: 2_000 });
+  await loopToggle.click();
+  await expect(loopToggle).toHaveAccessibleName("Pattern loop on");
+  await play.click();
+  await expect(play).toHaveAccessibleName("Pause pattern");
+  await page.waitForTimeout(600);
+  await expect(play).toHaveAccessibleName("Pause pattern");
+  await play.click();
+  await page.evaluate(() => globalThis.__patternPlayObserver.disconnect());
 
   const masterVolume = page.getByLabel("Master output volume");
   await expect(masterVolume).toHaveValue("35");

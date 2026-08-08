@@ -80,7 +80,7 @@ Invariants:
 - Playlist clips retain stable ID and Pattern reference but use integer `startTick`.
 - Clip duration is always the referenced Pattern's current content-derived `lengthTicks`.
 - Transport loop state uses `{ enabled, mode, startTick, endTick }`; `mode` remains `custom | arrangement`, `endTick` is exclusive and greater than `startTick`, and arrangement mode continues to follow the computed song end.
-- The user-facing control retains V1's direct `↻` Song-loop semantics: enabling it sets arrangement mode over `[0, currentSongEnd)`, disabling it turns looping off, and Pattern playback continues to repeat automatically without using this toggle.
+- The user-facing `↻` control is contextual. In Song mode, enabling it sets arrangement mode over `[0, currentSongEnd)` and disabling it stops Song playback at the arrangement end. In Pattern mode, it toggles repetition over exactly `[0, pattern.lengthTicks)`; disabled Pattern playback runs once and stops at that content end. Pattern-loop state is transient workspace state and does not alter Project data.
 - The existing maximum song duration is converted exactly from sixteenth steps to ticks.
 - Pattern, clip and loop fields switch to ticks as one foundation. Step and tick fields never coexist in an activated schema.
 
@@ -114,7 +114,7 @@ One normalized tick-to-occurrence projection is shared by Studio playback, publi
 - Schedule every occurrence entering the existing look-ahead window, including simultaneous and overlapping notes, under one deterministic 16-voice-per-Track arbitration policy.
 - Per Track, occurrences sort by absolute `startTick`, then pitch, note ID and clip ID before submission. The runtime retains V1's insertion-order cap: before the 17th trigger, retire the oldest inserted scheduled/sounding/releasing voice at the new occurrence time, then admit the new voice. Scheduled future and release-tail voices count until retired/ended. The shared projection/runtime applies this exact order in live, WAV and public playback.
 - Own voices by Project, transport mode, Track, clip, Pattern, note and occurrence identity.
-- Pattern mode loops at the Pattern's content-derived `lengthTicks`; Song mode adds Pattern-relative tick to `clip.startTick`.
+- Pattern mode loops at the Pattern's content-derived `lengthTicks` only while its contextual loop is engaged; otherwise it plays once. Song mode adds Pattern-relative tick to `clip.startTick`.
 - Gate ownership ends at the Pattern/clip boundary. Normal Instrument release and Effect tails may ring across that boundary; a note gate may not leak into the next iteration.
 - Zero velocity produces no voice.
 
@@ -193,7 +193,7 @@ Desktop supports the full pointer and keyboard contract in its modeless window. 
 
 ### Musical/time foundation
 
-- V1 step fixtures map exactly to 24-tick boundaries; clips and loops move to ticks in the same normalized result, and direct `↻` enable targets the full current Song exactly as V1.
+- V1 step fixtures map exactly to 24-tick boundaries; clips and loops move to ticks in the same normalized result, and direct `↻` enable targets the full current Pattern or Song according to playback mode.
 - A Pattern supports chords and overlapping same-pitch notes with distinct stable IDs.
 - Pitch 36â€“112, duration, boundary, velocity and count validation rejects malformed input before audio activation.
 - Pattern increase preflights all linked clips; decrease removes/truncates disclosed notes as one undoable command.
@@ -253,7 +253,7 @@ These slices use feature-flagged in-memory fixtures or isolated development stor
 - Already submitted Web Audio occurrences are not broadly rescheduled; active destructive edits release the owned voice, and future occurrences use new state.
 - Overflow deterministically retires the oldest inserted Track voice after canonical occurrence ordering, matching the V1 runtime cap.
 - Playback mode and Playlist insertion cursor are session state; Pattern playback never moves the insertion cursor.
-- The direct `↻` control toggles full-Song arrangement looping with V1 semantics; Pattern playback loops independently.
+- The direct `↻` control toggles the complete current playback context: the active Pattern in Pattern mode or the full arrangement in Song mode.
 - Piano Roll uses `Mod+wheel` zoom with no zoom buttons or Instrument launcher; empty right-click is suppressed and note right-click deletes.
 - A Project always retains at least one Pattern.
 - Normal release/effect tails may cross Pattern boundaries; gates may not.

@@ -104,6 +104,20 @@ test("Pattern loop wrap keeps canonical identity and clips gates at the boundary
   assert.deepEqual(harness.scheduled.map(({ event }) => event.playbackDurationTicks), [1, 1]);
 });
 
+test("disabled Pattern looping plays the entire Pattern once and stops at its content end", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.patterns[0].notes = [note("once", 60, 0, 24)];
+  const harness = createHarness(project, { getPatternLoopEnabled: () => false });
+
+  harness.scheduler.play({ mode: "pattern" });
+  assert.equal(harness.scheduled.length, 1);
+  harness.setAudioTime(10.13);
+  harness.intervalCallback();
+
+  assert.equal(harness.scheduler.getState().status, "stopped");
+  assert.equal(harness.scheduled.length, 1);
+});
+
 test("tempo changes retain the tick playhead, cancel future submissions and rebuild once", () => {
   const project = structuredClone(createDefaultV2Project());
   project.patterns[0].notes = [
