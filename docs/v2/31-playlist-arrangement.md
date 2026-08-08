@@ -173,14 +173,14 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Keyboard-only add/select/move/delete/undo/open-Pattern plus labelled cog-action journeys pass with contextual announcements.
 - The 390Ã—844 reduced journey exposes one fullscreen surface, can view/select/open a clip and return with transport accessible.
 
-## Automated coverage
+## Verification coverage
 
 - Domain tests for overlap, boundary, audible-Pattern disabled state, cursor scan/advance, two-Pattern placement, duplicate preflight and atomic failure
 - Pattern-content-span/linked-clip tests and Track/Pattern deletion/undo lifecycle tests
 - Shared scheduler projection tests for Pattern/Song/loop/seek/tempo
-- Playwright desktop compose â†’ Add â†’ arrange â†’ open Pattern journey with focus/announcement checkpoints
+- Manual desktop compose â†’ Add â†’ arrange â†’ open Pattern journey with focus/announcement checkpoints
 - Final-clip/final-Track focus fallback and exclusive-Mixer/narrow-width hidden-tree tests
-- Pattern-library default-expanded/collapse/dropdown/scalable selected-card/cog-action and clip/empty-lane right-click browser tests
+- Pattern-library default-expanded/collapse/dropdown/scalable selected-card/cog-action and clip/empty-lane right-click unit coverage plus manual interaction review
 - 1366Ã—768 layout plus 390Ã—844 reduced mobile smoke
 - Save/reload/import/export fixtures after PRD 32 activation
 

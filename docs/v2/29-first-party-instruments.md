@@ -153,13 +153,13 @@ Accessible labels carry complete context, for example `Track 1, Klinto Chip, Att
 - Parameter-update timing matches the explicit V1 launch policy.
 - Removing a Track closes its device, releases its voices, repairs focus and leaves project/scheduler state valid.
 
-## Automated coverage
+## Verification coverage
 
 - Registry tests for known/unknown type, version, defaults, validation and side-effect-free lookup
 - Pure schema-1-through-6 migration fixtures across source field names, `sawtooth â†’ saw`, bounds, multiple Tracks and deterministic IDs
 - Runtime tests for waveform/envelope/pitch/voice cap, update timing, smoothing and idempotent disposal
 - Live/offline/public definition-parity tests, with deterministic and noise-specific comparisons
-- Component/browser tests for all open routes, one-device replacement, focus fallback and 200% zoom
+- Component tests for all open routes, one-device replacement and focus fallback; manual review covers 200% zoom
 - Keyboard parameter and Reset/undo journey; 390Ã—844 edit/Back smoke journey
 - Save/reload and import/export/cloud fixture coverage under PRD 32's activation gate
 

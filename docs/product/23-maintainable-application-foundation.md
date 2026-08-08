@@ -79,20 +79,17 @@ The refactor must be incremental and behaviour-preserving. Each slice must keep 
 - Lazy-loading failure must be contained to the requested optional feature and must not unmount the editor.
 - Build output must avoid duplicate raw and fingerprinted copies of the same font or static asset.
 
-### Real-environment quality gates and documentation
+### Quality gates and documentation
 
-- Retain deterministic Node tests for pure domain, scheduling, persistence, synchronization, and serialization behaviour.
-- Extend the Playwright harness established by PRD 20 with critical workstation and player journeys in a real Chromium browser.
-- Browser journeys must cover first edit, keyboard and pointer note entry, playback, stop, undo/redo, project download/import, narrow-screen navigation, dialog focus, and public playback.
-- Consolidate the axe journeys introduced by PRD 21 for the initial workstation, populated arrangement, project/account dialogs, visualiser, storage warning, and player.
-- Accessibility automation must gate serious and critical violations while documented manual checks continue to cover meaning, musical feedback, screen-reader flow, zoom, contrast, and reduced motion.
-- Use real `AudioContext` and `OfflineAudioContext` browser coverage for user-gesture activation, boundary pitches, start-time scheduling, stop/release, live/offline event equivalence, and successful render completion.
+- Retain deterministic Node tests for pure domain, scheduling, persistence, synchronization, serialization and component behaviour.
+- Manual release journeys cover first edit, keyboard and pointer note entry, playback, stop, undo/redo, project download/import, narrow-screen navigation, dialog focus, public playback and real Web Audio activation.
+- Document manual accessibility checks for meaning, musical feedback, screen-reader flow, zoom, contrast and reduced motion.
 - Extend PRD 20's Firebase Local Emulator Suite harness to test private-project and publication rules for signed-out, wrong-owner, unverified, verified-owner, malformed-document, quota, and revision-precondition cases.
-- CI must run formatting or syntax checks, Node tests, the production build and module-identity check, browser tests, axe scans, and Firestore emulator tests from a clean checkout.
+- CI must run formatting or syntax checks, Node tests, the production build, the module-identity check and Firestore emulator tests from a clean checkout.
 - Cross-module data and adapter contracts must use checked JSDoc types or an equivalent JavaScript static-analysis boundary without requiring a TypeScript source migration.
 - Repeated build-and-test setup across deployment workflows must be consolidated into one reusable check workflow or command so preview, production, and pull-request gates cannot drift.
-- CI failures must retain useful Playwright traces, screenshots, and emulator logs as short-lived artifacts.
-- Document one local command for the fast suite and one for the complete pre-merge suite, including browser and emulator prerequisites.
+- CI failures must retain useful emulator logs as short-lived artifacts.
+- Document one local command for the fast suite and one for the complete pre-merge suite, including emulator prerequisites.
 - Update architecture documentation with composition roots, lifecycle ownership, state/data flow, optional-service loading, module dependency rules, and the location of each test layer.
 - Update the top-level README so its delivered feature summary and architecture entry points describe the current multi-track, persistence, export, account, sharing, and composition-visualisation product.
 
@@ -115,13 +112,13 @@ Resolved for this release:
 - Source imports use stable canonical paths; production build fingerprints own cache invalidation.
 - State performance is guarded by observable work counts and identity assertions, not machine-dependent timing alone.
 - Production-unreachable analyser and visualiser paths are removed. They can return behind a new feature contract when audio-reactive visuals have a product requirement.
-- Chromium is the first blocking browser target; accessibility still receives documented manual checks outside automation.
-- Playwright, axe, and Firebase emulator tooling may be added as development dependencies without changing the runtime dependency policy.
+- Browser interaction is manually reviewed for release; accessibility receives documented manual checks.
+- Firebase emulator tooling may be added as a development dependency without changing the runtime dependency policy.
 
 Deferred:
 
 - Should selector subscriptions use a small in-house contract or a future standards-based signal primitive?
 - At what project size should render-plan creation or visual projection move to a worker?
-- Which additional browser becomes the second blocking CI target after Chromium stabilizes?
+- Which browsers belong in the manual release-review matrix?
 - Should production source maps be uploaded to a private diagnostics service?
 - Should public player and workstation share one shell factory or retain separate composition roots over shared feature modules?

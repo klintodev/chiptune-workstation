@@ -209,13 +209,13 @@ Desktop supports the full pointer and keyboard contract in its modeless window. 
 - New/Duplicate/Rename/Delete obey the 64-Pattern cap and final-Pattern rule; undo of active-Pattern creation/deletion repairs the surface and focuses a visible Pattern control.
 - At 1366Ã—768 the fixed-size draggable window stays bounded above Playlist with no page scroll; at 200% zoom required editor and grouped actions remain reachable.
 
-## Automated coverage
+## Verification coverage
 
 - Pure migration fixtures for Pattern, clip and loop time/mode, deterministic IDs, `rootOctave` removal and 6/18-tick legacy endpoint editing
 - Validation/property tests for event invariants, limits, ordering and automatic Pattern-span atomicity
 - Scheduler tests for chords, same-pitch overlap, deterministic simultaneous ordering/oldest-voice retirement, V1 direct whole-Song `↻` loop boundaries, tempo/seek/stop and the live-edit policy
 - Shared occurrence-projection parity tests for Pattern, Song, offline and public adapters
-- Desktop Playwright pointer and exact keyboard-command compose journeys covering create, move, transpose, resize, velocity, right-click rules, `Mod+wheel`, delete, undo and focus/announcement checks, including absence of zoom buttons/Instrument launcher
+- Manual desktop pointer and keyboard-command compose review covering create, move, transpose, resize, velocity, right-click rules, `Mod+wheel`, delete, undo and focus/announcement checks, including absence of zoom buttons/Instrument launcher
 - 1366Ã—768 Playlist-under-window layout and 390Ã—844 single-fullscreen-surface smoke tests
 - Lifecycle/leak coverage for Pattern/Track/Project deletion and surface switching
 

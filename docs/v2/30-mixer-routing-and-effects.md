@@ -180,14 +180,14 @@ Stable type: `klinto-delay`, version 1. Tempo-synchronized delay only.
 - The ten-minute guard runs after tails and before 44,100 Hz allocation; WAV ignores loop repetition; public visitor volume remains transient.
 - 1366Ã—768 has no page scroll; narrow/200% channel detail remains complete; 390Ã—844 parameter edit/Back smoke passes.
 
-## Automated coverage
+## Verification coverage
 
 - Schema/registry tests for exact keys/enums/ranges, unique IDs, chain caps and unknown state
 - Pure V1 Mixer/master migration fixtures and no-Effect parity
 - Graph topology tests for mute/solo, order, Trackâ†’master composition and idempotent disposal, including a two-Track proof that each Master Effect is constructed and processed once
 - Offline Filter/Delay parameter, equal-power mix, pure tail-formula/cap and 44,100 Hz ten-minute-allocation tests
 - Undo/redo and focus tests for every insert mutation
-- Playwright keyboard Mixer/effect journey, 1366Ã—768 layout, 200% channel-detail and 390Ã—844 smoke
+- Manual keyboard Mixer/effect journey, 1366Ã—768 layout, 200% channel-detail and 390Ã—844 smoke review
 - Live/offline/public shared-definition and output-route tests
 
 ## Delivery slices

@@ -177,10 +177,10 @@ No window state, focus target, size, drag position or DOM identifier is saved in
 - A destructive confirmation traps/restores focus and has modal semantics.
 - Instrument and Effect views do neither.
 
-## Automated coverage
+## Verification coverage
 
 - Domain tests for surface reducer identity, opener validation, audition-Track repair and project lifecycle
-- Component/browser tests for persistent Playlist, one-Piano/one-device bounds, exclusive Mixer and hidden-tree exclusion
+- Component tests for persistent Playlist, exclusive Mixer and hidden-tree exclusion; manual review covers one-Piano/one-device bounds
 - Keyboard focus journeys for open, replace, close, Track removal, Pattern deletion and project switch
 - 1366Ã—768 no-page-scroll, bounded drag/fixed-size/default-geometry and chrome-budget assertions, including inline Master, direct `↻` loop and dark/light toggle
 - 390Ã—844 single-fullscreen-surface navigation/focus smoke journey

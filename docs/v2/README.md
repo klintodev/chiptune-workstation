@@ -37,7 +37,7 @@ The numbering follows the existing product-document sequence. Delivery order is 
 
 ## Delivery order
 
-1. Finish the V1 stabilization and E2E baseline already in progress.
+1. Finish the V1 stabilization and deterministic test baseline already in progress.
 2. Build PRD 27's generic primary-surface and single-device hosts behind a V2 flag, with approved 1366Ã—768 and 390Ã—844 wireframes.
 3. Build PRD 28's complete in-memory musical-time foundation and Piano Roll: pattern events, clip starts, loop bounds and shared scheduling all use ticks together.
 4. Build Klinto Chip and its first-party instrument runtime under PRD 29.

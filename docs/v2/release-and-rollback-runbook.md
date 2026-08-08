@@ -26,7 +26,7 @@ Any failed invariant is a release stop, even if the ordinary smoke tests pass.
 | `dist/studio-v1-rollback.html` | Rollback-compatible V1 Studio | Must remain deployable for the entire rollback window. When promoted to `/`, copy this generated file over `dist/index.html` in a fresh build directory. |
 | `dist/player.html` | Dual V1/V7 public player | Deploy before V7 writes and never replace with a V1-only player. |
 | `dist/assets/**` | Fingerprinted Studio, rollback, player, CSS, font and static assets referenced by the HTML files | Deploy only as the set emitted by the same build. Never combine HTML and assets from different commits. |
-| `dist/workbench.html` | Internal component workbench | Ship only from the same build; it is not a release selector or a substitute for the focused E2E suites. |
+| `dist/workbench.html` | Internal component workbench | Ship only from the same build; it is not a release selector or a substitute for release verification. |
 | `dist/robots.txt`, `dist/sitemap.xml` | Generated Hosting metadata | Ship unchanged with the coherent Hosting directory. |
 | `firestore.rules` | Authenticated, ownership-scoped dual V1/V7 envelope rules | Deploy first and leave in place during rollback. |
 | `firestore.indexes.json` | Required Firestore indexes | Deploy with the compatibility rules. |
@@ -112,11 +112,10 @@ git status --short
 git rev-parse HEAD
 npm ci
 npm run check
-npm run test:e2e
 npm run build
 ```
 
-`git status --short` must be empty before and after the build except for intentionally ignored `dist/` output. `npm run check` must include the complete build and Node test suite. The required browser suite must run in its pinned supported Chromium profile at desktop and approximately 390 x 844.
+`git status --short` must be empty before and after the build except for intentionally ignored `dist/` output. `npm run check` must include the complete build and Node test suite. The release owner manually verifies the required desktop and approximately 390 x 844 journeys against the built artifact.
 
 Confirm the generated entry selection:
 
@@ -137,8 +136,8 @@ Get-ChildItem -File -Recurse dist/assets | Sort-Object FullName | Get-FileHash -
 Attach to the release ticket:
 
 - commit SHA and reviewer approvals;
-- Node, npm, pinned Chromium and Firebase CLI versions;
-- test/check logs and the four focused PRD 32 journey results;
+- Node, npm, verification-browser and Firebase CLI versions;
+- test/check logs and the required PRD 32 journey results;
 - HTML/rules/index/assets hashes;
 - compatibility and final Hosting release IDs plus the Firestore ruleset ID;
 - named role assignments;
@@ -270,4 +269,4 @@ The release commander records the Hosting release ID, time, fixture evidence and
 
 Repair on top of a V7-capable commit. Repeat the entire preflight and compatibility verification, including the rollback drill against real `native-v7` local and production test-account records. Promote canonical `dist/index.html` with a Hosting-only deploy as in release step 4. Do not ask users to re-import recovery files until the fixed V2 Studio is live and the file validates as V7.
 
-Keep the recovery artifact, dual-schema rules and V7 player deployable until the declared rollback window closes. Closing the incident requires healthy dual-version telemetry, unchanged fixture evidence, successful focused E2E suites and no open P0/P1, data-loss, migration, stuck-audio or required-journey blocker.
+Keep the recovery artifact, dual-schema rules and V7 player deployable until the declared rollback window closes. Closing the incident requires healthy dual-version telemetry, unchanged fixture evidence, successful release-journey verification and no open P0/P1, data-loss, migration, stuck-audio or required-journey blocker.

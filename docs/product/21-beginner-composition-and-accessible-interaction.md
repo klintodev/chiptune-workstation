@@ -10,7 +10,7 @@ Optional guided onboarding is a separate product layer. Demo projects, starter t
 
 ## Dependencies
 
-- PRD 20 supplies the initial Playwright harness, reliable project/audio boundaries, and storage-recovery states exercised by this workflow.
+- PRD 20 supplies reliable project/audio boundaries, deterministic test seams, and storage-recovery states exercised by this workflow.
 - PRD 23 may deliver module seams alongside this PRD, but must not delay the release-critical interaction corrections.
 - PRD 22 reuses this PRD's workspace navigation, responsive layout, event-announcement, reduced-motion, dialog, and input policies.
 
@@ -136,7 +136,7 @@ Skipping or dismissing this layer must lead to the same complete blank-project w
 
 ### Validation and success measures
 
-- Playwright journeys must cover first note, first placement, Song playback, workspace switching, piano operation, clip movement and modal focus using pointer and keyboard input.
+- Manual release journeys must cover first note, first placement, Song playback, workspace switching, piano operation, clip movement and modal focus using pointer and keyboard input.
 - axe checks must report no critical or serious violations in the startup state, active workstation, each workspace tool, each modal and the published player.
 - Responsive acceptance must cover at least 320 by 568, 375 by 812, 768 by 1024, 1366 by 768 and 1920 by 1080 viewports.
 - Tests must verify that mobile users can reach tempo, master volume and Song/Pattern mode.

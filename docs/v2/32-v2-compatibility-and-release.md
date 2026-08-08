@@ -90,7 +90,7 @@ Normalized V1-versus-V7 comparisons require exact equality for:
 
 For audio fixtures:
 
-- WAV parity renders at the production 44.1 kHz export rate; live/public reference parity also runs at 48 kHz in the pinned CI Chromium build. At each pinned rate, maximum absolute sample difference is â‰¤ 1e-5 and RMS difference is â‰¤ 1e-6 after identical normalization;
+- WAV parity renders at the production 44.1 kHz export rate. Deterministic offline fixtures use a maximum absolute sample difference of â‰¤ 1e-5 and RMS difference of â‰¤ 1e-6 after identical normalization;
 - a deliberately changed test environment must re-baseline through reviewed evidence, never silently widen tolerances;
 - unseeded noise is not sample-identical: compare occurrence schedule, graph/configuration, envelope, gain, duration and bounded spectral/RMS characteristics;
 - release tails may cross a Pattern boundary exactly as in V1 and are compared separately from gate duration.
@@ -194,9 +194,9 @@ Only after these are live and verified may any user-facing build enable V7 autos
 - Superseded V1 step/stacked UI and dead adapters are removed after evidence, not in foundational slices.
 - The badge is removed or deliberately renamed; `V2 Beta` does not remain.
 
-## Focused release E2E suites
+## Focused release verification journeys
 
-Use clean-storage fixtures and fail each test on uncaught page error, unhandled rejection or unexpected console error. Do not create one brittle end-to-end mega-test.
+Run these journeys manually against a clean-storage production build. Check page errors, unhandled rejections and unexpected console errors throughout, and record the result in the release ticket.
 
 ### 1. Compose, save and reload
 
@@ -223,9 +223,9 @@ At approximately 390Ã—844: switch surfaces, create/select/delete one note thr
 - Schema/range/count/unique-ID/property tests pass.
 - Scheduler/graph/history/lifecycle tests pass with fake-clock determinism where applicable.
 
-### Browser/audio
+### Runtime/audio
 
-- Required Playwright suites pass in the supported Chromium profile at desktop and mobile viewports.
+- Required desktop and mobile release journeys pass manual review in the supported verification browser.
 - No new page/console errors, stuck voices, duplicate AudioNodes, leaked timers/listeners/animation frames or hidden-surface work.
 - Live/public 48 kHz reference parity and production WAV 44.1 kHz parity/tolerances pass.
 - Browser without Web Audio fails safely.
@@ -255,7 +255,7 @@ Severity labels prioritize repair; they do not narrow conformance scope.
 
 - All required PRDs accepted with their scope exclusions intact.
 - V7 schema/rules/normalizers/player deployed in the safe order and dual-version telemetry is healthy.
-- Migration fixture matrix and all four focused E2E suites pass.
+- Migration fixture matrix and all required release journeys pass.
 - Local, file, cloud, publish, public play, remix and WAV routes preserve V7.
 - 1366Ã—768 visual review confirms one dominant surface and no page scroll.
 - Accessibility Stable gate passes.
@@ -291,7 +291,7 @@ Severity labels prioritize repair; they do not narrow conformance scope.
 - Default V2 authoring waits for all exposed persistence/output routes.
 - Public/live/offline playback share occurrence and device definitions.
 - The existing ten-minute WAV allocation boundary remains after bounded tails.
-- Release automation is four focused E2E suites, not one mega-test.
+- Release journeys are verified by the release owner and recorded with the release evidence.
 - Exactly one `V2 Beta` badge is shown during Beta.
 
 

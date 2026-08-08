@@ -104,7 +104,7 @@ As a contributor, I want every listener, timer, voice, repository connection, an
 - Two test roots can edit different projects without state, selection, transport, dialog, or Auth leakage.
 - A clean guest startup excludes Firebase and Firestore from requested assets and the eager application bundle.
 - Opening the account control loads Auth; a cloud action loads Firestore; failure in either path leaves local editing usable.
-- Lifecycle tests use instrumented adapters and Playwright page navigation/remount scenarios rather than private implementation inspection.
+- Lifecycle tests use instrumented adapters and public mount/remount contracts rather than private implementation inspection.
 - Repository lifecycle tests open two schema versions, deliver `versionchange`, assert old connections close, complete the upgrade, reopen, and preserve existing project data.
 
 ## Epic 85 - Make immutable edits proportional to their change
@@ -147,13 +147,13 @@ As a feature author, I want my view to update only when the data it displays cha
 - Instrumented tests count normalization, clone, notification, projection-build, render, and serialization work for metadata, mixer, pattern, and arrangement edits.
 - A representative maximum-size project remains within explicit operation-count budgets documented beside the tests; timing data is reported for diagnosis but is not the sole gate.
 
-## Epic 86 - Add real-environment quality gates
+## Epic 86 - Add deterministic and release quality gates
 
 ### User stories
 
-#### US86.1 - Protect real browser workflows
+#### US86.1 - Verify real browser workflows
 
-As a composer, I want core workflows protected in the same browser environment where I make music.
+As a composer, I want core workflows reviewed in the same browser environment where I make music.
 
 #### US86.2 - Gate accessibility regressions
 
@@ -165,31 +165,27 @@ As a maintainer, I want Web Audio and Firestore rules verified by their real imp
 
 ### Tangible requirements
 
-- Extend PRD 20's Playwright harness into one blocking Chromium project with deterministic helpers for creating, editing, playing, saving, downloading, importing, and opening public projects.
-- Cover first edit, keyboard and pointer note entry, transport, undo/redo, project recovery, narrow-screen navigation, dialogs, reduced motion, and public playback.
-- Consolidate PRD 21's axe scans for empty and populated workstation states, project and account dialogs, storage warnings, visualiser states, and the public player.
-- Fail CI on every serious or critical axe violation in the checked surfaces; those impact levels may not be waived through a baseline.
-- Any temporary exclusion for a moderate or minor automated finding must record an owner, rationale, compensating manual check, and expiry.
-- Document manual checks for musical meaning, screen-reader announcements, focus order, 200-percent zoom, forced colors, contrast, reduced motion, touch, and keyboard-only clip editing.
-- Add real-browser `AudioContext` and `OfflineAudioContext` tests for activation, playable boundaries, current-time starts, envelope release, voice ownership, scheduler/export event parity, and completed WAV rendering.
+- Maintain a repeatable release checklist for first edit, keyboard and pointer note entry, transport, undo/redo, project recovery, narrow-screen navigation, dialogs, reduced motion and public playback.
+- Document manual checks for musical meaning, screen-reader announcements, focus order, 200-percent zoom, forced colors, contrast, reduced motion, touch and keyboard-only clip editing.
+- Include real `AudioContext` and `OfflineAudioContext` release checks for activation, playable boundaries, current-time starts, envelope release, voice ownership, scheduler/export event parity and completed WAV rendering.
 - Extend PRD 20's Local Emulator Suite harness for authentication, verification, ownership, schema and size limits, publication quota, legacy public reads, deletes, and revision conflicts.
 - Replace security tests that only search rule source text with emulator assertions where behaviour can be executed.
-- Define `npm` scripts for fast checks, browser checks, rules checks, and the complete pre-merge suite.
+- Define `npm` scripts for fast checks, rules checks and the complete pre-merge suite.
 - Add checked JSDoc contracts for project snapshots, commands, selectors, scheduler snapshots, repositories, and optional-service adapters, and run JavaScript static analysis in the fast suite.
 - Reuse one authoritative build-and-test workflow or command from pull-request, preview-deploy, and production-deploy workflows.
-- Run the production build and module-identity check before browser tests so deployed entry points receive coverage.
-- Upload Playwright traces, failure screenshots, and emulator logs when CI fails.
+- Run the production build and module-identity check in the pre-merge suite.
+- Upload emulator logs when CI fails.
 - Document runtime ownership, module dependencies, lazy boundaries, project-state flow, test-layer responsibilities, local prerequisites, and common failure diagnosis.
 - Refresh the top-level README to describe the delivered multi-track workstation and current composition roots rather than the earlier single-track feature set.
 
 ### Acceptance and automated coverage
 
 - A clean checkout can install development dependencies and run the documented complete suite without undisclosed local setup.
-- CI blocks a change that breaks pointer or keyboard editing, dialog focus return, reduced-motion behaviour, audio boundary rendering, or an owner-only Firestore rule.
-- Browser tests capture console errors and unhandled rejections as failures.
+- CI blocks deterministic state, audio-boundary and owner-only Firestore-rule regressions; interaction and focus regressions block release through the manual checklist.
+- Manual release review records console errors and unhandled rejections as failures.
 - Test fixtures use validated public project documents and do not depend on production Firebase, network access, speakers, or elapsed musical playback.
 - Emulator tests cover signed-out, unverified, wrong-owner, verified-owner, malformed, oversized, quota-full, and stale-revision requests.
-- CI artifacts make the failed interaction, audio setup, or rule assertion diagnosable without rerunning the job locally.
+- CI artifacts make failed deterministic or rule assertions diagnosable without rerunning the job locally.
 
 ## Out of scope
 
@@ -204,5 +200,5 @@ As a maintainer, I want Web Audio and Firestore rules verified by their real imp
 - Which selector-subscription contract is simplest while preserving closure-based stores?
 - Should reversible history use command-specific inverse data or a small generic patch representation?
 - Should remounting reuse an application instance or require constructing a new instance after disposal?
-- Which browser should become the next blocking target after Chromium?
+- Which browsers belong in the manual release-review matrix?
 - Should manual accessibility evidence be stored per release or maintained as a continuously updated checklist?

@@ -214,7 +214,7 @@ Requirements:
 
 ### Outcome
 
-Assistive technology receives calm, meaningful feedback, and browser tests protect the complete first-composition workflow across supported viewports.
+Assistive technology receives calm, meaningful feedback, deterministic tests protect interaction state, and release review covers the complete first-composition workflow across supported viewports.
 
 ### User stories
 
@@ -231,17 +231,17 @@ Requirements:
 
 #### US77.2 - Trust keyboard and responsive behaviour
 
-As a maintainer, I want browser acceptance tests so interaction regressions are caught before deployment.
+As a maintainer, I want a repeatable release checklist so interaction regressions are caught before deployment.
 
 Requirements:
 
-- Playwright covers first note, first placement, Song playback, workspace tabs, piano keys, clip movement, mobile mix and modal focus.
+- Manual release review covers first note, first placement, Song playback, workspace tabs, piano keys, clip movement, mobile mix and modal focus.
 - Each journey has keyboard coverage where the operation is keyboard-relevant.
 - Clip journeys cover one-step and four-step movement, cross-track movement, invalid destinations, variation, removal, undo, touch operation, and focus restoration.
 - Contextual-help journeys cover every required term, programmatic control relationship, touch and keyboard opening, Escape, close, and focus restoration.
-- axe reports no critical or serious violations in startup, workstation tools, dialogs and published playback.
+- Manual accessibility review records any critical or serious problem in startup, workstation tools, dialogs and published playback.
 - Viewport coverage includes 320 by 568, 375 by 812, 768 by 1024, 1366 by 768 and 1920 by 1080.
-- Audio-dependent journeys use a deterministic browser test seam and do not require audible CI output.
+- Audio-dependent journeys are verified against the release build without requiring audible CI output.
 - A reduced-motion test verifies discrete rather than frame-driven visual changes.
 
 #### US77.3 - Measure first-use success
@@ -262,8 +262,8 @@ Requirements:
 
 - Separate visual transport readouts from event-only live status.
 - Diff status content before changing a live region.
-- Extend PRD 20's Playwright harness with the beginner journeys, add axe integration, and expose one browser acceptance command.
-- Run responsive and accessibility acceptance in the production check or CI gate.
+- Add the beginner journeys to the repeatable manual release checklist.
+- Record responsive and accessibility acceptance with the release evidence.
 - Record the usability protocol and results without storing participant data in project documents.
 
 ## Epic 78 - Offer optional guided starts

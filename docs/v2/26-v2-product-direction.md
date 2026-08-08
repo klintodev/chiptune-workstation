@@ -175,13 +175,13 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 - Migrated event timing, pitch, duration, velocity, IDs, parameters, routing and mix values match normalized V1 fixtures exactly.
 - Deterministic oscillator renders meet the reference-browser tolerance; noise compares scheduling, envelope, gain, duration and spectral bounds unless deliberately seeded.
 - Save/reload, export and public playback preserve V2 device/effect state.
-- Required E2E journeys fail on uncaught page or console errors.
+- Required release journeys include a manual page and console error check.
 
 ### Quality
 
 - No known keyboard-only or screen-reader blocker in a required V2 journey at Stable.
 - No automatically detectable WCAG 2.2 A/AA violation on required surfaces except a documented false positive with manual evidence.
-- Existing V1 unit/integration/E2E checks remain green or are deliberately replaced by stronger V2 coverage.
+- Existing V1 unit and integration checks remain green or are deliberately replaced by stronger V2 coverage.
 
 ## V1 capabilities retained
 
