@@ -45,6 +45,43 @@ test.afterEach(async ({ page }) => {
   expect(browserErrors.get(page), "unexpected browser errors").toEqual([]);
 });
 
+test("drawing through the Piano Roll edge reveals another writable bar", async ({ page }) => {
+  const editor = page.locator(".v2-piano-canvas");
+  const scroller = page.locator(".v2-piano-scroll");
+  await editor.focus();
+  await editor.press("Enter");
+
+  const gesture = await scroller.evaluate((element) => {
+    const canvas = element.querySelector(".v2-piano-canvas");
+    const canvasRect = canvas.getBoundingClientRect();
+    const scrollerRect = element.getBoundingClientRect();
+    const pixelsPerTick = Number(canvas.style.getPropertyValue("--v2-pixels-per-tick"));
+    return {
+      beforeWidth: Number.parseFloat(canvas.style.width),
+      edgeX: canvasRect.left + 88 + 384 * pixelsPerTick,
+      endX: canvasRect.left + 88 + 432 * pixelsPerTick,
+      expectedExpandedWidth: 88 + 768 * pixelsPerTick,
+      startX: canvasRect.left + 88 + 336 * pixelsPerTick,
+      y: scrollerRect.top + 36,
+    };
+  });
+
+  await page.mouse.move(gesture.startX, gesture.y);
+  await page.mouse.down();
+  await page.mouse.move(gesture.edgeX, gesture.y, { steps: 4 });
+  await expect.poll(() => editor.evaluate((canvas) => Number.parseFloat(canvas.style.width)))
+    .toBeCloseTo(gesture.expectedExpandedWidth, 1);
+  expect(gesture.expectedExpandedWidth).toBeGreaterThan(gesture.beforeWidth);
+  await page.mouse.move(gesture.endX, gesture.y, { steps: 2 });
+  await page.mouse.up();
+
+  await expect(page.locator(".v2-piano-note")).toHaveCount(2);
+  await expect.poll(async () => Number.parseInt(
+    await page.locator(".v2-pattern-library-drag small").textContent(),
+    10,
+  )).toBeGreaterThan(384);
+});
+
 test("Piano Roll owns transport, note drag labels, deletion, geometry, and keyboard audition", async ({ page }) => {
   const editor = page.locator(".v2-piano-canvas");
   const scroller = page.locator(".v2-piano-scroll");

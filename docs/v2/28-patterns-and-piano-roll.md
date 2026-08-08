@@ -44,6 +44,7 @@ A Pattern has stable `id`, `name` and a bounded note collection. Its serialized 
 - `lengthTicks = max(1, max(note.startTick + note.durationTicks))`; an empty Pattern's one-tick span is a transport implementation detail.
 - Content may end on any integer tick from 1 through 3,072; there are no bar-sized choices or length increments.
 - The Piano Roll always shows writable grid beyond the current content, with at least one bar visible, without adding that empty editor space to the Pattern duration.
+- Reaching the right edge during a draw, move or resize drag extends that writable grid by exactly one 4/4 bar. Continued dragging can extend it another bar, up to the content limit; empty grid never changes Pattern duration.
 - Notes are canonically serialized by `startTick`, then `pitch`, then stable ID.
 - Initial safety limits: 1,024 notes per Pattern and 8,192 notes per Project, still subject to file/cloud byte limits.
 

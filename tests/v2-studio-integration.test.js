@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   getBoundedPianoMove,
+  getExpandedPianoEditorEndTick,
   getPianoMarqueeNoteIds,
 } from "../src/v2/ui/piano-roll.js";
 import {
@@ -463,6 +464,13 @@ test("Piano pointer geometry bounds moves and marquee selection to the Pattern g
     }),
     ["left"],
   );
+});
+
+test("Piano pointer drags extend the editor horizon one bar at a time", () => {
+  assert.equal(getExpandedPianoEditorEndTick(384, 383), 384);
+  assert.equal(getExpandedPianoEditorEndTick(384, 384), 768);
+  assert.equal(getExpandedPianoEditorEndTick(768, 900), 1_152);
+  assert.equal(getExpandedPianoEditorEndTick(3_072, 3_072), 3_072);
 });
 
 test("Playlist modifier-wheel scrolling follows the dominant axis and normalizes delta modes", () => {
