@@ -1,6 +1,7 @@
 import {
   DEFAULT_SNAP_TICKS,
   MAX_ARRANGEMENT_TICKS,
+  MAX_CLIPS_PER_TRACK,
   MAX_EFFECTS_PER_CHAIN,
   MAX_PATTERN_NAME_LENGTH,
   MAX_PROJECT_HISTORY,
@@ -117,6 +118,15 @@ function canPlaceClip(project, trackId, patternId, startTick, ignoredClipId = nu
   });
 }
 
+function appendClip(project, trackId, clip) {
+  return {
+    ...project,
+    tracks: project.tracks.map((track) => track.id === trackId
+      ? { ...track, clips: [...track.clips, clip] }
+      : track),
+  };
+}
+
 function synchronizeArrangementLoop(project) {
   const loop = project.transport.loop;
   if (!loop.enabled || loop.mode !== "arrangement") return project;
@@ -146,6 +156,16 @@ function normalizeNoteIds(noteIds) {
     throw new TypeError("Note identifiers must be iterable.");
   }
   return [...new Set(noteIds)];
+}
+
+function normalizeClipIds(clipIds) {
+  if (typeof clipIds === "string") return [clipIds];
+  if (!clipIds || typeof clipIds[Symbol.iterator] !== "function") {
+    throw new TypeError("Clip identifiers must be iterable.");
+  }
+  const result = [...new Set(clipIds)];
+  if (result.length === 0) throw new RangeError("At least one clip must be selected.");
+  return result;
 }
 
 export function createV2ProjectState(initialProject = createDefaultV2Project()) {
@@ -554,18 +574,116 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     return commit({ ...state, tracks }, { clipId, operation: "move-clip", trackId });
   }
 
-  function duplicateClip(clipId) {
-    const found = findClip(state, clipId);
-    const pattern = findPattern(state, found.clip.patternId);
-    const startTick = found.clip.startTick + pattern.lengthTicks;
-    if (!canPlaceClip(state, found.track.id, pattern.id, startTick)) {
-      throw new V2DomainError(
-        "The duplicated clip does not fit immediately after the selected clip.",
-        "CLIP_DUPLICATE_INVALID",
-        { clipId, startTick, trackId: found.track.id },
-      );
+  function moveClips(clipIds, { deltaTick = 0, deltaTrack = 0 } = {}) {
+    const ids = normalizeClipIds(clipIds);
+    assertInteger(deltaTick, "Clip move tick delta", -MAX_ARRANGEMENT_TICKS, MAX_ARRANGEMENT_TICKS);
+    assertInteger(deltaTrack, "Clip move Track delta", -MAX_PROJECT_TRACKS, MAX_PROJECT_TRACKS);
+    if (deltaTick === 0 && deltaTrack === 0) return false;
+
+    const selected = new Set(ids);
+    const sources = ids.map((clipId) => {
+      const found = findClip(state, clipId);
+      return {
+        ...found,
+        trackIndex: state.tracks.findIndex(({ id }) => id === found.track.id),
+      };
+    });
+    let candidate = {
+      ...state,
+      tracks: state.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.filter((clip) => !selected.has(clip.id)),
+      })),
+    };
+
+    for (const source of sources) {
+      const targetTrack = state.tracks[source.trackIndex + deltaTrack];
+      const startTick = source.clip.startTick + deltaTick;
+      if (!targetTrack || !canPlaceClip(
+        candidate,
+        targetTrack.id,
+        source.clip.patternId,
+        startTick,
+      )) {
+        throw new V2DomainError(
+          ids.length === 1
+            ? "That clip does not fit at the selected Track position."
+            : "The selected clips do not fit at that Playlist position.",
+          "CLIP_PLACEMENT_INVALID",
+          { clipIds: ids, deltaTick, deltaTrack },
+        );
+      }
+      candidate = appendClip(candidate, targetTrack.id, { ...source.clip, startTick });
     }
-    return addClip(found.track.id, pattern.id, startTick);
+
+    return commit(candidate, {
+      clipIds: deepFreeze([...ids]),
+      deltaTick,
+      deltaTrack,
+      operation: "move-clips",
+    });
+  }
+
+  function duplicateClips(clipIds) {
+    const ids = normalizeClipIds(clipIds);
+    const sources = ids.map((clipId) => {
+      const found = findClip(state, clipId);
+      return { ...found, pattern: findPattern(state, found.clip.patternId) };
+    });
+    const selectionStart = Math.min(...sources.map(({ clip }) => clip.startTick));
+    const selectionEnd = Math.max(...sources.map(({ clip, pattern }) => (
+      clip.startTick + pattern.lengthTicks
+    )));
+    const deltaTicks = selectionEnd - selectionStart;
+    const additionsByTrack = new Map();
+    for (const { track } of sources) {
+      additionsByTrack.set(track.id, (additionsByTrack.get(track.id) ?? 0) + 1);
+    }
+    for (const [trackId, additions] of additionsByTrack) {
+      if (findTrack(state, trackId).clips.length + additions > MAX_CLIPS_PER_TRACK) {
+        throw new V2DomainError(
+          "The duplicated clips exceed the Track clip limit.",
+          "CLIP_DUPLICATE_INVALID",
+          { clipIds: ids, deltaTicks, trackId },
+        );
+      }
+    }
+
+    const occupiedIds = new Set(state.tracks.flatMap((track) => track.clips.map((clip) => clip.id)));
+    const createdIds = [];
+    let candidate = state;
+    for (const source of sources) {
+      const startTick = source.clip.startTick + deltaTicks;
+      if (!canPlaceClip(candidate, source.track.id, source.pattern.id, startTick)) {
+        throw new V2DomainError(
+          ids.length === 1
+            ? "The duplicated clip does not fit immediately after the selected clip."
+            : "The duplicated clips do not fit immediately to the right of the selection.",
+          "CLIP_DUPLICATE_INVALID",
+          { clipIds: ids, deltaTicks, startTick, trackId: source.track.id },
+        );
+      }
+      const id = nextDomainId("clip", occupiedIds);
+      occupiedIds.add(id);
+      createdIds.push(id);
+      candidate = appendClip(candidate, source.track.id, {
+        id,
+        patternId: source.clip.patternId,
+        startTick,
+      });
+    }
+
+    commit(candidate, {
+      clipIds: deepFreeze([...createdIds]),
+      deltaTicks,
+      operation: "duplicate-clips",
+      sourceClipIds: deepFreeze([...ids]),
+    });
+    return deepFreeze(createdIds);
+  }
+
+  function duplicateClip(clipId) {
+    return duplicateClips([clipId])[0];
   }
 
   function removeClip(clipId) {
@@ -786,6 +904,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     createPattern,
     deletePattern,
     duplicateClip,
+    duplicateClips,
     duplicateNotes,
     duplicatePattern,
     endHistoryGroup,
@@ -797,6 +916,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     getState,
     getTrack,
     moveClip,
+    moveClips,
     moveEffect,
     moveTrack,
     redo,

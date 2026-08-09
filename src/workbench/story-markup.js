@@ -20,9 +20,6 @@ export function projectLibraryMarkup({ open = true } = {}) {
         <div class="project-dialog-actions">
           <button id="project-new" type="button">New</button>
           <button id="project-duplicate" type="button">Duplicate</button>
-          <button id="project-import" type="button">Import</button>
-          <button id="project-export" type="button">Download</button>
-          <input id="project-import-file" type="file" accept=".chipwork.json,.json,application/json" hidden />
         </div>
         <div class="project-library-heading"><span>Saved in this browser</span><output id="project-library-count">0 projects</output></div>
         <div id="project-list" class="project-list" aria-label="Saved projects"></div>

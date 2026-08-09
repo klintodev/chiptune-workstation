@@ -27,6 +27,13 @@ test("Studio coordinates Playlist, Piano, and device layers across focus and mob
   assert.match(studio, /focusTarget: pianoFocusTarget/);
   assert.match(studio, /activeDeviceWindow\?\.syncLayout\(event\.matches\)/);
   assert.match(deviceWindow, /dragController\.setDisabled\(currentMobile \|\| !dragTarget\)/);
+  assert.match(deviceWindow, /control\.setLabel\(`\$\{ownerName\}, \$\{definition\.name\}, \$\{definition\.ui\.parameters\[key\]\.label\}`\)/);
+  assert.match(deviceWindow, /\["replace", "open-project"\]\.includes\(operation\)\) build\(\)/);
+  assert.doesNotMatch(deviceWindow, /\["replace", "open-project", "rename-track"\]/);
+  assert.match(
+    studio,
+    /const visibleDevice = surfaceHost\.getSnapshot\(\)\.device;[\s\S]*descriptor\?\.name !== visibleDevice\.name[\s\S]*surfaceHost\.openDevice\(descriptor, \{ focusEntry: false \}\)/,
+  );
 
   const openDevice = studio.slice(
     studio.indexOf("function openDevice"),

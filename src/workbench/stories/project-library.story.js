@@ -7,7 +7,7 @@ import { projectLibraryMarkup } from "../story-markup.js";
 function mountProjectLibrary({ canvas, scenario }) {
   const root = createStoryRoot(canvas);
   root.innerHTML = `
-    <p class="story-note">A disposable local project catalogue; download and import effects are replaced with inert workbench fakes.</p>
+    <p class="story-note">A disposable local project catalogue with New, Duplicate, recovery, share, and render actions.</p>
     <div class="story-project-library"></div>
   `;
   root.querySelector(".story-project-library").innerHTML = projectLibraryMarkup();

@@ -118,7 +118,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 - 96 PPQ shared musical time.
 - Polyphonic note events with start, duration, MIDI pitch and velocity.
 - Launch snap values: 1/8, 1/16 and 1/32; default 1/16.
-- Pointer and desktop-keyboard creation, selection, movement, resize, velocity, delete, copy/paste, undo and redo.
+- Pointer and desktop-keyboard creation, modifier-marquee multi-selection, group movement/resize/delete, exact-span duplicate-right, copy/paste, undo and redo.
 - Explicit audition Track, compact New/Duplicate/Rename/Delete Pattern actions and one-click Add to Playlist.
 
 ### Sound
@@ -141,7 +141,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 - Linked, fixed-duration Pattern clips.
 - Add at the first valid snapped position at or after the session-local Playlist insertion cursor; advance the cursor to the new clip end and fail atomically only when no position fits.
 - Select a Pattern from the Playlist library dropdown and click an empty Track position to place it exactly on the snapped click; occupied positions reject without scanning forward.
-- Song mode, loop and single-clip select, duplicate, move and delete.
+- Song mode and loop, plus desktop marquee multi-selection, group move and duplicate-right Playlist editing.
 
 ### Persistence and output
 

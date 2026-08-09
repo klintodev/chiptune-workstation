@@ -59,6 +59,16 @@ test("public player exposes remixing only through an explained, revision-bound a
   assert.match(source, /buildRemixStudioUrl\(record\)/);
 });
 
+test("V2 mounts the Share launcher into the secondary Menu", async () => {
+  const source = await readFile(new URL("../src/features/publishing/publishing.js", import.meta.url), "utf8");
+
+  assert.match(source, /quickOpen\.textContent = "Share"/);
+  assert.match(
+    source,
+    /querySelector\("#v2-project-share-slot"\)[\s\S]*?\?\? root\.querySelector\("#global-tools"\)/,
+  );
+});
+
 test("republishing preserves one stable URL and advances snapshot revision", async () => {
   let remote = null;
   let deleted = null;

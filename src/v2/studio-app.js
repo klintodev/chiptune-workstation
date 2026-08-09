@@ -506,6 +506,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
           }
           const resolvedTick = Math.min(tick, arrangementEndTick - 1);
           scheduler.setMode("song");
+          workspaceState.setPlaybackMode("song");
           scheduler.seek(resolvedTick);
           workspaceState.seekSong(resolvedTick);
           return resolvedTick;
@@ -942,6 +943,13 @@ export async function createV2StudioApp({ document: documentLike = document } = 
         });
       } else {
         workspaceState.repairProject(projectState, { reason: `${operation ?? "project"}/repair` });
+      }
+      const visibleDevice = surfaceHost.getSnapshot().device;
+      if (visibleDevice) {
+        const descriptor = deviceDescriptor(workspaceState.getState().device, project);
+        if (descriptor?.name !== visibleDevice.name) {
+          surfaceHost.openDevice(descriptor, { focusEntry: false });
+        }
       }
       if (replacingProject) {
         scheduler.stop();

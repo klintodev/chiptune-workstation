@@ -211,16 +211,6 @@ export function createStudioShell({
     surfaceButtons.set(kind, button);
   }
 
-  const audioState = createElement("strong", { id: "audio-state", textContent: "Not started" });
-  const audioButton = createElement("button", {
-    className: "v2-audio-status status-cluster",
-    id: "audio-status-open",
-    type: "button",
-    "aria-haspopup": "dialog",
-    title: "Open audio setup",
-    onClick: onOpenAudio,
-  }, [createElement("span", { className: "v2-status-light status-light", id: "status-light", "aria-hidden": "true" }), audioState]);
-
   const toolsSlot = createElement("div", { id: "global-tools", className: "v2-menu-slot global-tools" });
   const accountSlot = createElement("div", { id: "account-slot", className: "v2-menu-slot account-slot" });
   const shareSlot = createElement("div", { id: "v2-project-share-slot", className: "v2-menu-slot" });
@@ -264,7 +254,7 @@ export function createStudioShell({
 
   const statusCluster = createElement("div", {
     className: "v2-global-status global-status",
-  }, [switcher, audioButton, toolsSlot, themeToggle, accountSlot, menu]);
+  }, [switcher, toolsSlot, themeToggle, accountSlot, menu]);
   const announcer = createElement("p", {
     className: "visually-hidden",
     id: "workstation-status",
@@ -402,7 +392,11 @@ export function createStudioShell({
     mode.value = frame.mode;
     play.textContent = frame.status === "playing" ? "Ⅱ" : "▶";
     play.setAttribute("aria-label", frame.status === "playing" ? `Pause ${mode.value}` : `Play ${mode.value}`);
-    stop.disabled = frame.status === "stopped";
+    const stoppedAtStart = frame.patternTick === 0
+      && frame.songTick === 0
+      && (workspace.playlist?.cursorTick ?? 0) === 0;
+    stop.disabled = frame.status === "stopped" && stoppedAtStart;
+    stop.title = frame.status === "stopped" ? "Return Playlist to start" : "Stop";
     const loop = project.transport.loop ?? {
       enabled: false,
       endTick: 384,
@@ -445,7 +439,6 @@ export function createStudioShell({
     masterValue.value = formatPercent(project.mixer.master.volume);
     projectButton.dataset.saveState = persistenceState.status;
     const audio = audioEngine?.getState?.() ?? "idle";
-    audioState.textContent = audio === "running" ? "Ready" : audio === "suspended" ? "Paused" : audio === "closed" ? "Closed" : "Not started";
     root.dataset.audioState = audio;
     return frame;
   }
@@ -467,7 +460,16 @@ export function createStudioShell({
       attemptTransport(() => scheduler.play({ mode: nextMode, startTick: playbackStartTick(nextMode) }));
     }
   }, { signal: lifecycle.signal });
-  stop.addEventListener("click", () => scheduler?.stop?.(), { signal: lifecycle.signal });
+  stop.addEventListener("click", () => {
+    if (scheduler?.getState?.().status !== "stopped") {
+      scheduler?.stop?.();
+      return;
+    }
+    scheduler?.stop?.();
+    workspaceState.setPatternPlayhead?.(0);
+    workspaceState.seekSong?.(0);
+    announcer.textContent = "Playlist returned to start.";
+  }, { signal: lifecycle.signal });
   mode.addEventListener("change", () => {
     workspaceState.setPlaybackMode(mode.value);
     scheduler?.setMode?.(mode.value);

@@ -35,7 +35,7 @@ export function createAudioStatusFeature({
   const elements = {
     action: queryRequired(root, "#audio-action"),
     actionLabel: queryRequired(root, "#audio-action span"),
-    audioState: queryRequired(root, "#audio-state"),
+    audioState: root.querySelector("#audio-state"),
     close: queryRequired(root, "#audio-setup-close"),
     audioTime: queryRequired(root, "#audio-time"),
     contextState: queryRequired(root, "#context-state"),
@@ -43,9 +43,9 @@ export function createAudioStatusFeature({
     errorPanel: queryRequired(root, "#error-panel"),
     sampleRate: queryRequired(root, "#sample-rate"),
     setup: queryRequired(root, "#audio-setup"),
-    statusOpen: queryRequired(root, "#audio-status-open"),
+    statusOpen: root.querySelector("#audio-status-open"),
     statusDescription: queryRequired(root, "#status-description"),
-    statusLight: queryRequired(root, "#status-light"),
+    statusLight: root.querySelector("#status-light"),
   };
   let timeFrame = null;
   let previousStatus = null;
@@ -102,12 +102,12 @@ export function createAudioStatusFeature({
       : (STATE_CONTENT[state] ?? STATE_CONTENT.idle);
     const sampleRate = audioEngine.getSampleRate();
 
-    setTextIfChanged(elements.audioState, content.title);
+    if (elements.audioState) setTextIfChanged(elements.audioState, content.title);
     setTextIfChanged(elements.actionLabel, content.action);
     setTextIfChanged(elements.statusDescription, content.description);
     setTextIfChanged(elements.contextState, state === "idle" ? "Not created" : state);
     setTextIfChanged(elements.sampleRate, sampleRate ? `${(sampleRate / 1000).toFixed(1)} kHz` : "\u2014");
-    elements.statusLight.dataset.state = error ? "error" : state;
+    if (elements.statusLight) elements.statusLight.dataset.state = error ? "error" : state;
     elements.errorPanel.hidden = !error;
     setTextIfChanged(elements.errorMessage, error?.message ?? "");
     const needsSetup = state !== "running" || Boolean(error);
@@ -148,7 +148,7 @@ export function createAudioStatusFeature({
   elements.close.addEventListener("click", () => closeSetup({ dismissed: true }), {
     signal: lifecycle.signal,
   });
-  elements.statusOpen.addEventListener("click", () => openSetup(elements.statusOpen), {
+  elements.statusOpen?.addEventListener("click", () => openSetup(elements.statusOpen), {
     signal: lifecycle.signal,
   });
   root.querySelector("#mobile-audio-open")?.addEventListener("click", () => {

@@ -151,7 +151,27 @@ test("seek and stop release owned voices without leaving the scheduler running",
   assert.equal(harness.scheduler.stop(), true);
   assert.equal(harness.scheduler.getState().status, "stopped");
   assert.equal(harness.scheduler.getPlayheadTick(), 192);
+  assert.equal(harness.scheduler.stop(), true);
+  assert.equal(harness.scheduler.getPlayheadTick(), 0);
   assert.equal(harness.scheduler.stop(), false);
+});
+
+test("the Stop return point survives Pause and Resume", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.patterns[0].notes = [note("long", 60, 0, 384)];
+  const harness = createHarness(project);
+
+  assert.equal(harness.scheduler.play({ mode: "pattern", startTick: 96 }), true);
+  harness.setAudioTime(10.25);
+  assert.equal(harness.scheduler.pause(), true);
+  const pausedTick = harness.scheduler.getPlayheadTick();
+  assert.equal(pausedTick, 144);
+
+  assert.equal(harness.scheduler.play({ mode: "pattern", startTick: pausedTick }), true);
+  assert.equal(harness.scheduler.stop(), true);
+  assert.equal(harness.scheduler.getPlayheadTick(), 96);
+  assert.equal(harness.scheduler.stop(), true);
+  assert.equal(harness.scheduler.getPlayheadTick(), 0);
 });
 
 test("Song loop changes rebuild only the future suffix and preserve one clock", () => {

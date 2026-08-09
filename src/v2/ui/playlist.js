@@ -4,6 +4,7 @@ import { formatDurationTicks, formatTickPosition } from "./music-format.js";
 const MAX_SONG_TICKS = 6144;
 const SNAP_OPTIONS = Object.freeze({ "1/8": 48, "1/16": 24, "1/32": 12 });
 const LANE_HEIGHT = 66;
+const ADD_INSTRUMENT_ROW_HEIGHT = 44;
 const TRACK_HEADER_WIDTH = 320;
 const TRACK_ACTION_ORDER = Object.freeze(["select", "instrument", "move-up", "move-down", "remove"]);
 const PATTERN_DRAG_TYPE = "application/x-klinto-pattern-id";
@@ -63,12 +64,146 @@ export function getSnappedPlaylistDropTick({ clientX, pixelsPerTick, snapTicks, 
   ));
 }
 
+export function getPlaylistRulerSeekTick(event, geometry) {
+  if (!event || event.button !== 0 || !event.target?.closest?.(".v2-playlist-ruler")) return null;
+  return getSnappedPlaylistDropTick({ clientX: event.clientX, ...geometry });
+}
+
 export function getPlaylistWheelScrollDelta({ clientWidth = 0, deltaMode = 0, deltaX = 0, deltaY = 0 } = {}) {
   const dominantDelta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
   if (!Number.isFinite(dominantDelta)) return 0;
   if (deltaMode === 1) return dominantDelta * 40;
   if (deltaMode === 2) return dominantDelta * Math.max(1, Number(clientWidth) || 0);
   return dominantDelta;
+}
+
+export function isPlaylistDuplicateShortcut(event) {
+  return Boolean(
+    event
+    && !event.defaultPrevented
+    && !event.altKey
+    && !event.shiftKey
+    && !event.repeat
+    && (event.ctrlKey || event.metaKey)
+    && String(event.key ?? "").toLowerCase() === "b"
+  );
+}
+
+export function getPlaylistContextMenuPosition({
+  clientX,
+  clientY,
+  edge = 8,
+  menuHeight,
+  menuWidth,
+  viewportHeight,
+  viewportWidth,
+} = {}) {
+  if (![clientX, clientY, edge, menuHeight, menuWidth, viewportHeight, viewportWidth]
+    .every(Number.isFinite)) return null;
+  const inset = Math.max(0, edge);
+  const maximumLeft = Math.max(inset, viewportWidth - Math.max(0, menuWidth) - inset);
+  const maximumTop = Math.max(inset, viewportHeight - Math.max(0, menuHeight) - inset);
+  return Object.freeze({
+    left: Math.round(Math.max(inset, Math.min(clientX, maximumLeft))),
+    top: Math.round(Math.max(inset, Math.min(clientY, maximumTop))),
+  });
+}
+
+export function routePlaylistContextMenu(event, options = {}) {
+  const onClip = options.onClip ?? (() => {});
+  const onTrack = options.onTrack ?? (() => {});
+  const onInstrument = options.onInstrument ?? onTrack;
+  const clip = event?.target?.closest?.(".v2-playlist-clip");
+  const instrument = event?.target?.closest?.(".v2-playlist-instrument");
+  const lane = event?.target?.closest?.(".v2-playlist-lane");
+  if (!clip?.dataset.clipId && !instrument?.dataset.trackId && !lane?.dataset.trackId) return false;
+  event.preventDefault?.();
+  event.stopPropagation?.();
+  if (clip?.dataset.clipId) onClip(clip.dataset.clipId, event, clip);
+  else if (instrument?.dataset.trackId) {
+    onInstrument(instrument.dataset.trackId, event, instrument);
+  }
+  else onTrack(lane.dataset.trackId, event, lane);
+  return true;
+}
+
+export function renamePlaylistInstrument({
+  announce = () => {},
+  mutate = (action) => action(),
+  projectState,
+  render = () => {},
+  requestedName,
+  trackId,
+} = {}) {
+  if (requestedName === null || requestedName === undefined) return false;
+  if (!projectState?.getTrack || !projectState?.renameTrack) {
+    throw new TypeError("Renaming a Playlist Instrument requires Project state.");
+  }
+  projectState.getTrack(trackId);
+  const changed = mutate(() => projectState.renameTrack(trackId, requestedName));
+  if (!changed) return false;
+  const resolvedName = projectState.getTrack(trackId).name;
+  announce(`Renamed Instrument to ${resolvedName}.`);
+  render();
+  return true;
+}
+
+export function createPatternForPlaylistTrack({
+  announce = () => {},
+  mutate = (action) => action(),
+  onOpenPattern = () => {},
+  projectState,
+  render = () => {},
+  setActivePattern = () => {},
+  setPlaylist = () => {},
+  trackId,
+} = {}) {
+  if (!projectState?.getState || !projectState?.createPattern || !projectState?.getPattern) {
+    throw new TypeError("Creating a Playlist Pattern requires Project state.");
+  }
+  const track = projectState.getState().tracks.find(({ id }) => id === trackId);
+  if (!track) throw new RangeError("The selected Track is no longer available.");
+  const patternId = mutate(() => projectState.createPattern());
+  setPlaylist({
+    destinationTrackId: track.id,
+    selectedClipId: null,
+    selectedClipIds: [],
+  });
+  setActivePattern(patternId);
+  announce(`Created ${projectState.getPattern(patternId).name} for ${track.name}.`);
+  render();
+  onOpenPattern(patternId, track.id);
+  return patternId;
+}
+
+export function getPlaylistMarqueeClipIds(project, {
+  endTick,
+  endTrackIndex,
+  startTick,
+  startTrackIndex,
+} = {}) {
+  if (!project?.tracks?.length || !project?.patterns?.length) return [];
+  if (![endTick, endTrackIndex, startTick, startTrackIndex].every(Number.isFinite)) return [];
+  const leftTick = Math.max(0, Math.min(startTick, endTick));
+  const rightTick = Math.min(MAX_SONG_TICKS, Math.max(startTick, endTick));
+  if (rightTick <= leftTick) return [];
+  const firstTrack = Math.max(0, Math.min(
+    project.tracks.length - 1,
+    Math.floor(Math.min(startTrackIndex, endTrackIndex)),
+  ));
+  const finalTrack = Math.max(0, Math.min(
+    project.tracks.length - 1,
+    Math.floor(Math.max(startTrackIndex, endTrackIndex)),
+  ));
+  const patterns = new Map(project.patterns.map((pattern) => [pattern.id, pattern]));
+  const result = [];
+  for (let trackIndex = firstTrack; trackIndex <= finalTrack; trackIndex += 1) {
+    for (const clip of project.tracks[trackIndex].clips) {
+      const end = clip.startTick + (patterns.get(clip.patternId)?.lengthTicks ?? 0);
+      if (clip.startTick < rightTick && end > leftTick) result.push(clip.id);
+    }
+  }
+  return result;
 }
 
 function findClip(project, clipId) {
@@ -129,6 +264,7 @@ export function createPlaylistSurface({
   onOpenPattern = () => {},
   onSeek = (tick) => tick,
   onTransportToggle = () => {},
+  promptInstrumentName = (track) => globalThis.prompt?.("Instrument name", track.name),
   projectState,
   getTransportFrame = () => null,
   transportFrameSource = null,
@@ -143,6 +279,11 @@ export function createPlaylistSurface({
   let playheadElement = null;
   let snapTicks = 24;
   let draggedPatternId = null;
+  let marquee = null;
+  let suppressNextPlaylistClick = false;
+  let trackContextMenu = null;
+  let trackContextReturnFocus = null;
+  let trackContextTrackId = null;
 
   const title = createElement("h2", { id: "v2-playlist-title", className: "v2-surface-title", textContent: "Playlist", tabIndex: -1 });
   const header = createElement("div", { className: "v2-surface-header v2-playlist-header" });
@@ -151,7 +292,8 @@ export function createPlaylistSurface({
     role: "grid",
     tabIndex: 0,
     "aria-label": "Playlist timeline",
-    "aria-keyshortcuts": "Home S",
+    "aria-keyshortcuts": "Home S Control+B Meta+B",
+    "aria-multiselectable": "true",
   });
   const scroller = createElement("div", { className: "v2-playlist-scroll" }, [timeline]);
   const patternLibrary = createElement("details", {
@@ -266,6 +408,18 @@ export function createPlaylistSurface({
     return id && findClip(project(), id) ? id : null;
   }
 
+  function selectedClipIds() {
+    const state = project();
+    const requested = new Set(Array.isArray(session().selectedClipIds)
+      ? session().selectedClipIds
+      : []);
+    const primary = selectedClipId();
+    if (primary) requested.add(primary);
+    return state.tracks.flatMap((track) => (
+      track.clips.filter(({ id }) => requested.has(id)).map(({ id }) => id)
+    ));
+  }
+
   function cursorTick() {
     return Math.max(0, Math.min(MAX_SONG_TICKS - snapTicks, session().cursorTick ?? 0));
   }
@@ -296,6 +450,170 @@ export function createPlaylistSurface({
       ?? actions[0];
     target?.focus({ preventScroll: true });
     return Boolean(target);
+  }
+
+  function closeTrackContextMenu({ restoreFocus = false } = {}) {
+    if (!trackContextMenu || trackContextMenu.menu.hidden) return false;
+    const returnFocus = trackContextReturnFocus;
+    const trackId = trackContextTrackId;
+    trackContextMenu.menu.hidden = true;
+    trackContextMenu.menu.removeAttribute("data-track-id");
+    trackContextReturnFocus = null;
+    trackContextTrackId = null;
+    if (restoreFocus) {
+      if (returnFocus?.isConnected && !returnFocus.disabled) {
+        returnFocus.focus({ preventScroll: true });
+      } else if (trackId) {
+        focusTrackAction(trackId);
+      }
+    }
+    return true;
+  }
+
+  function createPatternForTrack(trackId) {
+    try {
+      return createPatternForPlaylistTrack({
+        announce,
+        mutate: (action) => mutateProject(action),
+        onOpenPattern,
+        projectState,
+        render,
+        setActivePattern: (patternId) => workspaceState.setActivePattern?.(patternId),
+        setPlaylist: (patch) => setSession(patch),
+        trackId,
+      });
+    } catch (error) {
+      announce(error.message);
+      renderPatternLibrary();
+      return null;
+    }
+  }
+
+  function requestInstrumentRename(trackId) {
+    const state = project();
+    const trackIndex = state.tracks.findIndex(({ id }) => id === trackId);
+    const track = state.tracks[trackIndex];
+    if (!track) return false;
+    let requestedName;
+    try {
+      requestedName = promptInstrumentName(track);
+      if (requestedName === null || requestedName === undefined) return false;
+      return renamePlaylistInstrument({
+        announce,
+        mutate: (action) => mutateProject(action),
+        projectState,
+        render: () => {
+          rememberFocus({ clipId: null, trackAction: "instrument", trackId, trackIndex });
+          render();
+        },
+        requestedName,
+        trackId,
+      });
+    } catch (error) {
+      announce(error.message);
+      focusTrackAction(trackId, "instrument");
+      return false;
+    }
+  }
+
+  function ensureTrackContextMenu() {
+    if (trackContextMenu) return trackContextMenu;
+    const renameInstrument = createElement("button", {
+      role: "menuitem",
+      textContent: "Rename Instrument",
+      type: "button",
+    });
+    const newPattern = createElement("button", {
+      role: "menuitem",
+      textContent: "New Pattern",
+      type: "button",
+    });
+    const menu = createElement("div", {
+      "aria-label": "Track actions",
+      className: "v2-action-menu-panel v2-playlist-track-context-menu",
+      hidden: true,
+      role: "menu",
+      tabIndex: -1,
+    }, [renameInstrument, newPattern]);
+    renameInstrument.addEventListener("click", () => {
+      const trackId = trackContextTrackId;
+      closeTrackContextMenu({ restoreFocus: true });
+      if (trackId) requestInstrumentRename(trackId);
+    }, { signal: lifecycle.signal });
+    newPattern.addEventListener("click", () => {
+      const trackId = trackContextTrackId;
+      closeTrackContextMenu();
+      if (trackId) createPatternForTrack(trackId);
+    }, { signal: lifecycle.signal });
+    menu.addEventListener("contextmenu", (event) => event.preventDefault(), {
+      signal: lifecycle.signal,
+    });
+    menu.addEventListener("keydown", (event) => {
+      if (event.key === "Tab") {
+        closeTrackContextMenu({ restoreFocus: true });
+        return;
+      }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      const items = [...menu.querySelectorAll('[role="menuitem"]')]
+        .filter((item) => !item.hidden && !item.disabled);
+      if (items.length === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const currentIndex = items.indexOf(node.ownerDocument?.activeElement);
+      const directionalOrigin = currentIndex >= 0
+        ? currentIndex
+        : event.key === "ArrowUp" ? 0 : -1;
+      const nextIndex = event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? items.length - 1
+          : (directionalOrigin + (event.key === "ArrowUp" ? -1 : 1) + items.length)
+            % items.length;
+      items[nextIndex].focus({ preventScroll: true });
+    }, { signal: lifecycle.signal });
+    const menuHost = node.closest?.(".v2-workspace") ?? node.ownerDocument?.body;
+    menuHost?.append(menu);
+    trackContextMenu = { menu, newPattern, renameInstrument };
+    return trackContextMenu;
+  }
+
+  function openTrackContextMenu(event, trackId, { instrumentTarget = false } = {}) {
+    const track = project().tracks.find(({ id }) => id === trackId);
+    if (!track) return false;
+    closeTrackContextMenu();
+    const contextMenu = ensureTrackContextMenu();
+    const trackCountAtOpen = project().patterns.length;
+    trackContextTrackId = track.id;
+    trackContextReturnFocus = event.target?.closest?.("button")
+      ?? node.querySelector(`.v2-playlist-track-focus[data-track-id="${selectorId(track.id)}"]`);
+    contextMenu.menu.dataset.trackId = track.id;
+    contextMenu.menu.setAttribute(
+      "aria-label",
+      instrumentTarget ? `Actions for ${track.name} Instrument` : `Actions for ${track.name}`,
+    );
+    contextMenu.renameInstrument.hidden = !instrumentTarget;
+    contextMenu.renameInstrument.title = `Rename ${track.name} Instrument`;
+    contextMenu.newPattern.disabled = trackCountAtOpen >= 64;
+    contextMenu.newPattern.title = trackCountAtOpen >= 64
+      ? "A Project supports at most 64 Patterns"
+      : `Create a new Pattern for ${track.name}`;
+    contextMenu.menu.hidden = false;
+    const documentElement = node.ownerDocument?.documentElement;
+    const view = node.ownerDocument?.defaultView;
+    const position = getPlaylistContextMenuPosition({
+      clientX: event.clientX,
+      clientY: event.clientY,
+      menuHeight: contextMenu.menu.offsetHeight,
+      menuWidth: contextMenu.menu.offsetWidth,
+      viewportHeight: documentElement?.clientHeight ?? view?.innerHeight ?? 0,
+      viewportWidth: documentElement?.clientWidth ?? view?.innerWidth ?? 0,
+    }) ?? { left: 8, top: 8 };
+    contextMenu.menu.style.left = `${position.left}px`;
+    contextMenu.menu.style.top = `${position.top}px`;
+    const focusTarget = [contextMenu.renameInstrument, contextMenu.newPattern]
+      .find((item) => !item.hidden && !item.disabled);
+    (focusTarget ?? contextMenu.menu).focus({ preventScroll: true });
+    return true;
   }
 
   function addPatternToTrack(patternId, trackId, requestedTick, { exact = false } = {}) {
@@ -416,23 +734,46 @@ export function createPlaylistSurface({
     return true;
   }
 
-  function selectClip(clipId, { focus = false } = {}) {
-    const found = clipId ? findClip(project(), clipId) : null;
+  function selectClips(clipIds, { focus = false, primaryId = null } = {}) {
+    const state = project();
+    const requested = new Set(clipIds ?? []);
+    const ids = state.tracks.flatMap((track) => (
+      track.clips.filter(({ id }) => requested.has(id)).map(({ id }) => id)
+    ));
+    const primary = ids.includes(primaryId) ? primaryId : ids[0] ?? null;
+    const found = primary ? findClip(state, primary) : null;
     if (!found) {
-      setSession({ selectedClipId: null });
+      setSession({ selectedClipId: null, selectedClipIds: [] });
       render();
+      if (focus) timeline.focus({ preventScroll: true });
       return false;
     }
-    rememberFocus({ clipId, tick: found.clip.startTick, trackAction: null, trackId: found.track.id });
+    rememberFocus({ clipId: primary, tick: found.clip.startTick, trackAction: null, trackId: found.track.id });
     setSession({
-      selectedClipId: clipId,
+      selectedClipId: primary,
+      selectedClipIds: ids,
       cursorTick: found.clip.startTick,
       destinationTrackId: found.track.id,
     });
-    announce(`${clipLabel(project(), found.track, found.clip)}, selected.`);
+    announce(ids.length === 1
+      ? `${clipLabel(state, found.track, found.clip)}, selected.`
+      : `${ids.length} Playlist clips selected.`);
     render();
-    if (focus) node.querySelector(`[data-clip-id="${CSS.escape(clipId)}"]`)?.focus({ preventScroll: true });
+    if (focus) node.querySelector(`[data-clip-id="${selectorId(primary)}"]`)?.focus({ preventScroll: true });
     return true;
+  }
+
+  function selectClip(clipId, options = {}) {
+    return selectClips(clipId ? [clipId] : [], { ...options, primaryId: clipId });
+  }
+
+  function toggleClipSelection(clipId) {
+    const current = selectedClipIds();
+    const next = current.includes(clipId)
+      ? current.filter((id) => id !== clipId)
+      : [...current, clipId];
+    const primaryId = next.includes(clipId) ? clipId : next[0] ?? null;
+    return selectClips(next, { focus: true, primaryId });
   }
 
   function moveCursor(deltaTick, deltaTrack) {
@@ -456,30 +797,64 @@ export function createPlaylistSurface({
     }) ?? null;
   }
 
-  function moveSelected(deltaTick, deltaTrack, clipId = selectedClipId()) {
+  function moveSelected(
+    deltaTick,
+    deltaTrack,
+    clipIds = selectedClipIds(),
+    primaryId = selectedClipId(),
+  ) {
     const state = project();
-    const found = findClip(state, clipId);
-    if (!found) return false;
+    const requested = new Set(typeof clipIds === "string" ? [clipIds] : clipIds);
+    const ids = state.tracks.flatMap((track) => (
+      track.clips.filter(({ id }) => requested.has(id)).map(({ id }) => id)
+    ));
+    const primary = ids.includes(primaryId) ? primaryId : ids[0];
+    const found = primary ? findClip(state, primary) : null;
+    if (!found || ids.length === 0) return false;
     const currentTrackIndex = state.tracks.findIndex(({ id }) => id === found.track.id);
     const targetIndex = currentTrackIndex + deltaTrack;
     if (targetIndex < 0 || targetIndex >= state.tracks.length) {
-      throw new RangeError("That clip cannot move beyond the first or final Track.");
+      throw new RangeError(ids.length === 1
+        ? "That clip cannot move beyond the first or final Track."
+        : "The selected clips cannot move beyond the first or final Track.");
     }
     const target = state.tracks[targetIndex];
     const startTick = found.clip.startTick + deltaTick;
     rememberFocus({ clipId: found.clip.id, tick: startTick, trackId: target.id, trackIndex: targetIndex });
-    mutateProject(() => projectState.moveClip(found.clip.id, target.id, startTick));
-    setSession({ cursorTick: startTick, destinationTrackId: target.id, selectedClipId: found.clip.id });
+    mutateProject(() => ids.length === 1
+      ? projectState.moveClip(found.clip.id, target.id, startTick)
+      : projectState.moveClips(ids, { deltaTick, deltaTrack }));
+    setSession({
+      cursorTick: startTick,
+      destinationTrackId: target.id,
+      selectedClipId: found.clip.id,
+      selectedClipIds: ids,
+    });
+    announce(ids.length === 1 ? "Clip moved." : `${ids.length} clips moved together.`);
     render();
     return true;
   }
 
   function duplicateSelected() {
-    const id = selectedClipId();
-    if (!id) return false;
-    const created = mutateProject(() => projectState.duplicateClip(id));
-    const resultId = typeof created === "string" ? created : created.clipId;
-    selectClip(resultId, { focus: true });
+    const ids = selectedClipIds();
+    const primary = selectedClipId();
+    if (ids.length === 0 || !primary) return false;
+    const primaryIndex = Math.max(0, ids.indexOf(primary));
+    const createdIds = mutateProject(() => projectState.duplicateClips(ids));
+    const primaryId = createdIds[primaryIndex] ?? createdIds[0];
+    const found = findClip(project(), primaryId);
+    rememberFocus({ clipId: primaryId, tick: found.clip.startTick, trackId: found.track.id });
+    setSession({
+      cursorTick: found.clip.startTick,
+      destinationTrackId: found.track.id,
+      selectedClipId: primaryId,
+      selectedClipIds: createdIds,
+    });
+    announce(createdIds.length === 1
+      ? "Clip duplicated to the right."
+      : `${createdIds.length} clips duplicated to the right.`);
+    render();
+    node.querySelector(`[data-clip-id="${selectorId(primaryId)}"]`)?.focus({ preventScroll: true });
     return true;
   }
 
@@ -495,8 +870,14 @@ export function createPlaylistSurface({
       trackId: before?.track.id,
       trackIndex,
     });
+    const remaining = selectedClipIds().filter((id) => id !== clipId);
+    const nextPrimary = remaining.includes(selectedClipId()) ? selectedClipId() : remaining[0] ?? null;
     mutateProject(() => projectState.removeClip(clipId));
-    setSession({ selectedClipId: null, cursorTick: before?.clip.startTick ?? cursorTick() });
+    setSession({
+      selectedClipId: nextPrimary,
+      selectedClipIds: remaining,
+      cursorTick: before?.clip.startTick ?? cursorTick(),
+    });
     announce("Clip deleted.");
     render();
     return true;
@@ -544,7 +925,7 @@ export function createPlaylistSurface({
         handleTrackActionKeyDown(event, trackAction);
         return;
       }
-      const selected = Boolean(selectedClipId());
+      const selected = selectedClipIds().length > 0;
       if (event.key.toLowerCase() === "s" && !event.altKey && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
         const found = findClip(project(), selectedClipId());
@@ -577,7 +958,7 @@ export function createPlaylistSurface({
       } else if ((event.key === "Delete" || event.key === "Backspace") && selected) {
         event.preventDefault();
         removeSelected();
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d" && selected) {
+      } else if (isPlaylistDuplicateShortcut(event) && selected) {
         event.preventDefault();
         duplicateSelected();
       } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
@@ -615,32 +996,54 @@ export function createPlaylistSurface({
     }
   }
 
+  function suppressFollowingPlaylistClick() {
+    suppressNextPlaylistClick = true;
+    globalThis.setTimeout?.(() => {
+      suppressNextPlaylistClick = false;
+    }, 0);
+  }
+
+  function consumeSuppressedPlaylistClick(event) {
+    if (!suppressNextPlaylistClick) return false;
+    suppressNextPlaylistClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
+
   function bindClipPointer(button, found) {
     button.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || event.ctrlKey || event.metaKey) return;
       const originX = event.clientX;
       const originY = event.clientY;
+      const selection = selectedClipIds();
+      const dragIds = selection.includes(found.clip.id) ? selection : [found.clip.id];
+      const dragElements = dragIds
+        .map((clipId) => timeline.querySelector(`[data-clip-id="${selectorId(clipId)}"]`))
+        .filter(Boolean);
       let deltaTick = 0;
       let deltaTrack = 0;
-      button.setPointerCapture?.(event.pointerId);
+      try {
+        button.setPointerCapture?.(event.pointerId);
+      } catch {
+        // Pointer capture can disappear during cancellation or synthetic input.
+      }
       const move = (moveEvent) => {
         deltaTick = Math.round((moveEvent.clientX - originX) / pixelsPerTick / snapTicks) * snapTicks;
         deltaTrack = Math.round((moveEvent.clientY - originY) / LANE_HEIGHT);
-        button.style.translate = `${deltaTick * pixelsPerTick}px ${deltaTrack * LANE_HEIGHT}px`;
+        for (const element of dragElements) {
+          element.style.translate = `${deltaTick * pixelsPerTick}px ${deltaTrack * LANE_HEIGHT}px`;
+        }
       };
       const finish = (finishEvent) => {
         button.removeEventListener("pointermove", move);
         button.removeEventListener("pointerup", finish);
         button.removeEventListener("pointercancel", finish);
-        button.style.translate = "";
+        for (const element of dragElements) element.style.translate = "";
         if (finishEvent.type !== "pointerup" || (deltaTick === 0 && deltaTrack === 0)) return;
         try {
-          setSession({
-            cursorTick: found.clip.startTick,
-            destinationTrackId: found.track.id,
-            selectedClipId: found.clip.id,
-          });
-          moveSelected(deltaTick, deltaTrack, found.clip.id);
+          suppressFollowingPlaylistClick();
+          moveSelected(deltaTick, deltaTrack, dragIds, found.clip.id);
         } catch (error) {
           announce(error.message);
           render();
@@ -652,9 +1055,139 @@ export function createPlaylistSurface({
     });
   }
 
+  function getMarqueePoint(event) {
+    const state = project();
+    const bounds = timeline.getBoundingClientRect();
+    const tick = Math.max(0, Math.min(
+      MAX_SONG_TICKS,
+      (event.clientX - bounds.left - TRACK_HEADER_WIDTH) / pixelsPerTick,
+    ));
+    const trackIndex = Math.max(0, Math.min(
+      state.tracks.length - 1,
+      Math.floor((event.clientY - bounds.top - 46) / LANE_HEIGHT),
+    ));
+    return { tick, trackIndex };
+  }
+
+  function previewClipSelection(clipIds) {
+    const selected = new Set(clipIds);
+    for (const clip of timeline.querySelectorAll(".v2-playlist-clip")) {
+      const isSelected = selected.has(clip.dataset.clipId);
+      clip.classList.toggle("is-selected", isSelected);
+      clip.setAttribute("aria-selected", String(isSelected));
+    }
+  }
+
+  function updateMarquee(event) {
+    if (!marquee || event.pointerId !== marquee.pointerId) return false;
+    const point = getMarqueePoint(event);
+    if (!marquee.moved) {
+      marquee.moved = Math.hypot(
+        event.clientX - marquee.clientX,
+        event.clientY - marquee.clientY,
+      ) >= 4;
+    }
+    if (!marquee.moved) return true;
+    const leftTick = Math.min(marquee.origin.tick, point.tick);
+    const rightTick = Math.max(marquee.origin.tick, point.tick);
+    const firstTrack = Math.min(marquee.origin.trackIndex, point.trackIndex);
+    const finalTrack = Math.max(marquee.origin.trackIndex, point.trackIndex);
+    marquee.element.hidden = false;
+    Object.assign(marquee.element.style, {
+      height: `${(finalTrack - firstTrack + 1) * LANE_HEIGHT}px`,
+      left: `${TRACK_HEADER_WIDTH + leftTick * pixelsPerTick}px`,
+      top: `${46 + firstTrack * LANE_HEIGHT}px`,
+      width: `${Math.max(1, (rightTick - leftTick) * pixelsPerTick)}px`,
+    });
+    marquee.selection = getPlaylistMarqueeClipIds(project(), {
+      endTick: point.tick,
+      endTrackIndex: point.trackIndex,
+      startTick: marquee.origin.tick,
+      startTrackIndex: marquee.origin.trackIndex,
+    });
+    previewClipSelection(marquee.selection);
+    event.preventDefault();
+    return true;
+  }
+
+  function finishMarquee(event) {
+    if (!marquee || event.pointerId !== marquee.pointerId) return false;
+    const current = marquee;
+    marquee = null;
+    try {
+      timeline.releasePointerCapture?.(event.pointerId);
+    } catch {
+      // The pointer may already have been released by the browser.
+    }
+    current.element.remove();
+    event.preventDefault();
+    if (event.type !== "pointerup" || !current.moved) {
+      previewClipSelection(current.previousSelection);
+      return true;
+    }
+    suppressFollowingPlaylistClick();
+    selectClips(current.selection, {
+      focus: true,
+      primaryId: current.selection[0] ?? null,
+    });
+    return true;
+  }
+
+  function startMarquee(event) {
+    if (event.button !== 0 || (!event.ctrlKey && !event.metaKey)) return false;
+    const lane = event.target.closest?.(".v2-playlist-lane");
+    if (!lane || event.target.closest?.(
+      ".v2-playlist-track-header, .v2-playlist-clip, button, input, select, textarea",
+    )) return false;
+    const element = createElement("div", {
+      "aria-hidden": "true",
+      className: "v2-playlist-marquee",
+      hidden: true,
+      role: "presentation",
+    });
+    timeline.append(element);
+    marquee = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      element,
+      moved: false,
+      origin: getMarqueePoint(event),
+      pointerId: event.pointerId,
+      previousSelection: selectedClipIds(),
+      selection: [],
+    };
+    try {
+      timeline.setPointerCapture?.(event.pointerId);
+    } catch {
+      // Synthetic input and cancelled pointers may not be capturable.
+    }
+    timeline.focus({ preventScroll: true });
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
+
+  function createAddInstrumentButton() {
+    const trackCount = project().tracks.length;
+    return createElement("button", {
+      className: "v2-primary-action v2-playlist-add-instrument",
+      disabled: trackCount >= 8,
+      textContent: "+ Add Instrument",
+      title: trackCount >= 8
+        ? "A Project supports at most eight Instruments"
+        : "Create a Track with a Klinto Chip instrument",
+      type: "button",
+      onClick: () => {
+        const id = mutateProject(() => projectState.addTrack());
+        rememberFocus({ trackId: id, trackIndex: project().tracks.length - 1 });
+        setSession({ destinationTrackId: id, selectedClipId: null });
+        render();
+      },
+    });
+  }
+
   function renderHeader() {
     clearElement(header);
-    header.append(title);
     const snap = createElement("select", { "aria-label": "Playlist snap" });
     for (const label of Object.keys(SNAP_OPTIONS)) {
       snap.append(createElement("option", { textContent: label, value: label }));
@@ -666,27 +1199,8 @@ export function createPlaylistSurface({
       setSession({ snap: snapValue });
       renderTimeline();
     });
-    const tracks = project().tracks;
-    const addInstrument = createElement("button", {
-      className: "v2-primary-action v2-playlist-add-instrument",
-      disabled: tracks.length >= 8,
-      textContent: "+ Add Instrument",
-      title: tracks.length >= 8
-        ? "A Project supports at most eight Instruments"
-        : "Create a Track with a Klinto Chip instrument",
-      type: "button",
-      onClick: () => {
-        const id = mutateProject(() => projectState.addTrack());
-        rememberFocus({ trackId: id, trackIndex: project().tracks.length - 1 });
-        setSession({ destinationTrackId: id, selectedClipId: null });
-        render();
-      },
-    });
-    const leadingActions = createElement("div", {
-      className: "v2-playlist-header-leading",
-    }, [title, addInstrument]);
     header.append(
-      leadingActions,
+      title,
       createElement("label", {}, ["Snap", snap]),
       createElement("button", { textContent: "Zoom out", type: "button", onClick: () => { pixelsPerTick = Math.max(0.12, pixelsPerTick - 0.06); renderTimeline(); } }),
       createElement("button", { textContent: "Zoom in", type: "button", onClick: () => { pixelsPerTick = Math.min(1.1, pixelsPerTick + 0.06); renderTimeline(); } }),
@@ -735,23 +1249,13 @@ export function createPlaylistSurface({
         picker,
       ]),
     ]);
-    const createPattern = createElement("button", {
+    const createPatternButton = createElement("button", {
       disabled: state.patterns.length >= 64,
       textContent: "New Pattern",
       type: "button",
     });
-    createPattern.addEventListener("click", () => {
-      try {
-        const id = mutateProject(() => projectState.createPattern());
-        workspaceState.setActivePattern?.(id);
-        announce(`Created ${projectState.getPattern(id).name}.`);
-        render();
-        onOpenPattern(id, destination.id);
-      } catch (error) {
-        announce(error.message);
-      }
-    });
-    libraryHeader.append(createPattern);
+    createPatternButton.addEventListener("click", () => createPatternForTrack(destination.id));
+    libraryHeader.append(createPatternButton);
 
     const help = createElement("p", {
       className: "visually-hidden",
@@ -922,6 +1426,7 @@ export function createPlaylistSurface({
   function renderInspector() {
     clearElement(inspector);
     const state = project();
+    const selection = selectedClipIds();
     const found = findClip(state, selectedClipId());
     const destination = state.tracks.find(({ id }) => id === destinationTrackId()) ?? state.tracks[0];
     if (!found) {
@@ -935,6 +1440,22 @@ export function createPlaylistSurface({
           onClick: () => onOpenPattern(patternToAddId(), track.id),
         }));
       }
+      return;
+    }
+    if (selection.length > 1) {
+      inspector.append(
+        createElement("strong", { textContent: `${selection.length} Playlist clips selected` }),
+        createElement("button", { textContent: "Open primary Pattern", type: "button", onClick: openSelected }),
+        createElement("button", { textContent: "Move earlier", type: "button", onClick: () => moveSelected(-snapTicks, 0) }),
+        createElement("button", { textContent: "Move later", type: "button", onClick: () => moveSelected(snapTicks, 0) }),
+        createElement("button", {
+          "aria-keyshortcuts": "Control+B Meta+B",
+          textContent: "Duplicate right",
+          type: "button",
+          onClick: duplicateSelected,
+        }),
+        createElement("span", { textContent: "Drag any selected clip to move the complete selection." }),
+      );
       return;
     }
     const pattern = state.patterns.find(({ id }) => id === found.clip.patternId);
@@ -963,7 +1484,12 @@ export function createPlaylistSurface({
       createElement("button", { textContent: "Open Pattern", type: "button", onClick: openSelected }),
       createElement("button", { textContent: "Move earlier", type: "button", onClick: () => moveSelected(-snapTicks, 0) }),
       createElement("button", { textContent: "Move later", type: "button", onClick: () => moveSelected(snapTicks, 0) }),
-      createElement("button", { textContent: "Duplicate", type: "button", onClick: duplicateSelected }),
+      createElement("button", {
+        "aria-keyshortcuts": "Control+B Meta+B",
+        textContent: "Duplicate",
+        type: "button",
+        onClick: duplicateSelected,
+      }),
       createElement("button", { className: "v2-danger-button", textContent: "Delete clip", type: "button", onClick: removeSelected }),
     );
     inspector.append(createElement("span", {
@@ -983,16 +1509,25 @@ export function createPlaylistSurface({
 
   function renderTimeline() {
     if (disposed) return;
+    closeTrackContextMenu();
     const state = project();
     snapTicks = SNAP_OPTIONS[session().snap] ?? SNAP_OPTIONS["1/16"];
     const selectedId = selectedClipId();
+    const selectedIds = new Set(selectedClipIds());
     timeline.style.width = `${Math.max(900, TRACK_HEADER_WIDTH + MAX_SONG_TICKS * pixelsPerTick)}px`;
-    timeline.style.height = `${46 + state.tracks.length * LANE_HEIGHT}px`;
-    timeline.setAttribute("aria-rowcount", String(state.tracks.length));
+    timeline.style.height = `${
+      46 + state.tracks.length * LANE_HEIGHT + ADD_INSTRUMENT_ROW_HEIGHT
+    }px`;
+    timeline.setAttribute("aria-rowcount", String(state.tracks.length + 1));
     playheadElement = null;
     clearElement(timeline);
 
-    const ruler = createElement("div", { className: "v2-playlist-ruler", role: "presentation", "aria-hidden": "true" });
+    const ruler = createElement("div", {
+      "aria-hidden": "true",
+      className: "v2-playlist-ruler",
+      role: "presentation",
+      title: "Click to set the Song start position",
+    });
     for (let tick = 0; tick <= MAX_SONG_TICKS; tick += 384) {
       ruler.append(createElement("span", {
         style: { left: `${TRACK_HEADER_WIDTH + tick * pixelsPerTick}px` },
@@ -1077,8 +1612,8 @@ export function createPlaylistSurface({
         type: "button",
         onClick: (event) => onOpenInstrument(track.id, event.currentTarget),
       }, [
-        createElement("span", { textContent: "Klinto Chip" }),
-        createElement("small", { textContent: "Instrument" }),
+        createElement("span", { textContent: track.name, title: track.name }),
+        createElement("small", { textContent: "Klinto Chip" }),
       ]);
       const reorderTrack = (delta, trackAction) => {
         rememberFocus({
@@ -1134,15 +1669,16 @@ export function createPlaylistSurface({
 
       for (const clip of track.clips) {
         const pattern = state.patterns.find(({ id }) => id === clip.patternId);
+        const isSelected = selectedIds.has(clip.id);
         const button = createElement("button", {
-          className: `v2-playlist-clip${selectedId === clip.id ? " is-selected" : ""}`,
+          className: `v2-playlist-clip${isSelected ? " is-selected" : ""}`,
           id: `v2-playlist-clip-${clip.id}`,
           dataset: { clipId: clip.id, trackId: track.id },
           role: "gridcell",
           tabIndex: -1,
           type: "button",
-          "aria-label": `${clipLabel(state, track, clip)}${selectedId === clip.id ? ", selected" : ""}`,
-          "aria-selected": String(selectedId === clip.id),
+          "aria-label": `${clipLabel(state, track, clip)}${isSelected ? ", selected" : ""}`,
+          "aria-selected": String(isSelected),
           style: {
             left: `${TRACK_HEADER_WIDTH + clip.startTick * pixelsPerTick}px`,
             width: `${Math.max(8, pattern.lengthTicks * pixelsPerTick)}px`,
@@ -1153,24 +1689,47 @@ export function createPlaylistSurface({
         const activation = createPlaylistPatternActivation({
           onOpen: () => onOpenPattern(pattern.id, track.id),
           onSelect: () => {
-            if (button.isConnected) selectClip(clip.id);
+            if (!button.isConnected) return;
+            const current = selectedClipIds();
+            if (current.length > 1 && current.includes(clip.id)) {
+              selectClips(current, { primaryId: clip.id });
+            } else {
+              selectClip(clip.id);
+            }
           },
         });
-        button.addEventListener("click", (event) => activation.click(event.detail));
+        button.addEventListener("click", (event) => {
+          if (consumeSuppressedPlaylistClick(event)) return;
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+            activation.cancel();
+            toggleClipSelection(clip.id);
+            return;
+          }
+          activation.click(event.detail);
+        });
         button.addEventListener("dblclick", (event) => {
           event.preventDefault();
           activation.doubleClick();
-        });
-        button.addEventListener("contextmenu", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          button.focus({ preventScroll: true });
-          removeClip(clip.id);
         });
         lane.append(button);
       }
       timeline.append(lane);
     });
+
+    const addInstrumentRow = createElement("div", {
+      "aria-label": "Add Instrument",
+      "aria-rowindex": state.tracks.length + 1,
+      className: "v2-playlist-add-instrument-row",
+      role: "row",
+      style: { top: `${46 + state.tracks.length * LANE_HEIGHT}px` },
+    }, [
+      createElement("div", {
+        className: "v2-playlist-add-instrument-cell",
+        role: "gridcell",
+      }, [createAddInstrumentButton()]),
+    ]);
+    timeline.append(addInstrumentRow);
 
     const destinationIndex = state.tracks.findIndex(({ id }) => id === destinationTrackId());
     const destinationLane = timeline.querySelector(
@@ -1193,7 +1752,11 @@ export function createPlaylistSurface({
       "aria-hidden": "true",
       className: "v2-playlist-playhead",
       role: "presentation",
-      style: { left: `${TRACK_HEADER_WIDTH}px` },
+      style: {
+        bottom: "auto",
+        height: `${1 + state.tracks.length * LANE_HEIGHT}px`,
+        left: `${TRACK_HEADER_WIDTH}px`,
+      },
     });
     timeline.append(playheadElement);
     timeline.setAttribute("aria-activedescendant", selectedId ? `v2-playlist-clip-${selectedId}` : cursor.id);
@@ -1203,6 +1766,13 @@ export function createPlaylistSurface({
   }
 
   function render() {
+    if (trackContextMenu?.menu.contains(node.ownerDocument?.activeElement) && trackContextTrackId) {
+      rememberFocus({
+        clipId: null,
+        trackAction: trackContextReturnFocus?.dataset?.playlistTrackAction ?? "select",
+        trackId: trackContextTrackId,
+      });
+    }
     captureFocusPreference();
     renderHeader();
     renderPatternLibrary();
@@ -1210,8 +1780,27 @@ export function createPlaylistSurface({
   }
 
   timeline.addEventListener("keydown", handleTimelineKeyDown, { signal: lifecycle.signal });
+  timeline.addEventListener("pointerdown", startMarquee, { signal: lifecycle.signal });
+  timeline.addEventListener("pointermove", updateMarquee, { signal: lifecycle.signal });
+  timeline.addEventListener("pointerup", finishMarquee, { signal: lifecycle.signal });
+  timeline.addEventListener("pointercancel", finishMarquee, { signal: lifecycle.signal });
   timeline.addEventListener("click", (event) => {
+    if (consumeSuppressedPlaylistClick(event)) return;
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      return;
+    }
     if (event.button !== 0 || event.target.closest?.("button, input, select, textarea")) return;
+    const rulerSeekTick = getPlaylistRulerSeekTick(event, {
+      pixelsPerTick,
+      snapTicks,
+      timelineLeft: timeline.getBoundingClientRect().left,
+    });
+    if (rulerSeekTick !== null) {
+      event.preventDefault();
+      seekSong(rulerSeekTick);
+      return;
+    }
     const lane = event.target.closest?.(".v2-playlist-lane");
     if (!lane?.dataset.trackId) return;
     const dropTick = getSnappedPlaylistDropTick({
@@ -1224,15 +1813,44 @@ export function createPlaylistSurface({
     addPatternToTrack(patternToAddId(), lane.dataset.trackId, dropTick, { exact: true });
   }, { signal: lifecycle.signal });
   timeline.addEventListener("contextmenu", (event) => {
-    if (!event.target.closest?.(".v2-playlist-lane") || event.target.closest?.("button")) return;
-    event.preventDefault();
+    routePlaylistContextMenu(event, {
+      onClip: (clipId, _contextEvent, clip) => {
+        clip.focus({ preventScroll: true });
+        removeClip(clipId);
+      },
+      onInstrument: (trackId, contextEvent) => openTrackContextMenu(
+        contextEvent,
+        trackId,
+        { instrumentTarget: true },
+      ),
+      onTrack: (trackId, contextEvent) => openTrackContextMenu(contextEvent, trackId),
+    });
   }, { signal: lifecycle.signal });
   node.ownerDocument?.addEventListener?.("pointerdown", (event) => {
+    if (!event.target.closest?.(".v2-playlist-track-context-menu")) {
+      closeTrackContextMenu();
+    }
     if (event.target.closest?.(".v2-pattern-library-actions")) return;
     for (const actions of node.querySelectorAll(".v2-pattern-library-actions[open]")) {
       actions.open = false;
     }
   }, { capture: true, signal: lifecycle.signal });
+  node.ownerDocument?.addEventListener?.("keydown", (event) => {
+    if (event.key !== "Escape" || !trackContextMenu || trackContextMenu.menu.hidden) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeTrackContextMenu({ restoreFocus: true });
+  }, { signal: lifecycle.signal });
+  scroller.addEventListener("scroll", () => closeTrackContextMenu({
+    restoreFocus: Boolean(trackContextMenu?.menu.contains(node.ownerDocument?.activeElement)),
+  }), {
+    signal: lifecycle.signal,
+  });
+  node.ownerDocument?.defaultView?.addEventListener?.("resize", () => closeTrackContextMenu({
+    restoreFocus: Boolean(trackContextMenu?.menu.contains(node.ownerDocument?.activeElement)),
+  }), {
+    signal: lifecycle.signal,
+  });
   const replacementOperations = new Set(["open-project", "replace", "create-project-from-template"]);
   const handleProjectChange = (event) => {
     if (localProjectMutationDepth > 0 || replacementOperations.has(event?.detail?.operation)) return;
@@ -1246,7 +1864,10 @@ export function createPlaylistSurface({
       return;
     }
     const type = event?.detail?.action?.type ?? "";
-    if (type === "playlist/update" || type.startsWith("project/") || type.endsWith("/repair")) {
+    if (type === "playlist/update"
+      || type === "playback/seek-song"
+      || type.startsWith("project/")
+      || type.endsWith("/repair")) {
       render();
     }
   };
@@ -1262,6 +1883,8 @@ export function createPlaylistSurface({
     dispose() {
       if (disposed) return;
       disposed = true;
+      closeTrackContextMenu();
+      trackContextMenu?.menu.remove();
       lifecycle.abort();
       projectState.removeEventListener("change", handleProjectChange);
       workspaceState.removeEventListener?.("change", handleWorkspaceChange);

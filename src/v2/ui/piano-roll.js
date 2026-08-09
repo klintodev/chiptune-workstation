@@ -33,6 +33,27 @@ function isPlainSpace(event) {
     && (event.code === "Space" || event.key === " " || event.key === "Spacebar");
 }
 
+export function isPianoDuplicateShortcut(event) {
+  return Boolean(
+    event
+    && !event.defaultPrevented
+    && !event.altKey
+    && !event.shiftKey
+    && !event.repeat
+    && isMod(event)
+    && String(event.key ?? "").toLowerCase() === "b"
+  );
+}
+
+export function getPianoDuplicateDeltaTicks(notes) {
+  if (!Array.isArray(notes) || notes.length === 0) return 0;
+  const firstTick = Math.min(...notes.map(({ startTick }) => startTick));
+  const lastTick = Math.max(...notes.map(({ durationTicks, startTick }) => (
+    startTick + durationTicks
+  )));
+  return Math.max(1, lastTick - firstTick);
+}
+
 function noteLabel(note) {
   return `${formatMidiPitch(note.pitch)}, ${formatTickPosition(note.startTick)}, ${formatDurationTicks(note.durationTicks)}, velocity ${formatPercent(note.velocity)}`;
 }
@@ -173,6 +194,7 @@ export function createPianoRollSurface({
     className: "v2-piano-canvas",
     role: "listbox",
     "aria-multiselectable": "true",
+    "aria-keyshortcuts": "Delete Backspace Control+B Meta+B",
     tabIndex: 0,
     "aria-label": "Piano Roll note editor",
     "aria-describedby": "v2-piano-help",
@@ -182,7 +204,7 @@ export function createPianoRollSurface({
   const status = createElement("p", {
     className: "v2-editor-help",
     id: "v2-piano-help",
-    textContent: "Arrow keys move the cursor. Enter creates or selects a note. Control or Command with arrows edits the selected note; Control or Command with the wheel, +, or - zooms. Space toggles playback. Letter and number note keys audition the selected Track.",
+    textContent: "Hold Control or Command and drag to select notes. Delete removes the selection; Control or Command+B duplicates it to the right. Arrow keys move the cursor, and Control or Command with arrows edits selected notes. Space toggles playback.",
   });
   const node = createElement("section", {
     className: "v2-primary-surface v2-piano-roll",
@@ -471,6 +493,29 @@ export function createPianoRollSurface({
     return true;
   }
 
+  function duplicateSelection() {
+    const pattern = activePattern();
+    const notes = uniqueSelectedNotes(pattern, selectedNoteIds);
+    if (notes.length === 0) return false;
+    const deltaTicks = getPianoDuplicateDeltaTicks(notes);
+    const createdIds = mutateProject(() => projectState.duplicateNotes(
+      pattern.id,
+      notes.map(({ id }) => id),
+      { deltaTicks },
+    ));
+    const copies = uniqueSelectedNotes(activePattern(), createdIds);
+    const first = copies[0];
+    if (first) {
+      cursorTick = first.startTick;
+      cursorPitch = first.pitch;
+      updatePatternSession({ cursorPitch, cursorTick });
+    }
+    selectNotes(createdIds, { announceSelection: false });
+    renderHeader();
+    announce(`Duplicated ${createdIds.length} note${createdIds.length === 1 ? "" : "s"} to the right.`);
+    return true;
+  }
+
   function handleEditorKeyDown(event) {
     const pattern = activePattern();
     const selected = selectedNoteIds.size > 0;
@@ -498,6 +543,10 @@ export function createPianoRollSurface({
         selectedNoteIds.clear();
         updatePatternSession({ selectedNoteIds: [] });
         setCursor(first?.startTick ?? cursorTick, first?.pitch ?? cursorPitch);
+      } else if (isPianoDuplicateShortcut(event)) {
+        event.preventDefault();
+        if (selected) duplicateSelection();
+        else announce("Select one or more notes before duplicating.");
       } else if (isMod(event) && event.key.toLowerCase() === "c") {
         event.preventDefault();
         copySelection();
@@ -870,6 +919,10 @@ export function createPianoRollSurface({
     const note = noteButton
       ? activePattern().notes.find(({ id }) => id === noteButton.dataset.noteId)
       : null;
+    if (isMod(event) && !note) {
+      startMarquee(event);
+      return;
+    }
     if (tool === "pan") {
       startPan(event);
       return;

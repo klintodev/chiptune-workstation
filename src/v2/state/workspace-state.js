@@ -211,6 +211,7 @@ export function createInitialWorkspaceState(project, {
       cursorTick: 0,
       destinationTrackId: track.id,
       selectedClipId: null,
+      selectedClipIds: [],
       snap: DEFAULT_PLAYLIST_SNAP,
     },
     mixer: { channelId: track.id },
@@ -253,6 +254,14 @@ export function repairWorkspaceState(state, project, {
 
   const clipIds = new Set(allClips(root).map((clip) => clip.id));
   const sourcePlaylist = state?.playlist && typeof state.playlist === "object" ? state.playlist : {};
+  const selectedClipIds = [...new Set(
+    (Array.isArray(sourcePlaylist.selectedClipIds) ? sourcePlaylist.selectedClipIds : [])
+      .filter((clipId) => clipIds.has(clipId)),
+  )];
+  const selectedClipId = clipIds.has(sourcePlaylist.selectedClipId)
+    ? sourcePlaylist.selectedClipId
+    : selectedClipIds[0] ?? null;
+  if (selectedClipId && !selectedClipIds.includes(selectedClipId)) selectedClipIds.unshift(selectedClipId);
   const sourceMixer = state?.mixer && typeof state.mixer === "object" ? state.mixer : {};
   const sourcePlayback = state?.playback && typeof state.playback === "object" ? state.playback : {};
   const activePrimary = PRIMARY_KIND_SET.has(state?.activePrimary)
@@ -275,9 +284,8 @@ export function repairWorkspaceState(state, project, {
       destinationTrackId: trackIds.has(sourcePlaylist.destinationTrackId)
         ? sourcePlaylist.destinationTrackId
         : fallbackTrackId,
-      selectedClipId: clipIds.has(sourcePlaylist.selectedClipId)
-        ? sourcePlaylist.selectedClipId
-        : null,
+      selectedClipId,
+      selectedClipIds,
       snap: PLAYLIST_SNAP_SET.has(sourcePlaylist.snap)
         ? sourcePlaylist.snap
         : DEFAULT_PLAYLIST_SNAP,
@@ -425,6 +433,15 @@ export function reduceWorkspaceState(state, action, project) {
     }
     case "playlist/update": {
       const patch = action.patch && typeof action.patch === "object" ? cloneValue(action.patch) : {};
+      const hasPrimary = Object.hasOwn(patch, "selectedClipId");
+      const hasSelection = Object.hasOwn(patch, "selectedClipIds");
+      if (hasPrimary && !hasSelection) {
+        patch.selectedClipIds = patch.selectedClipId ? [patch.selectedClipId] : [];
+      } else if (hasSelection && !hasPrimary) {
+        patch.selectedClipId = Array.isArray(patch.selectedClipIds)
+          ? patch.selectedClipIds.find((clipId) => typeof clipId === "string") ?? null
+          : null;
+      }
       return repairWorkspaceState({
         ...state,
         playlist: { ...state.playlist, ...patch },

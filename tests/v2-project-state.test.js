@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  MAX_PATTERN_CONTENT_TICKS,
   V2DomainError,
   createV2ProjectState,
 } from "../src/v2/domain/index.js";
@@ -30,6 +31,113 @@ test("note commands are immutable, atomic, canonically ordered and history-backe
   assert.equal(project.getPattern().notes.length, 4);
   project.redo();
   assert.equal(project.getPattern().notes.length, 2);
+});
+
+test("Track rename is the undoable owner name for its Instrument and Mixer channel", () => {
+  const project = createV2ProjectState();
+  const original = project.getState();
+  const originalInstrument = original.tracks[0].instrument;
+  const changes = [];
+  project.addEventListener("change", (event) => changes.push(event.detail));
+
+  assert.equal(project.renameTrack("track-1", "  Lead Chip  "), true);
+  assert.equal(project.getTrack("track-1").name, "Lead Chip");
+  assert.deepEqual(project.getTrack("track-1").instrument, originalInstrument);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].operation, "rename-track");
+  assert.equal(changes[0].trackId, "track-1");
+
+  const renamed = project.getState();
+  assert.equal(project.renameTrack("track-1", "Lead Chip"), false);
+  assert.equal(project.getState(), renamed);
+  assert.equal(changes.length, 1);
+  assert.throws(() => project.renameTrack("track-1", "   "), TypeError);
+  assert.throws(() => project.renameTrack("track-1", "x".repeat(33)), TypeError);
+  assert.throws(() => project.renameTrack("missing-track", "Bass"), RangeError);
+  assert.equal(project.getState(), renamed);
+  assert.equal(changes.length, 1);
+
+  assert.equal(project.undo(), true);
+  assert.equal(project.getTrack("track-1").name, "Pulse 1");
+  assert.deepEqual(project.getTrack("track-1").instrument, originalInstrument);
+  assert.equal(project.redo(), true);
+  assert.equal(project.getTrack("track-1").name, "Lead Chip");
+});
+
+test("multi-note duplicate-right and delete preserve the complete block as atomic history", () => {
+  const project = createV2ProjectState();
+  const first = project.addNote("pattern-1", {
+    pitch: 60,
+    startTick: 0,
+    durationTicks: 18,
+    velocity: 0.6,
+  });
+  const second = project.addNote("pattern-1", {
+    pitch: 67,
+    startTick: 72,
+    durationTicks: 30,
+    velocity: 0.8,
+  });
+  const beforeDuplicate = project.getState();
+  let changes = 0;
+  project.addEventListener("change", () => { changes += 1; });
+
+  const copies = project.duplicateNotes("pattern-1", [first, second], { deltaTicks: 102 });
+  assert.equal(changes, 1);
+  assert.equal(new Set(copies).size, 2);
+  assert.deepEqual(copies.map((id) => {
+    const note = project.getPattern().notes.find((candidate) => candidate.id === id);
+    return {
+      durationTicks: note.durationTicks,
+      pitch: note.pitch,
+      startTick: note.startTick,
+      velocity: note.velocity,
+    };
+  }), [
+    { durationTicks: 18, pitch: 60, startTick: 102, velocity: 0.6 },
+    { durationTicks: 30, pitch: 67, startTick: 174, velocity: 0.8 },
+  ]);
+
+  project.undo();
+  assert.deepEqual(project.getState(), beforeDuplicate);
+  project.redo();
+  assert.deepEqual(
+    copies.map((id) => project.getPattern().notes.find((note) => note.id === id)?.startTick),
+    [102, 174],
+  );
+
+  changes = 0;
+  project.removeNotes("pattern-1", copies);
+  assert.equal(changes, 1);
+  assert.equal(project.getPattern().notes.length, 2);
+  project.undo();
+  assert.equal(project.getPattern().notes.length, 4);
+});
+
+test("multi-note duplication rejects out-of-range copies without a partial mutation", () => {
+  const project = createV2ProjectState();
+  const first = project.addNote("pattern-1", {
+    pitch: 60,
+    startTick: MAX_PATTERN_CONTENT_TICKS - 48,
+    durationTicks: 24,
+    velocity: 0.7,
+  });
+  const second = project.addNote("pattern-1", {
+    pitch: 64,
+    startTick: MAX_PATTERN_CONTENT_TICKS - 24,
+    durationTicks: 24,
+    velocity: 0.7,
+  });
+  const before = project.getState();
+  let changes = 0;
+  project.addEventListener("change", () => { changes += 1; });
+
+  assert.throws(
+    () => project.duplicateNotes("pattern-1", [first, second], { deltaTicks: 48 }),
+    RangeError,
+  );
+  assert.equal(project.getState(), before);
+  assert.equal(changes, 0);
 });
 
 test("Pattern span grows and shrinks with note content while preflighting every linked clip", () => {
@@ -91,6 +199,84 @@ test("Add to Playlist scans forward, then clip move/duplicate/delete remain atom
   project.removeClip(duplicateId);
   project.undo();
   assert.equal(project.getClip(duplicateId).track.id, track2);
+});
+
+test("multi-clip move and duplicate-right preserve the selected block as one undoable command", () => {
+  const project = createV2ProjectState();
+  makeAudible(project);
+  const secondPatternId = project.duplicatePattern("pattern-1");
+  const secondTrackId = project.addTrack("Bass");
+  const first = project.addClip("track-1", "pattern-1", 0);
+  const second = project.addClip("track-1", secondPatternId, 24);
+  const third = project.addClip(secondTrackId, "pattern-1", 12);
+  let changes = 0;
+  project.addEventListener("change", () => { changes += 1; });
+
+  project.moveClips([first, second, third], { deltaTick: 24, deltaTrack: 0 });
+  assert.equal(changes, 1);
+  assert.deepEqual([
+    project.getClip(first).clip.startTick,
+    project.getClip(second).clip.startTick,
+    project.getClip(third).clip.startTick,
+  ], [24, 48, 36]);
+  assert.equal(project.getClip(third).track.id, secondTrackId);
+
+  project.undo();
+  assert.deepEqual([
+    project.getClip(first).clip.startTick,
+    project.getClip(second).clip.startTick,
+    project.getClip(third).clip.startTick,
+  ], [0, 24, 12]);
+  project.redo();
+
+  const beforeDuplicate = project.getState();
+  const copies = project.duplicateClips([first, second, third]);
+  assert.equal(copies.length, 3);
+  assert.equal(new Set(copies).size, 3);
+  assert.deepEqual(copies.map((id) => project.getClip(id).clip.startTick), [72, 96, 84]);
+  assert.deepEqual(copies.map((id) => project.getClip(id).clip.patternId), [
+    "pattern-1",
+    secondPatternId,
+    "pattern-1",
+  ]);
+  assert.deepEqual(copies.map((id) => project.getClip(id).track.id), [
+    "track-1",
+    "track-1",
+    secondTrackId,
+  ]);
+  project.undo();
+  assert.deepEqual(project.getState(), beforeDuplicate);
+  project.redo();
+  assert.deepEqual(copies.map((id) => project.getClip(id).clip.startTick), [72, 96, 84]);
+});
+
+test("multi-clip placement and duplicate failures leave every clip untouched", () => {
+  const project = createV2ProjectState();
+  makeAudible(project);
+  const secondPatternId = project.duplicatePattern("pattern-1");
+  const first = project.addClip("track-1", "pattern-1", 0);
+  const second = project.addClip("track-1", secondPatternId, 24);
+  project.addClip("track-1", "pattern-1", 72);
+  let changes = 0;
+  project.addEventListener("change", () => { changes += 1; });
+  const before = project.getState();
+
+  assert.throws(
+    () => project.moveClips([first, second], { deltaTick: 48, deltaTrack: 0 }),
+    (error) => error.code === "CLIP_PLACEMENT_INVALID",
+  );
+  assert.equal(project.getState(), before);
+  assert.throws(
+    () => project.duplicateClips([first, second]),
+    (error) => error.code === "CLIP_DUPLICATE_INVALID",
+  );
+  assert.equal(project.getState(), before);
+  assert.throws(
+    () => project.moveClips([first, second], { deltaTick: 0, deltaTrack: -1 }),
+    (error) => error.code === "CLIP_PLACEMENT_INVALID",
+  );
+  assert.equal(project.getState(), before);
+  assert.equal(changes, 0);
 });
 
 test("Track, Instrument, Mixer and Effect commands retain identities and share history", () => {

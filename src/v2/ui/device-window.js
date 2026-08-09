@@ -35,6 +35,7 @@ function createParameter({
   valueText = (next) => String(next),
 }) {
   const output = createElement("output", { textContent: valueText(value) });
+  const labelText = createElement("span", { textContent: label });
   const input = options
     ? createElement("select", { "aria-label": label })
     : createElement("input", { "aria-label": label, max, min, step, type, value });
@@ -63,11 +64,15 @@ function createParameter({
   return {
     input,
     node: createElement("label", { className: "v2-device-parameter" }, [
-      createElement("span", { textContent: label }),
+      labelText,
       input,
       output,
     ]),
     output,
+    setLabel(next) {
+      labelText.textContent = next;
+      input.setAttribute("aria-label", next);
+    },
     setValue(next) {
       input.value = String(next);
       synchronizeValueText(next);
@@ -301,9 +306,19 @@ export function createDeviceWindow({
       onInvalid();
       return;
     }
-    const params = device.kind === "instrument" ? record.instrument.params : record.effect.params;
+    const instance = device.kind === "instrument" ? record.instrument : record.effect;
+    const ownerName = device.kind === "instrument" ? record.track.name : record.ownerName;
+    const definition = DEVICE_REGISTRY[device.kind === "instrument" ? "instruments" : "effects"]
+      .require(instance.type, instance.version);
+    title.textContent = `${ownerName}, ${definition.name}`;
+    node.setAttribute("aria-label", title.textContent);
+    for (const [key, control] of controls) {
+      control.setLabel(`${ownerName}, ${definition.name}, ${definition.ui.parameters[key].label}`);
+    }
+    const params = instance.params;
     if (device.kind === "effect" && bypassControl) {
       bypassControl.textContent = record.effect.bypassed ? "Enable Effect" : "Bypass Effect";
+      bypassControl.setAttribute("aria-label", `${ownerName} ${definition.name} bypass`);
       setPressed(bypassControl, record.effect.bypassed);
     }
     for (const [key, control] of controls) control.setValue(params[key]);

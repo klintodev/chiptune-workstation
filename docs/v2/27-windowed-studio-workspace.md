@@ -21,13 +21,13 @@ A new desktop project opens Playlist with its inline Pattern-library `<details>`
 On desktop the shell is one row with a maximum height of 72 CSS pixels. It contains only:
 
 - compact project identity and save status;
-- Return to start, Play/Pause, Stop and the direct contextual V1 `↻` whole-Pattern/whole-Song loop toggle;
+- Return to start, Play/Pause, two-stage Stop (return to the playback cue, then return to tick 0) and the direct contextual V1 `↻` whole-Pattern/whole-Song loop toggle;
 - Pattern/Song mode;
 - compact tempo control plus the always-inline V1 Master slider and readout;
-- audio-enable/state control;
+- audio setup appears when playback requires it, without a persistent Ready/status button;
 - controls to focus/open Piano Roll, return to Playlist and enter/leave exclusive Mixer;
 - the working direct dark/light toggle and recognisable V1 Klinto visual identity;
-- one secondary menu containing project management, help, share/publish and account actions;
+- a compact account control plus one secondary menu containing project management, help and share/publish actions;
 - exactly one `V2 Beta` badge during Beta.
 
 The shell never contains a visualiser, Pattern step grid, arrangement overview, device parameters or per-Track Mixer controls. It remains operable while a modeless device is open.
@@ -159,12 +159,15 @@ No window state, focus target, size, drag position or DOM identifier is saved in
 
 - A new project at 1366Ã—768 shows compact shell, Playlist base with expanded Pattern-library details and Pattern 1 Piano Roll; Mixer, device and visualiser are absent.
 - Piano Roll and device can each be dragged within bounds without resizing or changing Project data; reloading restores their approved defaults.
+- A Playlist ruler seek becomes the Song playback cue; the first Stop returns there and the second Stop returns to tick 0, including after Pause/Resume.
 - Pattern library collapses inline within Playlist and has no geometry to restore.
 - Opening Klinto Chip focuses its named editor; opening an Effect replaces it; closing returns to a valid visible origin while Piano Roll and Playlist remain available.
 - Activating Mixer hides Playlist (including Pattern library), Piano Roll and device as one exclusive switch without stopping audio; leaving Mixer restores valid Pattern viewport/selection and focus.
 - Mixer-hidden/replaced surfaces have no focusable or accessibility-tree descendants and perform no continuous visual work.
 - Removing an owning Track while its device is open closes it, repairs focus and preserves open Pattern state with a repaired audition Track.
 - There are no duplicate surface instances for one stable object ID.
+- The header has no Ready/audio-status or Share button; Share is available inside the secondary Menu.
+- The Projects modal presents New and Duplicate as its primary actions, without visible JSON Import or Download controls; conditional recovery download remains separate.
 
 ### Narrow screen
 

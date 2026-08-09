@@ -1,4 +1,3 @@
-import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js";
 import {
   downloadProjectFile,
   downloadRawProjectFile,
@@ -93,9 +92,6 @@ export function createProjectLibraryFeature({
     dialog: queryRequired(root, "#project-library-dialog"),
     duplicate: queryRequired(root, "#project-duplicate"),
     error: queryRequired(root, "#project-library-error"),
-    export: queryRequired(root, "#project-export"),
-    import: queryRequired(root, "#project-import"),
-    importFile: queryRequired(root, "#project-import-file"),
     librarySaveStatus: queryRequired(root, "#project-library-save-status"),
     list: queryRequired(root, "#project-list"),
     name: queryRequired(root, "#project-name-input"),
@@ -229,8 +225,6 @@ export function createProjectLibraryFeature({
       elements.close,
       elements.create,
       elements.duplicate,
-      elements.export,
-      elements.import,
       elements.name,
       elements.recoveryDownload,
     ]) {
@@ -327,18 +321,7 @@ export function createProjectLibraryFeature({
     onBeforeProjectChange();
     await persistence.duplicateProject();
   }, { closeAfter: true }), { signal: lifecycle.signal });
-  elements.import.addEventListener("click", () => elements.importFile.click(), { signal: lifecycle.signal });
-  elements.export.addEventListener("click", downloadActiveProject, { signal: lifecycle.signal });
   elements.recoveryDownload.addEventListener("click", downloadActiveProject, { signal: lifecycle.signal });
-  elements.importFile.addEventListener("change", () => void run(async () => {
-    const [file] = elements.importFile.files;
-    elements.importFile.value = "";
-    if (!file) return;
-    if (file.size > MAX_PROJECT_FILE_BYTES) throw new RangeError("Project file is larger than 2 MB.");
-    const text = await file.text();
-    onBeforeProjectChange();
-    await persistence.importProject(text);
-  }, { closeAfter: true }), { signal: lifecycle.signal });
   elements.list.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button || busy) return;

@@ -2,21 +2,35 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+import { createV2ProjectState } from "../src/v2/domain/index.js";
+import { createWorkspaceState } from "../src/v2/state/workspace-state.js";
+
 import {
   getBoundedPianoMove,
   getExpandedPianoEditorEndTick,
+  getPianoDuplicateDeltaTicks,
   getPianoMarqueeNoteIds,
+  isPianoDuplicateShortcut,
 } from "../src/v2/ui/piano-roll.js";
 import {
+  createPatternForPlaylistTrack,
   createPlaylistPatternActivation,
+  getPlaylistContextMenuPosition,
+  getPlaylistMarqueeClipIds,
+  getPlaylistRulerSeekTick,
   getPlaylistWheelScrollDelta,
   getSnappedPlaylistDropTick,
+  isPlaylistDuplicateShortcut,
+  renamePlaylistInstrument,
   resolvePlaylistFocusTarget,
-} from "../src/v2/ui/playlist.js";import {
+  routePlaylistContextMenu,
+} from "../src/v2/ui/playlist.js";
+import {
   createStudioShell,
   getGlobalHistoryAction,
   isGlobalTransportShortcut,
 } from "../src/v2/ui/studio-shell.js";
+import { createDeviceWindow } from "../src/v2/ui/device-window.js";
 
 class FakeClassList {
   constructor() {
@@ -27,6 +41,10 @@ class FakeClassList {
     if (force) this.values.add(value);
     else this.values.delete(value);
     return Boolean(force);
+  }
+
+  remove(value) {
+    this.values.delete(value);
   }
 }
 
@@ -45,7 +63,11 @@ class FakeNode extends EventTarget {
     this.nodeType = nodeType;
     this.ownerDocument = ownerDocument;
     this.parentNode = null;
-    this.style = {};
+    this.style = {
+      removeProperty(name) {
+        delete this[name];
+      },
+    };
     this.tagName = tagName.toUpperCase();
     this.textContent = "";
     this.value = "";
@@ -142,7 +164,7 @@ function createEventedState(initialState) {
   };
 }
 
-function createShellHarness({ schedulerState, workspacePlayback }) {
+function createShellHarness({ playlistCursorTick = 0, schedulerState, workspacePlayback }) {
   const project = createEventedState({
     metadata: { title: "Integration" },
     mixer: { master: { volume: 0.35 } },
@@ -196,6 +218,7 @@ function createShellHarness({ schedulerState, workspacePlayback }) {
   project.redo = () => { redoCalls += 1; return true; };
   const workspace = createEventedState({
     activePrimary: "piano-roll",
+    playlist: { cursorTick: playlistCursorTick },
     playback: { ...workspacePlayback },
   });
   workspace.setPlayback = (patch) => workspace.setState({
@@ -206,7 +229,12 @@ function createShellHarness({ schedulerState, workspacePlayback }) {
   workspace.seekSongCalls = 0;
   workspace.seekSong = (tick) => {
     workspace.seekSongCalls += 1;
-    workspace.setPlayback({ songPlayheadTick: tick });
+    const state = workspace.getState();
+    workspace.setState({
+      ...state,
+      playlist: { ...state.playlist, cursorTick: tick },
+      playback: { ...state.playback, songPlayheadTick: tick },
+    });
   };
   workspace.setPatternPlayhead = (tick) => workspace.setPlayback({ patternPlayheadTick: tick });
   workspace.activatePrimary = () => false;
@@ -216,6 +244,7 @@ function createShellHarness({ schedulerState, workspacePlayback }) {
   let currentSchedulerState = { ...schedulerState };
   let playError = null;
   let seekError = null;
+  let stopCalls = 0;
   const playCalls = [];
   const scheduler = {
     addEventListener: schedulerEvents.addEventListener.bind(schedulerEvents),
@@ -234,7 +263,7 @@ function createShellHarness({ schedulerState, workspacePlayback }) {
     },
     setBpm: () => true,
     setMode: () => true,
-    stop: () => true,
+    stop: () => { stopCalls += 1; return true; },
   };
   const persistence = createEventedState({ status: "saved" });
   const audio = createEventedState("running");
@@ -249,6 +278,7 @@ function createShellHarness({ schedulerState, workspacePlayback }) {
   return {
     get historyCalls() { return { redo: redoCalls, undo: undoCalls }; },
     get historyGroupCalls() { return { begin: beginHistoryCalls, end: endHistoryCalls }; },
+    get stopCalls() { return stopCalls; },
     loopCalls,
     playCalls,
     project,
@@ -308,6 +338,72 @@ test("V2 shell uses retained pause phase, workspace stopped phase, and contains 
   start.click();
   assert.equal(harness.workspace.seekSongCalls, 0);
   assert.match(announcer.textContent, /outside the playback range/);
+  harness.shell.dispose();
+});
+
+test("V2 header removes Ready and keeps its Share slot inside Menu", () => {
+  const harness = createShellHarness({
+    schedulerState: { mode: "pattern", retainedTick: 0, status: "stopped" },
+    workspacePlayback: { mode: "pattern", patternPlayheadTick: 0, songPlayheadTick: 0 },
+  });
+
+  assert.equal(harness.root.querySelector("#audio-status-open"), null);
+  assert.equal(harness.root.querySelector("#audio-state"), null);
+  const shareSlot = harness.shell.slots.share;
+  assert.equal(shareSlot.id, "v2-project-share-slot");
+  assert.equal(shareSlot.parentNode?.parentNode?.tagName, "DETAILS");
+  assert.match(shareSlot.parentNode.parentNode.className, /v2-secondary-menu/);
+  harness.shell.dispose();
+});
+
+test("a second Stop returns the Playlist cursor, scheduler, and playheads to tick zero", () => {
+  const harness = createShellHarness({
+    playlistCursorTick: 144,
+    schedulerState: { mode: "song", retainedTick: 144, status: "stopped" },
+    workspacePlayback: { mode: "song", patternPlayheadTick: 96, songPlayheadTick: 144 },
+  });
+  const stop = harness.root.querySelector("#transport-stop");
+  const announcer = harness.root.querySelector("#workstation-status");
+
+  assert.equal(stop.disabled, false);
+  assert.equal(stop.title, "Return Playlist to start");
+  stop.click();
+
+  assert.equal(harness.stopCalls, 1);
+  assert.equal(harness.workspace.getState().playlist.cursorTick, 0);
+  assert.equal(harness.workspace.getState().playback.patternPlayheadTick, 0);
+  assert.equal(harness.workspace.getState().playback.songPlayheadTick, 0);
+  assert.equal(stop.disabled, true);
+  assert.equal(announcer.textContent, "Playlist returned to start.");
+  harness.shell.dispose();
+});
+
+test("Stop returns playing Song transport to its cue before a second Stop returns to start", () => {
+  const harness = createShellHarness({
+    playlistCursorTick: 144,
+    schedulerState: { mode: "song", retainedTick: 96, status: "playing" },
+    workspacePlayback: { mode: "song", patternPlayheadTick: 24, songPlayheadTick: 96 },
+  });
+  const stop = harness.root.querySelector("#transport-stop");
+
+  stop.click();
+
+  assert.equal(harness.stopCalls, 1);
+  assert.equal(harness.workspace.getState().playlist.cursorTick, 144);
+  assert.equal(harness.workspace.getState().playback.songPlayheadTick, 96);
+
+  harness.workspace.setPlayback({ songPlayheadTick: 144 });
+  harness.setSchedulerState({ mode: "song", retainedTick: 144, status: "stopped" });
+  assert.equal(stop.disabled, false);
+  assert.equal(stop.title, "Return Playlist to start");
+  assert.equal(harness.workspace.getState().playback.patternPlayheadTick, 24);
+
+  stop.click();
+  assert.equal(harness.stopCalls, 2);
+  assert.equal(harness.workspace.getState().playlist.cursorTick, 0);
+  assert.equal(harness.workspace.getState().playback.patternPlayheadTick, 0);
+  assert.equal(harness.workspace.getState().playback.songPlayheadTick, 0);
+  assert.equal(stop.disabled, true);
   harness.shell.dispose();
 });
 
@@ -498,6 +594,24 @@ test("Piano pointer drags extend the editor horizon one bar at a time", () => {
   assert.equal(getExpandedPianoEditorEndTick(3_072, 3_072), 3_072);
 });
 
+test("Piano duplicate-right uses the exact selection span and an unrepeated platform modifier B", () => {
+  assert.equal(getPianoDuplicateDeltaTicks([
+    { durationTicks: 18, startTick: 0 },
+    { durationTicks: 30, startTick: 72 },
+    { durationTicks: 12, startTick: 48 },
+  ]), 102);
+  assert.equal(getPianoDuplicateDeltaTicks([]), 0);
+
+  assert.equal(isPianoDuplicateShortcut({ ctrlKey: true, key: "b" }), true);
+  assert.equal(isPianoDuplicateShortcut({ key: "B", metaKey: true }), true);
+  assert.equal(isPianoDuplicateShortcut({ ctrlKey: true, key: "b", repeat: true }), false);
+  assert.equal(isPianoDuplicateShortcut({ altKey: true, ctrlKey: true, key: "b" }), false);
+  assert.equal(isPianoDuplicateShortcut({ ctrlKey: true, key: "b", shiftKey: true }), false);
+  assert.equal(isPianoDuplicateShortcut({ ctrlKey: true, defaultPrevented: true, key: "b" }), false);
+  assert.equal(isPianoDuplicateShortcut({ ctrlKey: true, key: "d" }), false);
+  assert.equal(isPianoDuplicateShortcut({ key: "b" }), false);
+});
+
 test("Playlist modifier-wheel scrolling follows the dominant axis and normalizes delta modes", () => {
   assert.equal(getPlaylistWheelScrollDelta({ deltaX: 20, deltaY: 120 }), 120);
   assert.equal(getPlaylistWheelScrollDelta({ deltaX: -160, deltaY: 40 }), -160);
@@ -506,7 +620,265 @@ test("Playlist modifier-wheel scrolling follows the dominant axis and normalizes
   assert.equal(getPlaylistWheelScrollDelta({ deltaY: Number.NaN }), 0);
 });
 
-test("Playlist Pattern drops snap to the visible Track grid and reject Track headers", () => {
+test("Playlist context routing isolates clip, Instrument, and Track right-clicks", () => {
+  const createTarget = ({ clipId = null, instrumentTrackId = null, trackId = null } = {}) => {
+    const clip = clipId ? { dataset: { clipId } } : null;
+    const instrument = instrumentTrackId ? { dataset: { trackId: instrumentTrackId } } : null;
+    const lane = trackId ? { dataset: { trackId } } : null;
+    return {
+      closest(selector) {
+        if (selector === ".v2-playlist-clip") return clip;
+        if (selector === ".v2-playlist-instrument") return instrument;
+        if (selector === ".v2-playlist-lane") return lane;
+        return null;
+      },
+    };
+  };
+  const calls = [];
+  const createEvent = (target) => ({
+    target,
+    preventDefault: () => calls.push("prevent"),
+    stopPropagation: () => calls.push("stop"),
+  });
+  const handlers = {
+    onClip: (clipId) => calls.push(`clip:${clipId}`),
+    onInstrument: (trackId) => calls.push(`instrument:${trackId}`),
+    onTrack: (trackId) => calls.push(`track:${trackId}`),
+  };
+
+  assert.equal(routePlaylistContextMenu(createEvent(createTarget({
+    clipId: "clip-2",
+    instrumentTrackId: "track-2",
+    trackId: "track-2",
+  })), handlers), true);
+  assert.deepEqual(calls, ["prevent", "stop", "clip:clip-2"]);
+
+  calls.length = 0;
+  assert.equal(routePlaylistContextMenu(createEvent(createTarget({ trackId: "track-2" })), handlers), true);
+  assert.deepEqual(calls, ["prevent", "stop", "track:track-2"]);
+
+  calls.length = 0;
+  assert.equal(routePlaylistContextMenu(createEvent(createTarget({
+    instrumentTrackId: "track-2",
+    trackId: "track-2",
+  })), handlers), true);
+  assert.deepEqual(calls, ["prevent", "stop", "instrument:track-2"]);
+
+  calls.length = 0;
+  assert.equal(routePlaylistContextMenu(createEvent(createTarget()), handlers), false);
+  assert.deepEqual(calls, []);
+});
+
+test("Playlist Track menus stay inside the viewport", () => {
+  assert.deepEqual(getPlaylistContextMenuPosition({
+    clientX: 120,
+    clientY: 140,
+    menuHeight: 80,
+    menuWidth: 210,
+    viewportHeight: 600,
+    viewportWidth: 800,
+  }), { left: 120, top: 140 });
+  assert.deepEqual(getPlaylistContextMenuPosition({
+    clientX: 794,
+    clientY: 594,
+    menuHeight: 80,
+    menuWidth: 210,
+    viewportHeight: 600,
+    viewportWidth: 800,
+  }), { left: 582, top: 512 });
+  assert.deepEqual(getPlaylistContextMenuPosition({
+    clientX: -20,
+    clientY: -30,
+    menuHeight: 80,
+    menuWidth: 210,
+    viewportHeight: 600,
+    viewportWidth: 800,
+  }), { left: 8, top: 8 });
+  assert.equal(getPlaylistContextMenuPosition({ clientX: Number.NaN }), null);
+});
+
+test("Playlist Instrument rename cancels cleanly and renders the shared owner name", () => {
+  let cancelledMutationCount = 0;
+  assert.equal(renamePlaylistInstrument({
+    mutate: () => { cancelledMutationCount += 1; },
+    requestedName: null,
+  }), false);
+  assert.equal(cancelledMutationCount, 0);
+
+  const projectState = createV2ProjectState();
+  const announcements = [];
+  let mutationCount = 0;
+  let renderCount = 0;
+  assert.equal(renamePlaylistInstrument({
+    announce: (message) => announcements.push(message),
+    mutate: (action) => { mutationCount += 1; return action(); },
+    projectState,
+    render: () => { renderCount += 1; },
+    requestedName: "  Lead Chip  ",
+    trackId: "track-1",
+  }), true);
+  assert.equal(projectState.getTrack("track-1").name, "Lead Chip");
+  assert.equal(mutationCount, 1);
+  assert.equal(renderCount, 1);
+  assert.deepEqual(announcements, ["Renamed Instrument to Lead Chip."]);
+
+  assert.equal(renamePlaylistInstrument({
+    announce: (message) => announcements.push(message),
+    mutate: (action) => { mutationCount += 1; return action(); },
+    projectState,
+    render: () => { renderCount += 1; },
+    requestedName: "Lead Chip",
+    trackId: "track-1",
+  }), false);
+  assert.equal(mutationCount, 2);
+  assert.equal(renderCount, 1);
+  assert.equal(announcements.length, 1);
+
+  const beforeInvalid = projectState.getState();
+  assert.throws(() => renamePlaylistInstrument({
+    projectState,
+    requestedName: "   ",
+    trackId: "track-1",
+  }), TypeError);
+  assert.equal(projectState.getState(), beforeInvalid);
+});
+
+test("an open Instrument updates owner labels through rename, undo, and redo without rebuilding", () => {
+  const previousDocument = globalThis.document;
+  const document = createFakeDocument();
+  globalThis.document = document;
+  try {
+    const projectState = createV2ProjectState();
+    const track = projectState.getTrack("track-1");
+    const deviceWindow = createDeviceWindow({
+      device: {
+        instanceId: track.instrument.instanceId,
+        kind: "instrument",
+        trackId: track.id,
+      },
+      mobile: true,
+      onClose: () => {},
+      projectState,
+    });
+    const title = deviceWindow.node.find(({ tagName }) => tagName === "H2");
+    const attack = deviceWindow.node.find(({ dataset }) => dataset.deviceParam === "attackSeconds");
+    const originalNode = deviceWindow.node;
+    const originalAttack = attack;
+
+    assert.equal(title.textContent, "Pulse 1, Klinto Chip");
+    assert.equal(attack.getAttribute("aria-label"), "Pulse 1, Klinto Chip, Attack");
+
+    projectState.renameTrack(track.id, "Lead Chip");
+    assert.equal(deviceWindow.node, originalNode);
+    assert.equal(deviceWindow.node.find(({ dataset }) => dataset.deviceParam === "attackSeconds"), originalAttack);
+    assert.equal(title.textContent, "Lead Chip, Klinto Chip");
+    assert.equal(attack.getAttribute("aria-label"), "Lead Chip, Klinto Chip, Attack");
+
+    projectState.undo();
+    assert.equal(title.textContent, "Pulse 1, Klinto Chip");
+    assert.equal(attack.getAttribute("aria-label"), "Pulse 1, Klinto Chip, Attack");
+    projectState.redo();
+    assert.equal(title.textContent, "Lead Chip, Klinto Chip");
+    assert.equal(attack.getAttribute("aria-label"), "Lead Chip, Klinto Chip, Attack");
+    assert.equal(deviceWindow.node.find(({ dataset }) => dataset.deviceParam === "attackSeconds"), originalAttack);
+    deviceWindow.dispose();
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
+test("creating a Pattern from a Track binds destination and Piano audition without adding a clip", () => {
+  const projectState = createV2ProjectState();
+  const trackId = projectState.addTrack();
+  const workspaceState = createWorkspaceState(projectState);
+  workspaceState.activatePlaylist();
+  const order = [];
+  const announcements = [];
+  const beforeClips = projectState.getState().tracks.map(({ clips }) => clips.length);
+
+  const patternId = createPatternForPlaylistTrack({
+    announce: (message) => announcements.push(message),
+    onOpenPattern: (openedPatternId, auditionTrackId) => {
+      order.push(`open:${openedPatternId}:${auditionTrackId}`);
+      workspaceState.activatePianoRoll(openedPatternId, { auditionTrackId });
+      workspaceState.setAuditionTrack(openedPatternId, auditionTrackId);
+    },
+    projectState,
+    render: () => order.push("render"),
+    setActivePattern: (id) => workspaceState.setActivePattern(id),
+    setPlaylist: (patch) => workspaceState.setPlaylist(patch),
+    trackId,
+  });
+
+  assert.equal(projectState.getPattern(patternId).name, "Pattern 2");
+  assert.deepEqual(projectState.getState().tracks.map(({ clips }) => clips.length), beforeClips);
+  assert.equal(workspaceState.getState().playlist.destinationTrackId, trackId);
+  assert.equal(workspaceState.getState().playlist.selectedClipId, null);
+  assert.deepEqual(workspaceState.getState().playlist.selectedClipIds, []);
+  assert.equal(workspaceState.getState().activePatternId, patternId);
+  assert.equal(workspaceState.getState().activePrimary, "piano-roll");
+  assert.equal(workspaceState.getState().patternSurfaces[patternId].auditionTrackId, trackId);
+  assert.deepEqual(order, ["render", `open:${patternId}:${trackId}`]);
+  assert.deepEqual(announcements, ["Created Pattern 2 for Track 2."]);
+});
+
+test("Playlist marquee selection intersects clips across Tracks in either drag direction", () => {
+  const project = {
+    patterns: [
+      { id: "pattern-a", lengthTicks: 96 },
+      { id: "pattern-b", lengthTicks: 48 },
+    ],
+    tracks: [
+      {
+        id: "track-1",
+        clips: [
+          { id: "clip-a", patternId: "pattern-a", startTick: 0 },
+          { id: "clip-b", patternId: "pattern-b", startTick: 144 },
+        ],
+      },
+      {
+        id: "track-2",
+        clips: [{ id: "clip-c", patternId: "pattern-a", startTick: 72 }],
+      },
+      {
+        id: "track-3",
+        clips: [{ id: "clip-d", patternId: "pattern-b", startTick: 300 }],
+      },
+    ],
+  };
+  const forward = getPlaylistMarqueeClipIds(project, {
+    startTick: 80,
+    endTick: 160,
+    startTrackIndex: 0,
+    endTrackIndex: 1,
+  });
+  const reverse = getPlaylistMarqueeClipIds(project, {
+    startTick: 160,
+    endTick: 80,
+    startTrackIndex: 1,
+    endTrackIndex: 0,
+  });
+  assert.deepEqual(forward, ["clip-a", "clip-b", "clip-c"]);
+  assert.deepEqual(reverse, forward);
+  assert.deepEqual(getPlaylistMarqueeClipIds(project, {
+    startTick: 192,
+    endTick: 300,
+    startTrackIndex: 0,
+    endTrackIndex: 2,
+  }), []);
+});
+
+test("Playlist duplicate-right shortcut requires an unrepeated exact platform modifier B", () => {
+  assert.equal(isPlaylistDuplicateShortcut({ ctrlKey: true, key: "b" }), true);
+  assert.equal(isPlaylistDuplicateShortcut({ key: "B", metaKey: true }), true);
+  assert.equal(isPlaylistDuplicateShortcut({ ctrlKey: true, key: "b", repeat: true }), false);
+  assert.equal(isPlaylistDuplicateShortcut({ ctrlKey: true, key: "b", shiftKey: true }), false);
+  assert.equal(isPlaylistDuplicateShortcut({ ctrlKey: true, key: "d" }), false);
+  assert.equal(isPlaylistDuplicateShortcut({ key: "b" }), false);
+});
+
+test("Playlist pointer positions snap to the visible Track grid and reject Track headers", () => {
   assert.equal(getSnappedPlaylistDropTick({
     clientX: 723,
     pixelsPerTick: 0.36,
@@ -530,6 +902,37 @@ test("Playlist Pattern drops snap to the visible Track grid and reject Track hea
     pixelsPerTick: 0.36,
     snapTicks: 24,
     timelineLeft: 0,
+  }), null);
+
+  const rulerTarget = {
+    closest(selector) { return selector === ".v2-playlist-ruler" ? this : null; },
+  };
+  assert.equal(getPlaylistRulerSeekTick({
+    button: 0,
+    clientX: 723,
+    target: rulerTarget,
+  }, {
+    pixelsPerTick: 0.36,
+    snapTicks: 24,
+    timelineLeft: 333,
+  }), 192);
+  assert.equal(getPlaylistRulerSeekTick({
+    button: 2,
+    clientX: 723,
+    target: rulerTarget,
+  }, {
+    pixelsPerTick: 0.36,
+    snapTicks: 24,
+    timelineLeft: 333,
+  }), null);
+  assert.equal(getPlaylistRulerSeekTick({
+    button: 0,
+    clientX: 723,
+    target: { closest: () => null },
+  }, {
+    pixelsPerTick: 0.36,
+    snapTicks: 24,
+    timelineLeft: 333,
   }), null);
 });
 
@@ -680,12 +1083,43 @@ test("editor composites, shared playheads, opener routing, and replacement owner
   assert.match(piano, /role: "listbox"/);
   assert.match(piano, /"aria-multiselectable": "true"/);
   assert.match(piano, /role: "option",\s+tabIndex: -1/);
+  assert.match(piano, /"aria-keyshortcuts": "Delete Backspace Control\+B Meta\+B"/);
+  assert.match(piano, /if \(isMod\(event\) && !note\) \{\s+startMarquee\(event\)/);
+  assert.match(piano, /projectState\.duplicateNotes/);
+  assert.match(piano, /projectState\.removeNotes\(pattern\.id, ids\)/);
   assert.match(playlist, /role: "gridcell",\s+tabIndex: -1/);
+  assert.match(playlist, /"aria-multiselectable": "true"/);
+  assert.match(playlist, /function startMarquee\(event\)/);
+  assert.match(playlist, /projectState\.moveClips/);
+  assert.match(playlist, /projectState\.duplicateClips/);
+  assert.match(playlist, /isPlaylistDuplicateShortcut\(event\)/);
+  assert.match(playlist, /suppressFollowingPlaylistClick/);
+  assert.match(playlist, /getPlaylistRulerSeekTick\(event,[\s\S]*seekSong\(rulerSeekTick\)/);
+  assert.match(playlist, /type === "playback\/seek-song"/);
   assert.match(playlist, /onOpenInstrument\(track\.id, event\.currentTarget\)/);
+  assert.match(playlist, /routePlaylistContextMenu\(event,[\s\S]*onClip:[\s\S]*onInstrument:[\s\S]*onTrack:/);
+  assert.match(playlist, /className: "v2-action-menu-panel v2-playlist-track-context-menu"/);
+  assert.match(playlist, /textContent: "Rename Instrument"/);
+  assert.match(playlist, /promptInstrumentName\(track\)/);
+  assert.match(playlist, /projectState\.renameTrack\(trackId, requestedName\)/);
+  assert.match(playlist, /trackAction: "instrument"/);
+  assert.match(playlist, /createElement\("span", \{ textContent: track\.name, title: track\.name \}\),\s+createElement\("small", \{ textContent: "Klinto Chip" \}\)/);
+  assert.match(playlist, /createPatternForPlaylistTrack\([\s\S]*onOpenPattern,[\s\S]*trackId/);
+  assert.doesNotMatch(playlist, /event\.target\.closest\?\.\("button"\)\) return;\s+event\.preventDefault\(\);/);
+  assert.match(playlist, /const ADD_INSTRUMENT_ROW_HEIGHT = 44/);
+  assert.match(playlist, /className: "v2-playlist-add-instrument-row"/);
+  assert.match(playlist, /timeline\.append\(addInstrumentRow\)/);
+  assert.doesNotMatch(playlist, /v2-playlist-header-leading/);
+  assert.ok(
+    playlist.indexOf('className: "v2-playlist-add-instrument-row"')
+      > playlist.indexOf("state.tracks.forEach"),
+    "the Add Instrument row should follow the Track lanes",
+  );
   assert.doesNotMatch(piano, /requestAnimationFrame/);
   assert.doesNotMatch(playlist, /requestAnimationFrame/);
   assert.match(shell, /dispatchEvent\(new CustomEvent\("transportframe"/);
   assert.match(studio, /surfaceHost\.replacePrimary/);
+  assert.match(studio, /onSeek\(tick\)[\s\S]*workspaceState\.setPlaybackMode\("song"\)/);
   assert.match(studio, /markTrackInput\(trackId, event\.releaseEndTime\)/);
   assert.match(
     studio,

@@ -114,6 +114,7 @@ export function createOccurrenceScheduler({
   let mode = "pattern";
   let nextSessionId = 1;
   let retainedTick = 0;
+  let returnTick = 0;
   let session = null;
   let status = "stopped";
 
@@ -238,7 +239,7 @@ export function createOccurrenceScheduler({
 
   function finishNaturally(activeSession, time) {
     if (session !== activeSession) return;
-    retainedTick = activeSession.startTick;
+    retainedTick = returnTick;
     endSession(activeSession, time, { release: false });
     status = "stopped";
     emit();
@@ -294,7 +295,7 @@ export function createOccurrenceScheduler({
     } catch (error) {
       try { endSession(activeSession, getAudioTime()); } catch { clearTimer(activeSession); }
       status = "stopped";
-      retainedTick = activeSession.startTick;
+      retainedTick = returnTick;
       emit(error);
       return false;
     }
@@ -318,6 +319,9 @@ export function createOccurrenceScheduler({
     if (nextMode === "pattern" && !project.tracks.some((track) => track.id === trackId)) {
       throw new RangeError(`Unknown Track: ${trackId}.`);
     }
+    const resumesPausedSession = status === "paused"
+      && nextMode === mode
+      && (requested.startTick === undefined || requested.startTick === retainedTick);
     const bounds = getPlaybackBounds(project, nextMode, patternId, getPatternLoopEnabled());
     if (nextMode === "song" && bounds.endTick <= bounds.startTick) {
       throw new RangeError("Place an audible Pattern in Playlist before playing Song mode.");
@@ -334,6 +338,7 @@ export function createOccurrenceScheduler({
     currentBpm = requested.bpm ?? project.transport.bpm;
     assertBpm(currentBpm);
     retainedTick = startTick;
+    if (!resumesPausedSession) returnTick = startTick;
     const anchorAudioTime = getAudioTime() + startLeadSeconds;
     const activeSession = {
       anchorAudioTime,
@@ -400,6 +405,7 @@ export function createOccurrenceScheduler({
       throw new RangeError("Seek tick is outside the playback range.");
     }
     retainedTick = nextTick;
+    returnTick = nextTick;
     if (!session) {
       emit();
       return true;
@@ -428,12 +434,16 @@ export function createOccurrenceScheduler({
   }
 
   function stop() {
-    if (status === "stopped") return false;
+    if (status === "stopped") {
+      if (retainedTick === 0 && returnTick === 0) return false;
+      retainedTick = 0;
+      returnTick = 0;
+      emit();
+      return true;
+    }
     const activeSession = session;
-    if (activeSession) {
-      endSession(activeSession, getAudioTime());
-      retainedTick = activeSession.startTick;
-    } else retainedTick = 0;
+    if (activeSession) endSession(activeSession, getAudioTime());
+    retainedTick = returnTick;
     status = "stopped";
     emit();
     return true;
@@ -445,6 +455,7 @@ export function createOccurrenceScheduler({
     if (status !== "stopped") stop();
     mode = nextMode;
     retainedTick = 0;
+    returnTick = 0;
     emit();
     return true;
   }
@@ -549,6 +560,7 @@ export function createOccurrenceScheduler({
     disposed = true;
     status = "stopped";
     retainedTick = 0;
+    returnTick = 0;
     return true;
   }
 

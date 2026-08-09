@@ -65,6 +65,7 @@ test("initial workspace is deeply immutable, safe, and separate from Project JSO
     cursorTick: 0,
     destinationTrackId: "track-1",
     selectedClipId: null,
+    selectedClipIds: [],
     snap: "1/16",
   });
   assert.deepEqual(state.mixer, { channelId: "track-1" });
@@ -76,6 +77,7 @@ test("initial workspace is deeply immutable, safe, and separate from Project JSO
   });
   assert.equal(state.device, null);
   assert.equal(Object.isFrozen(state), true);
+  assert.throws(() => state.playlist.selectedClipIds.push("clip-1"), TypeError);
   assert.equal(Object.isFrozen(state.patternSurfaces["pattern-1"].viewport), true);
   assert.throws(() => state.patternSurfaces["pattern-1"].selection.push("note-1"), TypeError);
   assert.equal(JSON.stringify(project), projectJson);
@@ -304,4 +306,30 @@ test("snap and Playlist destination use canonical repaired workspace keys", () =
   state = workspace.getState();
   assert.equal(state.playlist.destinationTrackId, "track-1");
   assert.equal(state.playlist.snap, "1/32");
+});
+
+test("Playlist multi-selection is deduplicated, backwards compatible, and repaired by clip identity", () => {
+  const project = createProject();
+  const workspace = createWorkspaceState(project);
+
+  workspace.setPlaylist({
+    selectedClipId: "clip-2",
+    selectedClipIds: ["clip-2", "clip-1", "clip-2", "missing"],
+  });
+  assert.equal(workspace.getState().playlist.selectedClipId, "clip-2");
+  assert.deepEqual(workspace.getState().playlist.selectedClipIds, ["clip-2", "clip-1"]);
+
+  workspace.setPlaylist({ selectedClipId: "clip-1" });
+  assert.deepEqual(workspace.getState().playlist.selectedClipIds, ["clip-1"]);
+
+  workspace.setPlaylist({
+    selectedClipId: "clip-2",
+    selectedClipIds: ["clip-2", "clip-1"],
+  });
+  const withoutPrimary = structuredClone(project);
+  withoutPrimary.tracks[1].clips = [];
+  workspace.repairProject(withoutPrimary);
+  assert.equal(workspace.getState().playlist.selectedClipId, "clip-1");
+  assert.deepEqual(workspace.getState().playlist.selectedClipIds, ["clip-1"]);
+  workspace.dispose();
 });
