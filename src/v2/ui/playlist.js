@@ -7,6 +7,49 @@ const LANE_HEIGHT = 66;
 const TRACK_HEADER_WIDTH = 320;
 const TRACK_ACTION_ORDER = Object.freeze(["select", "instrument", "move-up", "move-down", "remove"]);
 const PATTERN_DRAG_TYPE = "application/x-klinto-pattern-id";
+const PLAYLIST_DOUBLE_CLICK_DELAY_MS = 250;
+
+export function createPlaylistPatternActivation({
+  cancel = (handle) => globalThis.clearTimeout(handle),
+  delay = PLAYLIST_DOUBLE_CLICK_DELAY_MS,
+  onOpen,
+  onSelect,
+  schedule = (callback, timeout) => globalThis.setTimeout(callback, timeout),
+} = {}) {
+  if (typeof cancel !== "function" || typeof onOpen !== "function"
+    || typeof onSelect !== "function" || typeof schedule !== "function") {
+    throw new TypeError("Playlist Pattern activation requires timer, select, and open functions.");
+  }
+  if (!Number.isFinite(delay) || delay < 0) {
+    throw new RangeError("Playlist Pattern activation delay must be non-negative.");
+  }
+
+  let pendingSelection = null;
+  function cancelPendingSelection() {
+    if (pendingSelection === null) return false;
+    cancel(pendingSelection);
+    pendingSelection = null;
+    return true;
+  }
+
+  return Object.freeze({
+    cancel: cancelPendingSelection,
+    click(clickCount = 1) {
+      if (clickCount > 1) return false;
+      cancelPendingSelection();
+      pendingSelection = schedule(() => {
+        pendingSelection = null;
+        onSelect();
+      }, delay);
+      return true;
+    },
+    doubleClick() {
+      cancelPendingSelection();
+      onOpen();
+      return true;
+    },
+  });
+}
 
 export function getSnappedPlaylistDropTick({ clientX, pixelsPerTick, snapTicks, timelineLeft }) {
   if (![clientX, pixelsPerTick, snapTicks, timelineLeft].every(Number.isFinite)
@@ -1107,8 +1150,17 @@ export function createPlaylistSurface({
         }, [createElement("strong", { textContent: pattern.name }), createElement("small", { textContent: formatDurationTicks(pattern.lengthTicks) })]);
         const found = { clip, track };
         bindClipPointer(button, found);
-        button.addEventListener("click", () => selectClip(clip.id));
-        button.addEventListener("dblclick", () => onOpenPattern(pattern.id, track.id));
+        const activation = createPlaylistPatternActivation({
+          onOpen: () => onOpenPattern(pattern.id, track.id),
+          onSelect: () => {
+            if (button.isConnected) selectClip(clip.id);
+          },
+        });
+        button.addEventListener("click", (event) => activation.click(event.detail));
+        button.addEventListener("dblclick", (event) => {
+          event.preventDefault();
+          activation.doubleClick();
+        });
         button.addEventListener("contextmenu", (event) => {
           event.preventDefault();
           event.stopPropagation();

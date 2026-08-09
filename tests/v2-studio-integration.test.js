@@ -8,6 +8,7 @@ import {
   getPianoMarqueeNoteIds,
 } from "../src/v2/ui/piano-roll.js";
 import {
+  createPlaylistPatternActivation,
   getPlaylistWheelScrollDelta,
   getSnappedPlaylistDropTick,
   resolvePlaylistFocusTarget,
@@ -623,6 +624,45 @@ test("Piano Roll and Playlist write canonical snap keys", async () => {
   assert.doesNotMatch(pianoRoll, /updatePatternSession\(\{ snapTicks \}\)/);
   assert.match(playlist, /setSession\(\{ snap: snapValue \}\)/);
   assert.doesNotMatch(playlist, /setSession\(\{ snapTicks \}\)/);
+});
+
+test("Playlist Pattern double-click opens instead of rebuilding on the first click", () => {
+  let cancelledHandle = null;
+  let openCount = 0;
+  let pendingCallback = null;
+  let scheduledDelay = null;
+  let selectCount = 0;
+  const activation = createPlaylistPatternActivation({
+    cancel(handle) {
+      cancelledHandle = handle;
+      pendingCallback = null;
+    },
+    onOpen() {
+      openCount += 1;
+    },
+    onSelect() {
+      selectCount += 1;
+    },
+    schedule(callback, delay) {
+      pendingCallback = callback;
+      scheduledDelay = delay;
+      return "pending-selection";
+    },
+  });
+
+  assert.equal(activation.click(1), true);
+  assert.equal(scheduledDelay, 250);
+  assert.equal(activation.click(2), false);
+  assert.equal(activation.doubleClick(), true);
+  assert.equal(cancelledHandle, "pending-selection");
+  assert.equal(pendingCallback, null);
+  assert.equal(selectCount, 0);
+  assert.equal(openCount, 1);
+
+  activation.click(1);
+  pendingCallback();
+  assert.equal(selectCount, 1);
+  assert.equal(openCount, 1);
 });
 test("editor composites, shared playheads, opener routing, and replacement ownership are wired", async () => {
   const [piano, playlist, shell, studio, scheduler] = await Promise.all([

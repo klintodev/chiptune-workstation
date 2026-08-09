@@ -157,7 +157,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 
 - Single-clip move, duplicate, action/keyboard/right-click delete and undo preserve stable identities/links and enforce overlap/boundary rules atomically.
 - Selecting a Pattern in the library and clicking an empty Track position adds that Pattern exactly at the snapped click position without changing existing clip-click behavior.
-- Double-clicking a Pattern card in the library opens that Pattern in the reusable Piano Roll for editing.
+- Double-clicking either the selected Pattern card or a Playlist clip opens that Pattern in the reusable Piano Roll for editing; a single clip click only selects it.
 - Creating a Pattern from the Playlist library immediately opens the newly created Pattern in the Piano Roll.
 - Pattern-library cog Rename/Duplicate/Delete actions obey caps, final-Pattern rules, atomic history and focus repair.
 - Pattern growth caused by note content rejects when any linked clip would become invalid; content shrinkage shortens all linked clips.
