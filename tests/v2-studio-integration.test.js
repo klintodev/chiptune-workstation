@@ -1153,6 +1153,114 @@ test("Playlist Pattern double-click opens instead of rebuilding on the first cli
   assert.equal(selectCount, 1);
   assert.equal(openCount, 1);
 });
+
+test("Piano pointer audition stays isolated from editing gestures and keeps its routing context", async () => {
+  const [piano, studio] = await Promise.all([
+    readFile(new URL("../src/v2/ui/piano-roll.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/v2/studio-app.js", import.meta.url), "utf8"),
+  ]);
+  const sourceBlock = (source, startLabel, endLabel) => {
+    const start = source.indexOf(startLabel);
+    const end = source.indexOf(endLabel, start + startLabel.length);
+    assert.notEqual(start, -1, `missing source block: ${startLabel}`);
+    assert.notEqual(end, -1, `missing source boundary: ${endLabel}`);
+    return source.slice(start, end);
+  };
+
+  assert.match(piano, /onAuditionPitch\s*=\s*\(\)\s*=>\s*false/);
+  assert.match(
+    piano,
+    /className:\s*"v2-pitch-label"[\s\S]*?dataset:\s*\{\s*pitch\s*\}/,
+  );
+
+  const audition = sourceBlock(piano, "function auditionPitch", "function updatePatternSession");
+  assert.match(
+    audition,
+    /onAuditionPitch\(Object\.freeze\(\{\s*noteId,\s*patternId:\s*pattern\.id,\s*pitch,\s*trackId:\s*auditionTrackId\(\),\s*velocity,\s*\}\)\)/,
+  );
+  assert.match(piano, /const PIANO_CLICK_SLOP_PX\s*=\s*4/);
+  assert.match(
+    piano,
+    /function exceedsPianoClickSlop\(originX,\s*originY,\s*event\)\s*\{[\s\S]*?event\.clientX[\s\S]*?event\.clientY[\s\S]*?PIANO_CLICK_SLOP_PX[\s\S]*?\}/,
+  );
+
+  const pointer = sourceBlock(piano, "function handlePointerDown", "function handleContextMenu");
+  const primaryGuard = pointer.indexOf("event.button !== 0");
+  const pitchTarget = pointer.indexOf('.v2-pitch-label');
+  const pitchPan = pointer.indexOf("startPan(event, { pitch })", pitchTarget);
+  const pitchGesture = pointer.indexOf("startPitchAudition(", pitchTarget);
+  const pitchReturn = pointer.indexOf("return;", pitchGesture);
+  const notePan = pointer.indexOf("startPan(event, { note })", pitchReturn);
+  const drawBranch = pointer.indexOf('tool === "draw"');
+  assert.ok(primaryGuard >= 0 && primaryGuard < pitchTarget);
+  assert.ok(pitchTarget < pitchPan && pitchPan < pitchGesture);
+  assert.match(pointer.slice(pitchTarget, pitchReturn), /pitchLabel\.dataset\.pitch/);
+  assert.ok(pitchGesture < pitchReturn && pitchReturn < notePan && notePan < drawBranch);
+  assert.doesNotMatch(pointer, /auditionPitch\(/, "pointerdown must defer every preview to gesture commit");
+
+  const move = sourceBlock(piano, "function startNoteMove", "function startNoteResize");
+  const movePreview = sourceBlock(move, "move(moveEvent)", "commit(");
+  const moveCommit = sourceBlock(move, "commit(", "cancel:");
+  const stationaryMove = move.indexOf("if (deltaTick === 0 && deltaPitch === 0)");
+  const stationaryMoveAudition = move.indexOf("auditionPitch(", stationaryMove);
+  const stationaryMoveReturn = move.indexOf("return;", stationaryMove);
+  assert.doesNotMatch(movePreview, /auditionPitch\(/);
+  assert.match(move, /let dragged\s*=\s*false/);
+  assert.match(movePreview, /exceedsPianoClickSlop\(originX,\s*originY,\s*moveEvent\)/);
+  assert.match(movePreview, /dragged/);
+  assert.match(moveCommit, /exceedsPianoClickSlop\(originX,\s*originY,\s*upEvent\)/);
+  assert.match(moveCommit, /if \(!dragged\)[\s\S]*?auditionPitch\(/);
+  assert.ok(stationaryMove >= 0 && stationaryMove < stationaryMoveAudition);
+  assert.ok(stationaryMoveAudition < stationaryMoveReturn);
+  assert.equal(move.match(/auditionPitch\(/g)?.length, 1);
+
+  const resize = sourceBlock(piano, "function startNoteResize", "function startPitchAudition");
+  const resizePreview = sourceBlock(resize, "move(moveEvent)", "commit(");
+  const resizeCommit = sourceBlock(resize, "commit(", "cancel:");
+  const stationaryResize = resize.indexOf("if (deltaTick === 0)");
+  const stationaryResizeAudition = resize.indexOf("auditionPitch(", stationaryResize);
+  const stationaryResizeReturn = resize.indexOf("return;", stationaryResize);
+  assert.doesNotMatch(resizePreview, /auditionPitch\(/);
+  assert.match(resize, /let dragged\s*=\s*false/);
+  assert.match(resizePreview, /exceedsPianoClickSlop\(originX,\s*originY,\s*moveEvent\)/);
+  assert.match(resizePreview, /dragged/);
+  assert.match(resizeCommit, /exceedsPianoClickSlop\(originX,\s*originY,\s*upEvent\)/);
+  assert.match(resizeCommit, /if \(!dragged\)[\s\S]*?auditionPitch\(/);
+  assert.ok(stationaryResize >= 0 && stationaryResize < stationaryResizeAudition);
+  assert.ok(stationaryResizeAudition < stationaryResizeReturn);
+  assert.equal(resize.match(/auditionPitch\(/g)?.length, 1);
+
+  const pitch = sourceBlock(piano, "function startPitchAudition", "function startPan");
+  const pitchPreview = sourceBlock(pitch, "move(moveEvent)", "commit(");
+  assert.match(pitch, /let dragged\s*=\s*false/);
+  assert.match(pitchPreview, /exceedsPianoClickSlop\(originX,\s*originY,\s*moveEvent\)/);
+  assert.doesNotMatch(pitchPreview, /auditionPitch\(/);
+  assert.match(pitch, /commit\(upEvent\)\s*\{[\s\S]*?exceedsPianoClickSlop\(originX,\s*originY,\s*upEvent\)[\s\S]*?if \(!dragged\) auditionPitch\(/);
+  assert.equal(pitch.match(/auditionPitch\(/g)?.length, 1);
+
+  const pan = sourceBlock(piano, "function startPan", "function handlePointerDown");
+  const panPreview = sourceBlock(pan, "move(moveEvent)", "commit(");
+  const panCommit = sourceBlock(pan, "commit(", "cancel()");
+  const context = sourceBlock(piano, "function handleContextMenu", "function renderInspector");
+  assert.match(pan, /let dragged\s*=\s*false/);
+  assert.match(panPreview, /exceedsPianoClickSlop\(originX,\s*originY,\s*moveEvent\)/);
+  assert.doesNotMatch(panPreview, /auditionPitch\(/);
+  assert.match(panCommit, /exceedsPianoClickSlop\(originX,\s*originY,\s*upEvent\)/);
+  assert.match(panCommit, /if \(dragged\) return;[\s\S]*?if \(note\)[\s\S]*?auditionPitch\([\s\S]*?else if \(Number\.isInteger\(pitch\)\)[\s\S]*?auditionPitch\(/);
+  assert.equal(pan.match(/auditionPitch\(/g)?.length, 2, "stationary Pan clicks audition notes and pitch labels");
+  assert.doesNotMatch(context, /auditionPitch\(/);
+
+  const pianoWiring = sourceBlock(
+    studio,
+    'if (surface.kind === "piano-roll")',
+    'if (surface.kind === "playlist")',
+  );
+  assert.match(
+    pianoWiring,
+    /onAuditionPitch\(context\)\s*\{\s*if \(!audioEngine\.isReady\(\)\) \{[\s\S]*?return false;\s*\}\s*return keyboardAudition\.previewNote\(context\);\s*\}/,
+  );
+});
+
 test("editor composites, shared playheads, opener routing, and replacement ownership are wired", async () => {
   const [piano, playlist, shell, studio, scheduler] = await Promise.all([
     readFile(new URL("../src/v2/ui/piano-roll.js", import.meta.url), "utf8"),
@@ -1163,7 +1271,7 @@ test("editor composites, shared playheads, opener routing, and replacement owner
   ]);
   assert.match(piano, /function startDraw\(event\)/);
   assert.match(piano, /function startMarquee\(event\)/);
-  assert.match(piano, /function startPan\(event\)/);
+  assert.match(piano, /function startPan\(event(?:,|\))/);
   assert.ok(piano.includes('event.target.closest?.(".v2-note-resize")'));
   assert.match(piano, /"pointercancel"/);
   assert.match(piano, /role: "listbox"/);

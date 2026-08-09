@@ -147,6 +147,8 @@ History is grouped; Piano Roll zoom has no buttons and is controlled only by `Mo
 
 The editor shows pitch rows, bar/beat grid, notes, selection and a visual playhead. Velocity appears only for selection/property editing, not as a permanent full-width lane. `Control+wheel` on Windows/Linux and `Command+wheel` on macOS zoom around the pointer; ordinary wheel/trackpad input pans or scrolls. Zoom and pan never modify musical data or invoke page zoom while the editor owns the gesture.
 
+The pitch-name rail is the Piano Roll's audition keyboard. A completed primary click that stays within the editor's click slop on a pitch name plays one fixed short preview at that pitch through the surface's explicit audition Track, using that Track's current Instrument, Mixer and Effect route at the default note velocity. The same completed click on an existing note previews its stored pitch and velocity through that route while retaining ordinary note-selection behaviour. Both clicks audition in every tool, including Pan. Moving beyond click slop makes the interaction a pitch-rail, note-edit or Pan drag and suppresses audition even if the pointer returns to its origin or the edit snaps to no change; right-click and cancelled gestures also do not preview. Preview does not start or seek transport, change musical data or create history, and zero-velocity notes remain silent. If audio is disabled, the audition action opens Audio Setup instead of creating a voice. Starting another Piano Roll preview immediately retires the prior Piano Roll preview; preview and computer-key voices remain subject to the authoritative shared 16-voice cap and its oldest-voice retirement policy.
+
 Launch tools:
 
 - **Draw:** click/drag empty space to create one snapped note with default duration of one snap; drag a note to move; drag its end handle to resize.
@@ -204,6 +206,7 @@ Desktop supports the full pointer and keyboard contract in its modeless window. 
 
 - A new desktop Project opens Pattern 1 Piano Roll above visible Playlist; no second Piano Roll, device or Mixer competes with it.
 - Pointer and keyboard journeys create, `Mod`-marquee select, move, resize, change velocity, delete the complete selection, duplicate it right with `Mod+B`, repeat the duplicate and undo notes on desktop.
+- Completing a primary pitch-name or existing-note click within click slop produces exactly one fixed short preview through that Piano Roll's explicit audition Track in every tool, including Pan. Track octave and routing are honoured; an existing note uses its stored velocity, the pitch rail uses the default note velocity, zero velocity remains silent, and transport, musical data and history remain unchanged. Crossing click slop, right-clicking or cancelling suppresses preview regardless of final pointer position or snapped edit delta; disabled audio opens Audio Setup. A new preview immediately retires its predecessor, subject to the shared 16-voice cap.
 - `Mod+wheel` zooms without zoom buttons; empty right-click is suppressed/no-op, note right-click deletes, and Piano Roll exposes no Instrument launcher.
 - Clicking the visible Piano Roll title or focusing it and pressing Enter invokes the same canonical Pattern rename as Pattern actions; success updates every Pattern label in place and is undoable, while cancel/no-op/invalid input preserves data, window position and title focus. The rest of the title bar remains draggable and Space remains transport.
 - Open-from-clip changes audition Track; ordinary surface return preserves it; Track removal repairs it without closing the Pattern.
@@ -217,7 +220,7 @@ Desktop supports the full pointer and keyboard contract in its modeless window. 
 - Validation/property tests for event invariants, limits, ordering and automatic Pattern-span atomicity
 - Scheduler tests for chords, same-pitch overlap, deterministic simultaneous ordering/oldest-voice retirement, V1 direct whole-Song `↻` loop boundaries, tempo/seek/stop and the live-edit policy
 - Shared occurrence-projection parity tests for Pattern, Song, offline and public adapters
-- Manual desktop pointer and keyboard-command compose review covering create, title-click/Enter rename, title-focus and drag-handle preservation, `Mod`-marquee selection, group move, transpose, resize, velocity, right-click rules, `Mod+wheel`, group delete, repeated `Mod+B`, undo and focus/announcement checks, including absence of zoom buttons/Instrument launcher
+- Manual desktop pointer and keyboard-command compose review covering create, pitch-rail and existing-note click-slop audition in every tool, explicit routing/non-mutation, Audio Setup fallback, zero-velocity and actual-drag/right-click suppression, title-click/Enter rename, title-focus and drag-handle preservation, `Mod`-marquee selection, group move, transpose, resize, velocity, right-click rules, `Mod+wheel`, group delete, repeated `Mod+B`, undo and focus/announcement checks, including absence of zoom buttons/Instrument launcher
 - 1366Ã—768 Playlist-under-window layout and 390Ã—844 single-fullscreen-surface smoke tests
 - Lifecycle/leak coverage for Pattern/Track/Project deletion and surface switching
 
@@ -257,6 +260,7 @@ These slices use feature-flagged in-memory fixtures or isolated development stor
 - Playback mode and Playlist insertion cursor are session state; Pattern playback never moves the insertion cursor.
 - The direct `↻` control toggles the complete current playback context: the active Pattern in Pattern mode or the full arrangement in Song mode.
 - Piano Roll uses `Mod+wheel` zoom with no zoom buttons or Instrument launcher; empty right-click is suppressed and note right-click deletes.
+- A completed Piano Roll pitch-label or existing-note click within click slop auditions at default or stored velocity through the surface's explicit audition Track in every tool, including Pan. Crossing click slop, right-clicking or cancelling suppresses preview even when the pointer returns or the edit snaps to no change; disabled audio opens Audio Setup. Preview does not start transport or change musical data/history, a new preview immediately retires the prior preview, and all audition voices remain subject to the shared 16-voice cap.
 - The visible Piano Roll title exposes canonical Pattern rename on pointer activation or Enter; Space remains the global transport command and the remaining title bar remains draggable.
 - Piano Roll `Mod`-drag from empty grid space selects a note range regardless of active tool; Delete removes that complete selection and `Mod+B` duplicates its exact bounding block to the right, selecting the copies.
 - A Project always retains at least one Pattern.

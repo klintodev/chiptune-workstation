@@ -463,6 +463,13 @@ export async function createV2StudioApp({ document: documentLike = document } = 
             announce(error.message);
           }
         },
+        onAuditionPitch(context) {
+          if (!audioEngine.isReady()) {
+            showAudioSetup();
+            return false;
+          }
+          return keyboardAudition.previewNote(context);
+        },
         onOpenInstrument: openTrackInstrument,
         onTransportToggle: toggleTransport,
         projectState,

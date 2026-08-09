@@ -6,6 +6,7 @@ import {
   createV2KeyboardAudition,
   V2_KEYBOARD_AUDITION_HEARTBEAT_SECONDS,
   V2_KEYBOARD_AUDITION_HOLD_SECONDS,
+  V2_PIANO_PREVIEW_SECONDS,
 } from "../src/v2/audio/keyboard-audition.js";
 import { VOICE_RETIRE_RAMP_SECONDS } from "../src/v2/audio/klinto-chip-synth.js";
 
@@ -457,5 +458,345 @@ test("V2 keyboard audition drains a held Track before remove/undo graph sync and
     { inputId: "keyboard-audition:1", phase: "start", trackId: "track-held" },
     { inputId: "keyboard-audition:1", phase: "end", trackId: "track-held" },
   ]);
+  audition.dispose();
+});
+
+test("V2 Piano previews use the explicit Track's complete finite audition event", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  const renderEvents = [];
+  const inputEvents = [];
+  const inputLifecycles = [];
+  let heartbeatStarts = 0;
+  let finishPreview;
+  const project = {
+    id: "project-piano-preview",
+    tracks: [
+      {
+        id: "track-fallback",
+        instrument: {
+          params: {
+            attackSeconds: 0.008,
+            octave: 0,
+            releaseSeconds: 0.03,
+            waveform: "square",
+          },
+        },
+      },
+      {
+        id: "track-preview",
+        instrument: {
+          params: {
+            attackSeconds: 0.02,
+            octave: 1,
+            releaseSeconds: 0.3,
+            waveform: "pulse25",
+          },
+        },
+      },
+    ],
+  };
+  const audition = createV2KeyboardAudition({
+    audioEngine: { getCurrentTime: () => 6, isReady: () => true },
+    documentLike,
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger(event) {
+        renderEvents.push(event);
+        const listeners = new Set();
+        let ended = false;
+        finishPreview = () => {
+          if (ended) return false;
+          ended = true;
+          for (const listener of listeners) listener();
+          return true;
+        };
+        return {
+          addEndedListener(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          get ended() { return ended; },
+          retire: finishPreview,
+          stop: finishPreview,
+        };
+      },
+    }),
+    getTrackId: () => "track-fallback",
+    keyupTarget: documentLike,
+    onTrackInput(trackId, event, lifecycle) {
+      inputEvents.push({ ...event, trackId });
+      inputLifecycles.push({ ...lifecycle, trackId });
+    },
+    setIntervalLike() {
+      heartbeatStarts += 1;
+      return 1;
+    },
+  });
+
+  assert.equal(audition.previewNote({
+    noteId: "note-preview",
+    patternId: "pattern-preview",
+    pitch: 60,
+    trackId: "track-preview",
+    velocity: 0.35,
+  }), true);
+  assert.equal(V2_PIANO_PREVIEW_SECONDS, 0.14);
+  assert.equal(renderEvents.length, 1);
+  const preview = renderEvents[0];
+  assert.equal(preview.trackId, "track-preview", "the explicit Piano Track overrides live-key context");
+  assert.equal(preview.frequencyHz, midiNoteToFrequency(72), "the Track octave transposes stored pitch");
+  assert.equal(preview.waveform, "pulse25");
+  assert.equal(preview.attackSeconds, 0.02);
+  assert.equal(preview.releaseSeconds, 0.3);
+  assert.equal(preview.velocity, 0.35);
+  assert.equal(preview.durationSeconds, V2_PIANO_PREVIEW_SECONDS);
+  assert.equal(preview.startTime, 6);
+  assert.equal(preview.releaseEndTime, 6 + V2_PIANO_PREVIEW_SECONDS + 0.3 + 0.01);
+  assert.match(preview.ownership.occurrenceId, /^piano-preview:/);
+  assert.deepEqual(preview.ownership, {
+    clipId: null,
+    mode: "audition",
+    noteId: "note-preview",
+    occurrenceId: preview.ownership.occurrenceId,
+    patternId: "pattern-preview",
+    projectId: "project-piano-preview",
+    trackId: "track-preview",
+  });
+  assert.deepEqual(inputEvents, [{
+    releaseEndTime: preview.releaseEndTime,
+    trackId: "track-preview",
+  }]);
+  assert.deepEqual(inputLifecycles, [{
+    inputId: preview.ownership.occurrenceId,
+    phase: "start",
+    trackId: "track-preview",
+  }]);
+  assert.equal(heartbeatStarts, 0, "finite previews do not start the held-key heartbeat");
+  assert.equal(audition.getActiveVoiceCount(), 1);
+
+  finishPreview();
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  assert.deepEqual(inputEvents, [
+    { releaseEndTime: preview.releaseEndTime, trackId: "track-preview" },
+    { releaseEndTime: preview.releaseEndTime, trackId: "track-preview" },
+  ]);
+  assert.deepEqual(inputLifecycles, [
+    { inputId: preview.ownership.occurrenceId, phase: "start", trackId: "track-preview" },
+    { inputId: preview.ownership.occurrenceId, phase: "end", trackId: "track-preview" },
+  ]);
+
+  assert.equal(audition.previewNote({
+    noteId: "silent-note",
+    patternId: "pattern-preview",
+    pitch: 64,
+    trackId: "track-preview",
+    velocity: 0,
+  }), false);
+  assert.equal(renderEvents.length, 1, "zero velocity schedules no preview voice");
+  assert.equal(audition.dispose(), true);
+});
+
+test("V2 Piano preview retrigger retires only the prior preview without stealing held keys", (t) => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  const voices = [];
+  const project = {
+    id: "project-preview-ownership",
+    tracks: [{
+      id: "track-1",
+      instrument: {
+        params: {
+          attackSeconds: 0.008,
+          octave: 0,
+          releaseSeconds: 0.2,
+          waveform: "square",
+        },
+      },
+    }],
+  };
+  const audition = createV2KeyboardAudition({
+    audioEngine: { getCurrentTime: () => 3, isReady: () => true },
+    documentLike,
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger(event) {
+        const listeners = new Set();
+        const operations = [];
+        let ended = false;
+        let stopTime = event.startTime + event.durationSeconds;
+        const finish = (kind, time) => {
+          if (ended) return false;
+          operations.push({ kind, time });
+          ended = true;
+          for (const listener of listeners) listener();
+          return true;
+        };
+        const record = {
+          event,
+          finishNaturally: () => finish("natural", stopTime),
+          operations,
+        };
+        voices.push(record);
+        return {
+          addEndedListener(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          get ended() { return ended; },
+          retire: (time) => finish("retire", time),
+          stop(time) {
+            if (ended || time >= stopTime) return false;
+            stopTime = time;
+            operations.push({ kind: "stop", time });
+            return true;
+          },
+        };
+      },
+    }),
+    getTrackId: () => "track-1",
+    keyupTarget: documentLike,
+  });
+  t.after(() => audition.dispose());
+
+  documentLike.dispatchEvent(keyEvent("keydown", "KeyZ"));
+  assert.equal(audition.previewNote({
+    noteId: "note-1",
+    patternId: "pattern-1",
+    pitch: 64,
+    trackId: "track-1",
+    velocity: 0.6,
+  }), true);
+  assert.equal(audition.previewNote({
+    noteId: "note-2",
+    patternId: "pattern-1",
+    pitch: 67,
+    trackId: "track-1",
+    velocity: 0.7,
+  }), true);
+
+  assert.equal(voices.length, 3);
+  assert.deepEqual(voices[0].operations, [], "the computer-key voice remains held");
+  assert.deepEqual(
+    voices[1].operations,
+    [{ kind: "retire", time: 3 }],
+    "retrigger immediately retires and removes exactly the prior Piano preview",
+  );
+  assert.deepEqual(voices[2].operations, []);
+  assert.equal(audition.getActiveVoiceCount(), 2);
+});
+
+test("V2 Piano preview Track removal retires a release tail before graph synchronization", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  let audioTime = 4;
+  const instrument = {
+    params: {
+      attackSeconds: 0.008,
+      octave: 0,
+      releaseSeconds: 1,
+      waveform: "square",
+    },
+  };
+  let project = {
+    id: "project-preview-track-removal",
+    tracks: [
+      { id: "track-preview", instrument },
+      { id: "track-retained", instrument },
+    ],
+  };
+  let syncedTrackIds = new Set(project.tracks.map(({ id }) => id));
+  const inputEvents = [];
+  const inputLifecycles = [];
+  let previewRuntime;
+  const audition = createV2KeyboardAudition({
+    audioEngine: { getCurrentTime: () => audioTime, isReady: () => true },
+    documentLike,
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger(event) {
+        const listeners = new Set();
+        let ended = false;
+        let stopTime = event.startTime + event.durationSeconds;
+        const operations = [];
+        const finish = (kind, time) => {
+          if (ended) return false;
+          operations.push({ kind, time });
+          ended = true;
+          for (const listener of listeners) listener();
+          return true;
+        };
+        previewRuntime = {
+          finishNaturally: () => finish("natural", stopTime),
+          operations,
+        };
+        return {
+          addEndedListener(listener) {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+          get ended() { return ended; },
+          retire: (time) => finish("retire", time),
+          stop(time) {
+            if (ended || time >= stopTime) return false;
+            stopTime = time;
+            operations.push({ kind: "stop", time });
+            return true;
+          },
+        };
+      },
+    }),
+    getTrackId: () => "track-retained",
+    keyupTarget: documentLike,
+    onTrackInput(trackId, event, lifecycle) {
+      if (!syncedTrackIds.has(trackId)) {
+        throw new RangeError(`Stale input lifecycle for removed Track: ${trackId}`);
+      }
+      inputEvents.push({ ...event, trackId });
+      inputLifecycles.push({ ...lifecycle, trackId });
+    },
+  });
+
+  assert.equal(audition.previewNote({
+    noteId: "note-preview",
+    patternId: "pattern-preview",
+    pitch: 60,
+    trackId: "track-preview",
+    velocity: 0.8,
+  }), true);
+  const inputId = inputLifecycles[0].inputId;
+  assert.deepEqual(inputLifecycles, [{
+    inputId,
+    phase: "start",
+    trackId: "track-preview",
+  }]);
+
+  audioTime = 4.2;
+  project = {
+    ...project,
+    tracks: project.tracks.filter(({ id }) => id !== "track-preview"),
+  };
+  assert.equal(audition.reconcileProject(project), true);
+  assert.deepEqual(previewRuntime.operations, [{ kind: "retire", time: 4.2 }]);
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  assert.deepEqual(inputEvents, [
+    {
+      releaseEndTime: 4 + V2_PIANO_PREVIEW_SECONDS + 1 + 0.01,
+      trackId: "track-preview",
+    },
+    {
+      releaseEndTime: 4.2 + VOICE_RETIRE_RAMP_SECONDS,
+      trackId: "track-preview",
+    },
+  ]);
+  assert.deepEqual(inputLifecycles, [
+    { inputId, phase: "start", trackId: "track-preview" },
+    { inputId, phase: "end", trackId: "track-preview" },
+  ]);
+
+  syncedTrackIds = new Set(project.tracks.map(({ id }) => id));
+  assert.doesNotThrow(() => previewRuntime.finishNaturally());
+  assert.equal(previewRuntime.finishNaturally(), false, "a retired preview cannot emit a later stale end");
+  assert.equal(inputLifecycles.length, 2);
   audition.dispose();
 });

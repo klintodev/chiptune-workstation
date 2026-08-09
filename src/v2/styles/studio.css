@@ -542,7 +542,16 @@ body {
   border-right: 1px solid var(--v2-line);
   background: var(--v2-panel);
   color: var(--v2-muted);
+  cursor: pointer;
   font: 0.9rem "VT323", "Courier New", monospace;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.v2-pitch-label:hover,
+.v2-pitch-label:active {
+  background: var(--accent-soft);
+  color: var(--accent-bright);
 }
 
 .v2-piano-note,

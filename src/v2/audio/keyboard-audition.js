@@ -1,9 +1,11 @@
 import { createInputController } from "../../features/keyboard/input-controller.js";
+import { getEffectiveMidiNote, midiNoteToFrequency } from "../../audio/pitch-policy.js";
 import { MAX_DELAY_TAIL_SECONDS } from "./effect-tail.js";
 import { VOICE_RETIRE_RAMP_SECONDS } from "./klinto-chip-synth.js";
 
 export const V2_KEYBOARD_AUDITION_HOLD_SECONDS = 30;
 export const V2_KEYBOARD_AUDITION_HEARTBEAT_SECONDS = MAX_DELAY_TAIL_SECONDS / 2;
+export const V2_PIANO_PREVIEW_SECONDS = 0.14;
 const V2_KEYBOARD_AUDITION_VOICE_LIMIT = 16;
 const VOICE_DISCONNECT_GRACE_SECONDS = 0.01;
 
@@ -47,6 +49,7 @@ export function createV2KeyboardAudition({
   const activeVoices = [];
   let heartbeatId = null;
   let nextVoiceId = 1;
+  let previewVoice = null;
   let disposed = false;
 
   function stopHeartbeat() {
@@ -57,7 +60,7 @@ export function createV2KeyboardAudition({
   }
 
   function heldVoiceRecords() {
-    return activeVoices.filter((record) => record.inputMarked !== true);
+    return activeVoices.filter((record) => record.held && record.inputMarked !== true);
   }
 
   function heartbeat() {
@@ -91,11 +94,10 @@ export function createV2KeyboardAudition({
     );
   }
 
-  function resolveTrack() {
+  function resolveTrack(explicitTrackId = getTrackId()) {
     const project = getProject();
-    const trackId = getTrackId();
-    const track = project?.tracks?.find(({ id }) => id === trackId);
-    if (!track) throw new RangeError(`Unknown audition Track: ${trackId}.`);
+    const track = project?.tracks?.find(({ id }) => id === explicitTrackId);
+    if (!track) throw new RangeError(`Unknown audition Track: ${explicitTrackId}.`);
     return { project, track };
   }
 
@@ -111,8 +113,8 @@ export function createV2KeyboardAudition({
     onTrackInput(trackId, Object.freeze({ releaseEndTime }), Object.freeze(lifecycle));
   }
 
-  function createVoiceEngine() {
-    const { track } = resolveTrack();
+  function createVoiceEngine(explicitTrackId) {
+    const { track } = resolveTrack(explicitTrackId);
     return Object.freeze({
       trigger(event) {
         if (disposed || !audioEngine.isReady()) throw createNotReadyError();
@@ -123,14 +125,15 @@ export function createV2KeyboardAudition({
         while (activeVoices.length >= maxVoices) {
           activeVoices[0].wrapper.retire(startTime);
         }
-        const durationSeconds = V2_KEYBOARD_AUDITION_HOLD_SECONDS;
+        const held = event.durationSeconds === undefined;
+        const durationSeconds = event.durationSeconds ?? V2_KEYBOARD_AUDITION_HOLD_SECONDS;
         const releaseEndTime = startTime
           + durationSeconds
           + event.releaseSeconds
           + VOICE_DISCONNECT_GRACE_SECONDS;
         const voiceId = nextVoiceId;
         nextVoiceId += 1;
-        const inputId = `keyboard-audition:${voiceId}`;
+        const inputId = `${event.inputKind ?? "keyboard-audition"}:${voiceId}`;
         const voice = runtime.trigger(Object.freeze({
           attackSeconds: event.attackSeconds,
           durationSeconds,
@@ -138,9 +141,9 @@ export function createV2KeyboardAudition({
           ownership: Object.freeze({
             clipId: null,
             mode: "audition",
-            noteId: null,
+            noteId: event.noteId ?? null,
             occurrenceId: inputId,
-            patternId: null,
+            patternId: event.patternId ?? null,
             projectId: getProject().id ?? null,
             trackId: track.id,
           }),
@@ -148,7 +151,7 @@ export function createV2KeyboardAudition({
           releaseSeconds: event.releaseSeconds,
           startTime,
           trackId: track.id,
-          velocity: 1,
+          velocity: event.velocity ?? 1,
           waveform: event.type,
         }));
         let record;
@@ -197,6 +200,7 @@ export function createV2KeyboardAudition({
         });
         record = {
           detachEnded: null,
+          held,
           inputId,
           inputEndTime: releaseEndTime,
           inputMarked: false,
@@ -204,7 +208,7 @@ export function createV2KeyboardAudition({
           wrapper,
         };
         activeVoices.push(record);
-        markInput(track.id, startTime, {
+        markInput(track.id, held ? startTime : releaseEndTime, {
           inputId,
           phase: "start",
         });
@@ -216,6 +220,49 @@ export function createV2KeyboardAudition({
         return wrapper;
       },
     });
+  }
+
+  function stopPreview() {
+    const current = previewVoice;
+    previewVoice = null;
+    return current?.retire() ?? false;
+  }
+
+  function previewNote({
+    noteId = null,
+    patternId = null,
+    pitch,
+    trackId,
+    velocity = 1,
+  } = {}) {
+    stopPreview();
+    if (velocity === 0) return false;
+    if (!Number.isFinite(velocity) || velocity < 0 || velocity > 1) {
+      throw new RangeError("Piano preview velocity must be between 0 and 1.");
+    }
+    const { track } = resolveTrack(trackId);
+    const params = track.instrument.params;
+    try {
+      const voice = createVoiceEngine(track.id).trigger({
+        attackSeconds: params.attackSeconds,
+        durationSeconds: V2_PIANO_PREVIEW_SECONDS,
+        frequency: midiNoteToFrequency(getEffectiveMidiNote(pitch, params.octave)),
+        inputKind: "piano-preview",
+        noteId,
+        patternId,
+        releaseSeconds: params.releaseSeconds,
+        type: params.waveform,
+        velocity,
+      });
+      previewVoice = voice;
+      voice.addEndedListener?.(() => {
+        if (previewVoice === voice) previewVoice = null;
+      });
+      return true;
+    } catch (error) {
+      if (error?.code === "not-ready") return false;
+      throw error;
+    }
   }
 
   const inputController = createInputController({
@@ -238,19 +285,34 @@ export function createV2KeyboardAudition({
   documentLike.addEventListener("keyup", handleKeyUp);
   if (keyupTarget !== documentLike) keyupTarget?.addEventListener?.("keyup", handleKeyUp);
 
+  function stopAllAuditionVoices() {
+    const hadActiveVoices = activeVoices.some(({ inputMarked }) => !inputMarked);
+    inputController.stopAll();
+    stopPreview();
+    const now = audioEngine.getCurrentTime();
+    for (const record of [...activeVoices]) {
+      if (!record.inputMarked) record.wrapper.retire(now);
+    }
+    return hadActiveVoices;
+  }
+
   return Object.freeze({
     dispose() {
       if (disposed) return false;
-      disposed = true;
       documentLike.removeEventListener("keydown", handleKeyDown);
       documentLike.removeEventListener("keyup", handleKeyUp);
       if (keyupTarget !== documentLike) keyupTarget?.removeEventListener?.("keyup", handleKeyUp);
+      stopAllAuditionVoices();
+      disposed = true;
       stopHeartbeat();
       inputController.dispose();
+      for (const record of activeVoices) record.detachEnded?.();
       activeVoices.length = 0;
+      previewVoice = null;
       return true;
     },
     getActiveVoiceCount: () => activeVoices.length,
+    previewNote,
     /**
      * Drain computer-key ownership that targets a Track absent from the next
      * Project. Call this after Project state changes but before graph sync, so
@@ -265,9 +327,10 @@ export function createV2KeyboardAudition({
         record.inputMarked !== true && !validTrackIds.has(record.trackId)
       ));
       if (!ownsInvalidTrack) return false;
-      inputController.stopAll();
+      stopAllAuditionVoices();
       return true;
     },
-    stopAll: inputController.stopAll,
+    stopAll: stopAllAuditionVoices,
+    stopPreview,
   });
 }
