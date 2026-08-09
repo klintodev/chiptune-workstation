@@ -95,11 +95,15 @@ V2 does not add oscillators, filters, LFOs, modulation, samples or a full ADSR t
 
 Reset restores the pinned Klinto Chip defaults as one undoable command. It does not change Pattern notes, Track Mixer state, effects, clips or the Piano Roll audition Track. Factory/user presets and `Custom` preset state are deferred.
 
-### Shared owner name
+### Shared owner name and duplication
 
-Right-clicking the Playlist Klinto Chip launcher takes priority over the surrounding Track and exposes Rename Instrument. The command is intentionally user-facing shorthand for renaming canonical `Track.name`; it does not mutate `instanceId`, `type`, version, parameters, Mixer state, clips or runtime identity. The launcher shows the renamed owner name alongside the immutable Klinto Chip product type, while Track, Mixer, device-window and accessible owner labels use the same value.
+Right-clicking the Playlist Klinto Chip launcher takes priority over the surrounding Track and exposes Rename Instrument followed by Duplicate Instrument. Rename is intentionally user-facing shorthand for renaming canonical `Track.name`; it does not mutate `instanceId`, `type`, version, parameters, Mixer state, clips or runtime identity. The launcher shows the renamed owner name alongside the immutable Klinto Chip product type, while Track, Mixer, device-window and accessible owner labels use the same value.
 
 Input uses the existing Track-name command: trim, require 1–32 characters and commit only a changed valid value. Success creates one undo/autosave entry and restores focus to the same stable launcher. Cancel, unchanged input and validation failure commit nothing and retain/restore launcher focus. An already-open Instrument or Track-owned Effect updates its owner title and parameter labels live without being replaced, reopening audio nodes or interrupting playback.
+
+Duplicate Instrument preserves one-to-one Track ownership by creating an independently owned Track immediately below the source. The copy receives fresh Track and Instrument instance IDs plus a bounded unique owner name such as `Pulse 1 copy`; it copies the source Klinto Chip type, version and complete parameter snapshot. It does not copy clips, Track Mixer volume/pan/mute/solo, Effects or open device presentation: the new Track starts with the default Mixer state and empty clip/Effect collections. The source and any sounding runtime remain unchanged.
+
+Duplication commits one undo/autosave entry, makes the new Track the Playlist destination, clears clip selection and focuses its Instrument launcher without opening it. Undo removes the copied Track and redo restores the same allocated identities. At the eight-Track Project limit, Duplicate Instrument remains visible but disabled with the Track-cap reason and commits nothing.
 
 ## V1 migration
 
@@ -121,7 +125,7 @@ There is no preset selector, movable geometry or permanent keyboard. An optional
 
 Open routes are the Piano Roll audition-Track control, Playlist Track header and Mixer Instrument slot. Opening the same instance focuses it; opening another device replaces the visible presentation. Opening focuses the programmatically focusable title or first parameter. Closing restores the connected, visible, enabled opener, then the owning Track launcher, active primary heading or global switcher.
 
-The Playlist launcher context menu follows PRD 31's clip > Instrument > Track right-click priority. Rename Instrument appears only for the Instrument target; New Pattern remains Track-scoped.
+The Playlist launcher context menu follows PRD 31's clip > Instrument > Track right-click priority. Rename Instrument and Duplicate Instrument appear only for the Instrument target, in that order; New Pattern remains Track-scoped and follows them in the Instrument menu.
 
 Accessible labels carry complete context, for example `Track 1, Klinto Chip, Attack: 8 milliseconds`. Instrument output uses that phrase explicitly so it cannot be confused with `Track 1 Mixer channel volume`.
 
@@ -132,6 +136,7 @@ Accessible labels carry complete context, for example `Track 1, Klinto Chip, Att
 - Autosave sees committed values, not transient drag samples.
 - Undo/redo updates the one existing runtime without duplicate nodes/voices.
 - Rename Instrument/Track is one undoable owner-name command; undo/redo updates every live owner label without changing or replacing the Instrument runtime.
+- Duplicate Instrument is one undoable command that creates one new Track/Instrument identity from a parameter snapshot without copying or restarting the source runtime.
 - Reset is one undoable command and requires no confirmation.
 - Abrupt gain changes use bounded click-safe smoothing.
 - Device UI subscribes only to its instance and necessary owner context.
@@ -159,8 +164,11 @@ Accessible labels carry complete context, for example `Track 1, Klinto Chip, Att
 ## Acceptance criteria
 
 - Each Track opens exactly its own stable Klinto Chip from Piano Roll, Playlist and Mixer routes.
-- Right-clicking a Playlist Instrument launcher exposes Rename Instrument, maps it to the owning Track's canonical name and leaves the Klinto Chip type plus stable Instrument identity unchanged.
+- Right-clicking a Playlist Instrument launcher exposes Rename Instrument, Duplicate Instrument and then New Pattern; the remaining Track area exposes New Pattern only.
+- Rename Instrument maps to the owning Track's canonical name and leaves the Klinto Chip type plus stable Instrument identity unchanged.
 - Rename success, undo and redo update Track, Mixer, device-window and accessible owner labels live; cancel, no-op and invalid input preserve data and return focus to the launcher/fallback.
+- Duplicate Instrument creates one independent Track immediately below the source with copied Klinto Chip parameters, fresh Track/Instrument IDs and a bounded unique owner name, but default Mixer state and no Effects or clips. It focuses the new launcher without opening it, and undo/redo removes/restores the same copy atomically.
+- At eight Tracks Duplicate Instrument is disabled with a reason and changes neither Project, history nor focus.
 - Changing Track 1 never changes Track 2.
 - Opening focuses a correctly contextualized target; closing returns to the exact visible launcher or documented fallback.
 - Opening an Effect or another Instrument removes the first presentation from layout, tab order and accessibility tree without interrupting its audio.
@@ -177,6 +185,7 @@ Accessible labels carry complete context, for example `Track 1, Klinto Chip, Att
 - Live/offline/public definition-parity tests, with deterministic and noise-specific comparisons
 - Component tests for all open routes, one-device replacement and focus fallback; manual review covers 200% zoom
 - Domain/component coverage for Track-name trim/bounds/no-op/undo, launcher-specific right-click priority, immutable Instrument shape/type/identity, focus restoration and live owner-label refresh in an already-open device
+- Domain/component coverage for Duplicate Instrument parameter fidelity, fresh deterministic identities, bounded unique names, source-adjacent order, default Mixer/empty Effects and clips, one-step undo/redo, eight-Track rejection and destination/focus repair
 - Keyboard parameter and Reset/undo journey; 390Ã—844 edit/Back smoke journey
 - Save/reload and import/export/cloud fixture coverage under PRD 32's activation gate
 
@@ -193,7 +202,7 @@ Accessible labels carry complete context, for example `Track 1, Klinto Chip, Att
 
 - VST/VST3, Audio Unit, native binaries, remote scripts or third-party device loading
 - Public plug-in SDK, sandbox host or marketplace
-- More Instruments, factory/user presets or preset sharing
+- Additional Instrument products/types, factory/user presets or preset sharing
 - Extra oscillators, ADSR stages, filters, LFO/modulation, samples or wavetable synthesis
 - MIDI learn, external MIDI, automation or macro controls
 - Multiple Instruments, layering or split zones on one Track
@@ -205,6 +214,7 @@ Accessible labels carry complete context, for example `Track 1, Klinto Chip, Att
 - Closed static registry; project data contains type IDs and parameters, never executable code.
 - Stable type ID is `klinto-chip`; stable waveform enum is `pulse12|pulse25|square|triangle|saw|noise`.
 - `Track.name` is the shared persisted owner/Instrument display name; Rename Instrument delegates to Track rename and the Instrument schema gains no name field.
+- Duplicate Instrument creates a second one-Instrument Track with fresh identities and copied Klinto Chip parameters; it is not full Track, Mixer, Effect or clip duplication.
 - V1 parameter meaning and active/future voice update behaviour are preserved.
 - Instrument output and Mixer channel volume remain distinct.
 - Reset ships; presets do not.

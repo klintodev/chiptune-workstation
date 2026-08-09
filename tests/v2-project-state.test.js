@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   MAX_PATTERN_CONTENT_TICKS,
+  MAX_PROJECT_TRACKS,
   V2DomainError,
   createV2ProjectState,
 } from "../src/v2/domain/index.js";
@@ -265,6 +266,123 @@ test("Track rename is the undoable owner name for its Instrument and Mixer chann
   assert.deepEqual(project.getTrack("track-1").instrument, originalInstrument);
   assert.equal(project.redo(), true);
   assert.equal(project.getTrack("track-1").name, "Lead Chip");
+});
+
+test("duplicateInstrument creates an adjacent independent Instrument Track as one undoable command", () => {
+  const setup = createV2ProjectState();
+  setup.setInstrumentParam("track-1", "waveform", "triangle");
+  setup.setInstrumentParam("track-1", "octave", -1);
+  setup.setInstrumentParam("track-1", "attackSeconds", 0.25);
+  setup.setInstrumentParam("track-1", "releaseSeconds", 1.5);
+  setup.setInstrumentParam("track-1", "level", 0.8);
+  setup.setTrackMixer("track-1", { muted: true, pan: -0.4, solo: true, volume: 0.45 });
+  setup.addEffect("track-1", "klinto-filter");
+  makeAudible(setup);
+  setup.addClip("track-1", "pattern-1", 0);
+  const trailingTrackId = setup.addTrack("Trailing");
+
+  const project = createV2ProjectState(setup.getState());
+  const before = project.getState();
+  const source = project.getTrack("track-1");
+  const changes = [];
+  project.addEventListener("change", (event) => changes.push(event.detail));
+
+  const duplicateId = project.duplicateInstrument("track-1");
+  const duplicate = project.getTrack(duplicateId);
+
+  assert.deepEqual(project.getState().tracks.map(({ id }) => id), [
+    "track-1",
+    duplicateId,
+    trailingTrackId,
+  ]);
+  assert.equal(duplicate.name, "Pulse 1 copy");
+  assert.equal(duplicate.instrument.type, source.instrument.type);
+  assert.equal(duplicate.instrument.version, source.instrument.version);
+  assert.deepEqual(duplicate.instrument.params, source.instrument.params);
+  assert.notEqual(duplicate.instrument.params, source.instrument.params);
+  assert.notEqual(duplicate.instrument.instanceId, source.instrument.instanceId);
+  assert.equal(
+    new Set(project.getState().tracks.map(({ instrument }) => instrument.instanceId)).size,
+    project.getState().tracks.length,
+  );
+  assert.deepEqual(duplicate.mixer, {
+    volume: 1,
+    pan: 0,
+    muted: false,
+    solo: false,
+    effects: [],
+  });
+  assert.deepEqual(duplicate.clips, []);
+  assert.deepEqual(project.getTrack("track-1"), source, "the source Track must remain unchanged");
+  assert.deepEqual(changes.map(({ operation, sourceTrackId, trackId }) => ({
+    operation,
+    sourceTrackId,
+    trackId,
+  })), [{
+    operation: "duplicate-instrument",
+    sourceTrackId: "track-1",
+    trackId: duplicateId,
+  }]);
+  assert.deepEqual(project.getHistoryState(), { canRedo: false, canUndo: true });
+
+  const duplicated = project.getState();
+  assert.equal(project.undo(), true);
+  assert.deepEqual(project.getState(), before);
+  assert.equal(project.undo(), false, "duplication must consume exactly one undo entry");
+  assert.equal(project.redo(), true);
+  assert.deepEqual(project.getState(), duplicated);
+  assert.deepEqual(project.getTrack(duplicateId), duplicate);
+});
+
+test("duplicateInstrument derives bounded repeated copy names and accepts an explicit name", () => {
+  const setup = createV2ProjectState();
+  setup.renameTrack("track-1", "A".repeat(32));
+  const project = createV2ProjectState(setup.getState());
+
+  const firstId = project.duplicateInstrument("track-1");
+  const secondId = project.duplicateInstrument("track-1");
+  const namedId = project.duplicateInstrument("track-1", "Lead Chip");
+
+  assert.equal(project.getTrack(firstId).name, `${"A".repeat(27)} copy`);
+  assert.equal(project.getTrack(secondId).name, `${"A".repeat(25)} copy 2`);
+  assert.equal(project.getTrack(namedId).name, "Lead Chip");
+  assert.deepEqual(project.getState().tracks.map(({ id }) => id), [
+    "track-1",
+    namedId,
+    secondId,
+    firstId,
+  ]);
+  assert.equal(new Set(project.getState().tracks.map(({ name }) => name)).size, 4);
+  assert.ok(project.getState().tracks.every(({ name }) => name.length <= 32));
+});
+
+test("duplicateInstrument rejects unknown sources and the Track cap atomically", () => {
+  const project = createV2ProjectState();
+  const beforeUnknown = project.getState();
+  const beforeUnknownHistory = project.getHistoryState();
+  let unknownChanges = 0;
+  project.addEventListener("change", () => { unknownChanges += 1; });
+
+  assert.throws(() => project.duplicateInstrument("missing-track"), /Unknown Track/);
+  assert.equal(project.getState(), beforeUnknown);
+  assert.deepEqual(project.getHistoryState(), beforeUnknownHistory);
+  assert.equal(unknownChanges, 0);
+
+  const setup = createV2ProjectState();
+  while (setup.getState().tracks.length < MAX_PROJECT_TRACKS) setup.addTrack();
+  const capped = createV2ProjectState(setup.getState());
+  const beforeCap = capped.getState();
+  const beforeCapHistory = capped.getHistoryState();
+  let cappedChanges = 0;
+  capped.addEventListener("change", () => { cappedChanges += 1; });
+
+  assert.throws(
+    () => capped.duplicateInstrument("track-1"),
+    new RegExp(`at most ${MAX_PROJECT_TRACKS} Tracks`),
+  );
+  assert.equal(capped.getState(), beforeCap);
+  assert.deepEqual(capped.getHistoryState(), beforeCapHistory);
+  assert.equal(cappedChanges, 0);
 });
 
 test("multi-note duplicate-right and delete preserve the complete block as atomic history", () => {

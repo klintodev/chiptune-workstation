@@ -156,6 +156,30 @@ export function renamePlaylistInstrument({
   return true;
 }
 
+export function duplicatePlaylistInstrument({
+  announce = () => {},
+  mutate = (action) => action(),
+  projectState,
+  render = () => {},
+  setPlaylist = () => {},
+  sourceTrackId,
+} = {}) {
+  if (!projectState?.getTrack || !projectState?.duplicateInstrument) {
+    throw new TypeError("Duplicating a Playlist Instrument requires Project state.");
+  }
+  const source = projectState.getTrack(sourceTrackId);
+  const trackId = mutate(() => projectState.duplicateInstrument(sourceTrackId));
+  const duplicate = projectState.getTrack(trackId);
+  setPlaylist({
+    destinationTrackId: trackId,
+    selectedClipId: null,
+    selectedClipIds: [],
+  });
+  announce(`Duplicated ${source.name} Instrument as ${duplicate.name}.`);
+  render(trackId);
+  return trackId;
+}
+
 export function createPatternForPlaylistTrack({
   announce = () => {},
   mutate = (action) => action(),
@@ -524,11 +548,37 @@ export function createPlaylistSurface({
     }
   }
 
+  function duplicateInstrumentForTrack(sourceTrackId) {
+    try {
+      return duplicatePlaylistInstrument({
+        announce,
+        mutate: (action) => mutateProject(action),
+        projectState,
+        render: (trackId) => {
+          const trackIndex = project().tracks.findIndex(({ id }) => id === trackId);
+          rememberFocus({ clipId: null, trackAction: "instrument", trackId, trackIndex });
+          render();
+        },
+        setPlaylist: (patch) => setSession(patch),
+        sourceTrackId,
+      });
+    } catch (error) {
+      announce(error.message);
+      focusTrackAction(sourceTrackId, "instrument");
+      return null;
+    }
+  }
+
   function ensureTrackContextMenu() {
     if (trackContextMenu) return trackContextMenu;
     const renameInstrument = createElement("button", {
       role: "menuitem",
       textContent: "Rename Instrument",
+      type: "button",
+    });
+    const duplicateInstrument = createElement("button", {
+      role: "menuitem",
+      textContent: "Duplicate Instrument",
       type: "button",
     });
     const newPattern = createElement("button", {
@@ -542,11 +592,16 @@ export function createPlaylistSurface({
       hidden: true,
       role: "menu",
       tabIndex: -1,
-    }, [renameInstrument, newPattern]);
+    }, [renameInstrument, duplicateInstrument, newPattern]);
     renameInstrument.addEventListener("click", () => {
       const trackId = trackContextTrackId;
       closeTrackContextMenu({ restoreFocus: true });
       if (trackId) requestInstrumentRename(trackId);
+    }, { signal: lifecycle.signal });
+    duplicateInstrument.addEventListener("click", () => {
+      const trackId = trackContextTrackId;
+      closeTrackContextMenu();
+      if (trackId) duplicateInstrumentForTrack(trackId);
     }, { signal: lifecycle.signal });
     newPattern.addEventListener("click", () => {
       const trackId = trackContextTrackId;
@@ -581,7 +636,7 @@ export function createPlaylistSurface({
     }, { signal: lifecycle.signal });
     const menuHost = node.closest?.(".v2-workspace") ?? node.ownerDocument?.body;
     menuHost?.append(menu);
-    trackContextMenu = { menu, newPattern, renameInstrument };
+    trackContextMenu = { duplicateInstrument, menu, newPattern, renameInstrument };
     return trackContextMenu;
   }
 
@@ -590,7 +645,8 @@ export function createPlaylistSurface({
     if (!track) return false;
     closeTrackContextMenu();
     const contextMenu = ensureTrackContextMenu();
-    const trackCountAtOpen = project().patterns.length;
+    const patternCountAtOpen = project().patterns.length;
+    const trackCapReached = project().tracks.length >= 8;
     trackContextTrackId = track.id;
     trackContextReturnFocus = event.target?.closest?.("button")
       ?? node.querySelector(`.v2-playlist-track-focus[data-track-id="${selectorId(track.id)}"]`);
@@ -601,8 +657,13 @@ export function createPlaylistSurface({
     );
     contextMenu.renameInstrument.hidden = !instrumentTarget;
     contextMenu.renameInstrument.title = `Rename ${track.name} Instrument`;
-    contextMenu.newPattern.disabled = trackCountAtOpen >= 64;
-    contextMenu.newPattern.title = trackCountAtOpen >= 64
+    contextMenu.duplicateInstrument.hidden = !instrumentTarget;
+    contextMenu.duplicateInstrument.disabled = trackCapReached;
+    contextMenu.duplicateInstrument.title = trackCapReached
+      ? "A Project supports at most eight Instruments"
+      : `Duplicate ${track.name} Instrument`;
+    contextMenu.newPattern.disabled = patternCountAtOpen >= 64;
+    contextMenu.newPattern.title = patternCountAtOpen >= 64
       ? "A Project supports at most 64 Patterns"
       : `Create a new Pattern for ${track.name}`;
     contextMenu.menu.hidden = false;
@@ -618,7 +679,11 @@ export function createPlaylistSurface({
     }) ?? { left: 8, top: 8 };
     contextMenu.menu.style.left = `${position.left}px`;
     contextMenu.menu.style.top = `${position.top}px`;
-    const focusTarget = [contextMenu.renameInstrument, contextMenu.newPattern]
+    const focusTarget = [
+      contextMenu.renameInstrument,
+      contextMenu.duplicateInstrument,
+      contextMenu.newPattern,
+    ]
       .find((item) => !item.hidden && !item.disabled);
     (focusTarget ?? contextMenu.menu).focus({ preventScroll: true });
     return true;

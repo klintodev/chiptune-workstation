@@ -493,6 +493,45 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     return id;
   }
 
+  function duplicateInstrument(trackId, name) {
+    if (state.tracks.length >= MAX_PROJECT_TRACKS) {
+      throw new RangeError(`A Project supports at most ${MAX_PROJECT_TRACKS} Tracks.`);
+    }
+    const sourceIndex = state.tracks.findIndex((track) => track.id === trackId);
+    if (sourceIndex === -1) throw new RangeError(`Unknown Track: ${trackId}.`);
+    const source = state.tracks[sourceIndex];
+    const id = nextDomainId("track", new Set(state.tracks.map((track) => track.id)));
+    const resolvedName = createBoundedUniqueName(name ?? source.name, state.tracks.map((track) => track.name), {
+      fallback: `Track ${state.tracks.length + 1}`,
+      maximumLength: MAX_TRACK_NAME_LENGTH,
+      suffix: name === undefined ? "copy" : "",
+    });
+    const instanceIds = getInstanceIds(state);
+    const preferredInstanceId = `instrument-${id}`;
+    const instanceId = instanceIds.has(preferredInstanceId)
+      ? nextDomainId("instrument", instanceIds)
+      : preferredInstanceId;
+    const duplicate = {
+      id,
+      name: resolvedName,
+      instrument: {
+        ...source.instrument,
+        instanceId,
+        params: { ...source.instrument.params },
+      },
+      mixer: { volume: 1, pan: 0, muted: false, solo: false, effects: [] },
+      clips: [],
+    };
+    const tracks = [...state.tracks];
+    tracks.splice(sourceIndex + 1, 0, duplicate);
+    commit({ ...state, tracks }, {
+      operation: "duplicate-instrument",
+      sourceTrackId: trackId,
+      trackId: id,
+    });
+    return id;
+  }
+
   function renameTrack(trackId, name) {
     const resolvedName = trimCommandName(name, "Track name", MAX_TRACK_NAME_LENGTH);
     return updateTrack(trackId, (track) => track.name === resolvedName ? track : { ...track, name: resolvedName }, {
@@ -933,6 +972,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     deletePattern,
     duplicateClip,
     duplicateClips,
+    duplicateInstrument,
     duplicateNotes,
     duplicatePattern,
     endHistoryGroup,

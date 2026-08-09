@@ -45,9 +45,13 @@ Limits remain one to eight Tracks. A prominent Add Instrument action in Playlist
 
 Every Playlist Instrument row exposes compact Mute and Solo switches. They are alternate controls for the owning Track's canonical `mixer.muted` and `mixer.solo` fields, not separate Instrument state: Playlist and Mixer always show the same pressed values through edits, undo/redo and Project replacement. Multiple Tracks may be soloed, and mute always wins when a Track is both muted and soloed. Each activation commits one undoable/autosaved Track Mixer command without selecting the Track, opening the Instrument or changing transport.
 
-Right-click routing uses the most specific target under the pointer: a clip first, its Klinto Chip Instrument launcher second, then the remaining Track header or empty lane. Every handled route suppresses the browser menu. A clip keeps its direct-delete command. The Instrument launcher opens the Track-scoped menu with Rename Instrument followed by New Pattern; the remaining Track area exposes New Pattern without the rename action.
+Right-click routing uses the most specific target under the pointer: a clip first, its Klinto Chip Instrument launcher second, then the remaining Track header or empty lane. Every handled route suppresses the browser menu. A clip keeps its direct-delete command. The Instrument launcher opens the Track-scoped menu in the order Rename Instrument, Duplicate Instrument, New Pattern; the remaining Track area exposes New Pattern only.
 
 Rename Instrument edits the owning Track's canonical persisted `name`; it does not add `instrument.name`, mutate `instrument.instanceId` or rename the immutable Klinto Chip product/type. The shared name updates the Instrument launcher's owner line, Track header, Mixer channel, device-window title and contextual labels live while the same Instrument/runtime remains open. A valid changed name is trimmed, bounded to the Track-name contract and commits one undo/autosave entry. Cancel, an unchanged trimmed value or invalid input commits nothing. After success, cancel or validation failure, focus returns to the same stable Instrument launcher or the documented Track fallback.
+
+Duplicate Instrument creates an independent Track immediately below the source so the one-Track/one-Instrument invariant remains intact. It copies the Klinto Chip type, version and full parameter snapshot, allocates fresh Track and Instrument instance IDs and derives a bounded unique owner name such as `Pulse 1 copy`. It deliberately does not copy clips, Effects or Track Mixer volume/pan/mute/solo; those collections are empty and the Mixer starts at its defaults. The source Instrument and runtime are not changed or reopened.
+
+The duplication is one undoable/autosaved Project command. Success makes the copy the Playlist destination, clears clip selection and focuses its Instrument launcher without opening the device; undo removes it and redo restores the same identities. Duplicate Instrument remains visible but disabled with the Track-cap reason at eight Tracks. A disabled activation changes neither Project, history, transport nor focus.
 
 New Pattern creates one empty automatically sized Pattern, makes the clicked Track the Playlist destination and Piano Roll audition Track, selects the Pattern and immediately opens its reusable Piano Roll. It does not create a clip; placement remains an explicit Playlist action after the Pattern has audible content. The menu closes on action, outside interaction, Escape, scrolling, resize or surface replacement, and New Pattern is disabled with its existing reason at the 64-Pattern cap.
 
@@ -92,10 +96,10 @@ Desktop pointer and keyboard commands support one or more selected clips:
 - Control/Command+B duplicates the selected bounding block immediately to its right, preserving Pattern links, Tracks and internal gaps, then selects the new copies so the command can be repeated;
 - the duplicate offset is the exact span from the earliest selected start to the latest selected end;
 - move and duplicate preflight the complete candidate and commit one undo entry, rejecting without partial mutation when any clip would collide, cross a Track/song boundary or exceed a Track limit;
-- right-clicking a clip deletes exactly that clip; otherwise the Instrument launcher takes priority over its Track and exposes Rename Instrument plus New Pattern, while the remaining Track area exposes New Pattern without changing any clip;
+- right-clicking a clip deletes exactly that clip; otherwise the Instrument launcher takes priority over its Track and exposes Rename Instrument, Duplicate Instrument and New Pattern, while the remaining Track area exposes New Pattern without changing any clip;
 - undo/redo.
 
-Drag previews never mutate the Project until drop. Invalid drops restore the original position and announce why. Pointer cancellation commits nothing. Reorder/move keeps focus tied to stable clip identity, not its old lane/cell. Clip right-click suppresses the browser context menu and deletes exactly that clip as one undoable command; Instrument-launcher right-click opens Rename Instrument/New Pattern, and the remaining Track header or empty lane opens the Track-scoped New Pattern menu.
+Drag previews never mutate the Project until drop. Invalid drops restore the original position and announce why. Pointer cancellation commits nothing. Reorder/move keeps focus tied to stable clip identity, not its old lane/cell. Clip right-click suppresses the browser context menu and deletes exactly that clip as one undoable command; Instrument-launcher right-click opens Rename Instrument/Duplicate Instrument/New Pattern, and the remaining Track header or empty lane opens the Track-scoped New Pattern menu.
 
 Empty-lane left-click adds the active Pattern at the exact snapped position on that Track. Clicking a clip continues to select it and never creates another clip.
 
@@ -149,6 +153,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 
 - Clip/Track commands persist through the final V2 schema owned by PRD 32.
 - `Track.name` is the sole persisted owner/Instrument display name. Instrument type and identity remain the strict PRD 29 fields; Playlist rename never adds another schema key.
+- Duplicate Instrument reuses the existing Track/Instrument schema with fresh identities and copies only the strict Instrument contract; it introduces no alias or duplication-only field.
 - Opening, importing, switching, deleting or undoing Projects repairs selected Track, selected clip IDs/primary, Pattern phase, Song playhead, Playlist insertion cursor, loop and Pattern audition contexts before render.
 - Invalid/missing Pattern references or overlapping/out-of-bound clips fail normalization; they do not enter audio state.
 - Removing a Track containing the final clip updates Playlist immediately, closes only owned device UI, releases owned voices and applies the focus fallback.
@@ -170,7 +175,8 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Selecting a Pattern in the library and clicking an empty Track position adds that Pattern exactly at the snapped click position without changing existing clip-click behavior.
 - Double-clicking either the selected Pattern card or a Playlist clip opens that Pattern in the reusable Piano Roll for editing; a single clip click only selects it.
 - Creating a Pattern from either the Playlist library or a Track's context menu immediately opens the newly created Pattern in the Piano Roll; the Track menu binds audition/destination to the clicked Track without creating a clip.
-- Right-clicking a Klinto Chip launcher exposes Rename Instrument before New Pattern; a successful rename changes the canonical Track name in one undoable command, keeps the stable Instrument identity/type/runtime, updates all live owner labels and restores focus to the launcher. Cancel, no-op and validation failure preserve data and focus.
+- Right-clicking a Klinto Chip launcher exposes Rename Instrument, Duplicate Instrument and then New Pattern; a successful rename changes the canonical Track name in one undoable command, keeps the stable Instrument identity/type/runtime, updates all live owner labels and restores focus to the launcher. Cancel, no-op and validation failure preserve data and focus.
+- Duplicate Instrument creates and focuses a source-adjacent Track with a bounded unique owner name, copied Klinto Chip parameters and fresh identities, while leaving its Mixer at defaults and its Effects/clips empty. It does not open the device, commits once, restores the same copy through redo and is disabled without mutation at eight Tracks.
 - Playlist Mute and Solo switches update the same Track Mixer state shown by the Mixer, apply during playback without restarting transport, retain focus through render and undo/redo, and preserve multi-solo with mute-overrides-solo semantics.
 - Pattern-library cog Rename/Duplicate/Delete actions obey caps, final-Pattern rules, atomic history and focus repair.
 - Pattern growth caused by note content rejects when any linked clip would become invalid; content shrinkage shortens all linked clips.
@@ -193,7 +199,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Shared scheduler projection tests for Pattern/Song/loop/ruler-seek/tempo plus first-Stop return and second-Stop reset across Pause/Resume
 - Manual desktop compose â†’ Add â†’ arrange â†’ open Pattern journey with focus/announcement checkpoints
 - Final-clip/final-Track focus fallback and exclusive-Mixer/narrow-width hidden-tree tests
-- Pattern-library default-expanded/collapse/dropdown/scalable selected-card/cog-action, marquee/group-drag, shortcut and right-click routing coverage, including clip > Instrument > Track priority, Track-menu positioning/dismissal, clicked-Track binding, Rename Instrument validation/undo/focus/live-label behaviour, Playlist/Mixer mute-solo state mirroring and clip-delete isolation, plus manual interaction review
+- Pattern-library default-expanded/collapse/dropdown/scalable selected-card/cog-action, marquee/group-drag, shortcut and right-click routing coverage, including clip > Instrument > Track priority, Track-menu positioning/dismissal, clicked-Track binding, Rename Instrument validation/undo/focus/live-label behaviour, Duplicate Instrument copy boundaries/name/identity/order/cap/undo/destination/focus behaviour, Playlist/Mixer mute-solo state mirroring and clip-delete isolation, plus manual interaction review
 - 1366Ã—768 layout plus 390Ã—844 reduced mobile smoke
 - Save/reload/import/export fixtures after PRD 32 activation
 
@@ -201,7 +207,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 
 1. **Playlist command adoption:** consume PRD 28 tick clips/loop plus session cursor/playheads; overlap, boundary and scan-forward Add commands.
 2. **Read-only Playlist:** Track lanes, linked clips, ruler, viewport, managed semantic selection and the default-expanded collapsible Pattern-library `<details>` with one scalable dropdown, one selected card and a labelled cog menu.
-3. **Editing/history:** marquee multi-selection, atomic group move/duplicate-right, single-clip delete, Track add/reorder/remove and undo/redo.
+3. **Editing/history:** marquee multi-selection, atomic group move/duplicate-right, single-clip delete, Track add/Instrument duplicate/reorder/remove and undo/redo.
 4. **Transport/navigation:** Pattern/Song projection, loop/seek and open-Pattern audition context.
 5. **Lifecycle/accessibility:** final-object focus, project switching, 200% zoom and reduced mobile smoke.
 6. **Persistence hand-off:** contribute Playlist fixtures to PRD 32; no new intermediate schema version.
@@ -215,7 +221,7 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Track groups, folders, buses, sends or sidechains
 - More than eight Tracks or the existing song boundary
 - Repeat-count, clipboard operations and full touch multi-clip rearrangement
-- Track context actions beyond New Pattern and shared-owner Rename Instrument, and richer clip context actions beyond direct deletion
+- Track context actions beyond New Pattern plus the Instrument-target Rename Instrument and Duplicate Instrument actions, and richer clip context actions beyond direct deletion
 - A separate per-Instrument alias, mutable Klinto Chip product/type name or `instrument.name` schema field
 
 ## Resolved decisions
@@ -227,8 +233,9 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Only Patterns with an audible note may be added.
 - Removing a Track never closes project-level Pattern surfaces; it repairs their audition context.
 - Removing the final clip leaves an intentional Playlist empty state with deterministic visible focus.
-- Pattern library is a default-expanded inline `<details>` section with one dropdown for all Patterns and one draggable selected-Pattern card with labelled cog actions; right-click priority is clip, Instrument launcher, then Track. Clip right-click deletes, the Instrument launcher exposes shared-owner Rename Instrument plus New Pattern, and the remaining Track exposes New Pattern.
+- Pattern library is a default-expanded inline `<details>` section with one dropdown for all Patterns and one draggable selected-Pattern card with labelled cog actions; right-click priority is clip, Instrument launcher, then Track. Clip right-click deletes, the Instrument launcher exposes shared-owner Rename Instrument, Duplicate Instrument and New Pattern in that order, and the remaining Track exposes New Pattern.
 - Rename Instrument is UI wording for renaming canonical `Track.name`; Klinto Chip type and Instrument identity are immutable, and no Instrument-name field is introduced.
+- Duplicate Instrument creates a source-adjacent Track with copied Klinto Chip parameters and new stable Track/Instrument identities; Mixer state, Effects and clips are intentionally not duplicated.
 - Playlist selection is transient, retains stable clip IDs plus one primary focus ID, and never enters Project JSON; group move and duplicate-right each commit atomically once.
 
 

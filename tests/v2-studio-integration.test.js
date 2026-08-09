@@ -17,6 +17,7 @@ import {
   createPatternForPlaylistTrack,
   createPlaylistSurface,
   createPlaylistPatternActivation,
+  duplicatePlaylistInstrument,
   getPlaylistContextMenuPosition,
   getPlaylistMarqueeClipIds,
   getPlaylistRulerSeekTick,
@@ -818,6 +819,52 @@ test("Playlist Instrument rename cancels cleanly and renders the shared owner na
     trackId: "track-1",
   }), TypeError);
   assert.equal(projectState.getState(), beforeInvalid);
+});
+
+test("Playlist Instrument duplicate selects and focuses its independent Track", () => {
+  const projectState = createV2ProjectState();
+  projectState.setInstrumentParam("track-1", "waveform", "triangle");
+  const announcements = [];
+  const playlistPatches = [];
+  let mutationCount = 0;
+  let renderedTrackId = null;
+
+  const trackId = duplicatePlaylistInstrument({
+    announce: (message) => announcements.push(message),
+    mutate: (action) => { mutationCount += 1; return action(); },
+    projectState,
+    render: (nextTrackId) => { renderedTrackId = nextTrackId; },
+    setPlaylist: (patch) => playlistPatches.push(patch),
+    sourceTrackId: "track-1",
+  });
+
+  assert.equal(trackId, "track-2");
+  assert.equal(projectState.getTrack(trackId).name, "Pulse 1 copy");
+  assert.equal(projectState.getTrack(trackId).instrument.params.waveform, "triangle");
+  assert.equal(mutationCount, 1);
+  assert.equal(renderedTrackId, trackId);
+  assert.deepEqual(playlistPatches, [{
+    destinationTrackId: trackId,
+    selectedClipId: null,
+    selectedClipIds: [],
+  }]);
+  assert.deepEqual(announcements, ["Duplicated Pulse 1 Instrument as Pulse 1 copy."]);
+});
+
+test("Playlist Instrument context menu wires duplicate between rename and New Pattern", async () => {
+  const playlist = await readFile(new URL("../src/v2/ui/playlist.js", import.meta.url), "utf8");
+  const renameIndex = playlist.indexOf('textContent: "Rename Instrument"');
+  const duplicateIndex = playlist.indexOf('textContent: "Duplicate Instrument"');
+  const newPatternIndex = playlist.indexOf('textContent: "New Pattern"', duplicateIndex);
+
+  assert.ok(renameIndex >= 0 && renameIndex < duplicateIndex && duplicateIndex < newPatternIndex);
+  assert.match(playlist, /\[renameInstrument, duplicateInstrument, newPattern\]/);
+  assert.match(playlist, /contextMenu\.duplicateInstrument\.hidden = !instrumentTarget/);
+  assert.match(playlist, /contextMenu\.duplicateInstrument\.disabled = trackCapReached/);
+  assert.match(playlist, /A Project supports at most eight Instruments/);
+  assert.match(playlist, /duplicateInstrumentForTrack\(trackId\)/);
+  assert.match(playlist, /rememberFocus\(\{ clipId: null, trackAction: "instrument", trackId, trackIndex \}\)/);
+  assert.match(playlist, /setPlaylist: \(patch\) => setSession\(patch\)/);
 });
 
 test("an open Instrument updates owner labels through rename, undo, and redo without rebuilding", () => {
