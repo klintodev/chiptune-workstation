@@ -1399,7 +1399,7 @@ body {
     display: none;
   }
 
-  .v2-piano-header .v2-segmented [data-piano-tool="draw"] {
+  .v2-piano-header .v2-piano-tools {
     display: none;
   }
 

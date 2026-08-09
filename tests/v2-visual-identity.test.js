@@ -73,6 +73,7 @@ test("Piano Roll grid geometry and Mixer density remain visually bounded", async
   assert.match(css, /@media \(max-width:\s*1400px\)\s*{[\s\S]*\.v2-brand-name,[\s\S]*\.v2-master-readout\s*{\s*display:\s*none/s);
   assert.match(css, /@media \(max-width:\s*1040px\)\s*{[\s\S]*\.v2-global-shell\s*{[^}]*min-width:\s*0/s);
   assert.match(css, /@media \(max-width:\s*700px\)\s*{[\s\S]*grid-template-rows:\s*44px 44px/s);
+  assert.match(css, /@media \(max-width:\s*700px\), \(max-height:\s*640px\)\s*{[\s\S]*\.v2-piano-header \.v2-piano-tools\s*{\s*display:\s*none/s);
   assert.match(css, /grid-template-areas:\s*"surfaces surfaces" "theme menu"/);
   assert.doesNotMatch(css, /\.v2-audio-status|\.v2-status-light/);
 });

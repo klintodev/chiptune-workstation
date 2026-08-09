@@ -51,6 +51,11 @@ export function isPianoDuplicateShortcut(event) {
   );
 }
 
+export function getPianoToolForViewport(compact, desktopTool = "draw") {
+  const visibleTool = desktopTool === "select" ? "select" : "draw";
+  return compact ? "pan" : visibleTool;
+}
+
 export function getPianoDuplicateDeltaTicks(notes) {
   if (!Array.isArray(notes) || notes.length === 0) return 0;
   const firstTick = Math.min(...notes.map(({ startTick }) => startTick));
@@ -213,7 +218,8 @@ export function createPianoRollSurface({
   let snapTicks = 24;
   const editorEndOverrides = new Map();
   const mobileEditorQuery = globalThis.matchMedia?.("(max-width: 700px), (max-height: 640px)");
-  let tool = mobileEditorQuery?.matches ? "pan" : "draw";
+  let desktopTool = "draw";
+  let tool = getPianoToolForViewport(mobileEditorQuery?.matches, desktopTool);
   const noteElements = new Map();
   const noteLabelElements = new Map();
 
@@ -1295,15 +1301,20 @@ export function createPianoRollSurface({
       updatePatternSession({ auditionTrackId: auditionSelect.value });
       announce(`${pattern.name} will audition through ${projectState.getTrack(auditionSelect.value).name}.`);
     });
-    const toolGroup = createElement("div", { className: "v2-segmented", role: "group", "aria-label": "Piano Roll tool" });
-    for (const [value, label] of [["draw", "Draw"], ["select", "Select"], ["pan", "Pan"]]) {
+    const toolGroup = createElement("div", { className: "v2-segmented v2-piano-tools", role: "group", "aria-label": "Piano Roll tool" });
+    for (const [value, label] of [["draw", "Draw"], ["select", "Select"]]) {
       const button = createElement("button", {
         dataset: { pianoTool: value },
         textContent: label,
         type: "button",
       });
       setPressed(button, tool === value);
-      button.addEventListener("click", () => { tool = value; canvas.dataset.tool = tool; renderHeader(); });
+      button.addEventListener("click", () => {
+        desktopTool = value;
+        tool = value;
+        canvas.dataset.tool = tool;
+        renderHeader();
+      });
       toolGroup.append(button);
     }
     const snapSelect = createElement("select", { "aria-label": "Piano Roll snap" });
@@ -1388,8 +1399,9 @@ export function createPianoRollSurface({
   canvas.addEventListener("contextmenu", handleContextMenu, { signal: lifecycle.signal });
   scroller.addEventListener("wheel", handleWheel, { signal: lifecycle.signal, passive: false });
   mobileEditorQuery?.addEventListener?.("change", (event) => {
-    if (!event.matches || tool !== "draw") return;
-    tool = "pan";
+    const nextTool = getPianoToolForViewport(event.matches, desktopTool);
+    if (tool === nextTool) return;
+    tool = nextTool;
     canvas.dataset.tool = tool;
     renderHeader();
   }, { signal: lifecycle.signal });

@@ -10,6 +10,7 @@ import {
   getExpandedPianoEditorEndTick,
   getPianoDuplicateDeltaTicks,
   getPianoMarqueeNoteIds,
+  getPianoToolForViewport,
   isPianoDuplicateShortcut,
   renamePianoPattern,
 } from "../src/v2/ui/piano-roll.js";
@@ -625,6 +626,15 @@ test("Piano duplicate-right uses the exact selection span and an unrepeated plat
   assert.equal(isPianoDuplicateShortcut({ ctrlKey: true, defaultPrevented: true, key: "b" }), false);
   assert.equal(isPianoDuplicateShortcut({ ctrlKey: true, key: "d" }), false);
   assert.equal(isPianoDuplicateShortcut({ key: "b" }), false);
+});
+
+test("Piano compact navigation restores the last visible desktop tool", () => {
+  for (const desktopTool of ["draw", "select"]) {
+    assert.equal(getPianoToolForViewport(false, desktopTool), desktopTool);
+    assert.equal(getPianoToolForViewport(true, desktopTool), "pan");
+    assert.equal(getPianoToolForViewport(false, desktopTool), desktopTool);
+  }
+  assert.equal(getPianoToolForViewport(false, "pan"), "draw");
 });
 
 test("Playlist modifier-wheel scrolling follows the dominant axis and normalizes delta modes", () => {
@@ -1453,6 +1463,14 @@ test("editor composites, shared playheads, opener routing, and replacement owner
   assert.match(piano, /function startDraw\(event\)/);
   assert.match(piano, /function startMarquee\(event\)/);
   assert.match(piano, /function startPan\(event(?:,|\))/);
+  assert.match(
+    piano,
+    /for \(const \[value, label\] of \[\s*\["draw",\s*"Draw"\],\s*\["select",\s*"Select"\]\s*\]\)/,
+    "the visible Piano Roll toolbar exposes only Draw and Select",
+  );
+  assert.doesNotMatch(piano, /\["pan", "Pan"\]/);
+  assert.match(piano, /let desktopTool = "draw";\s*let tool = getPianoToolForViewport\(mobileEditorQuery\?\.matches, desktopTool\)/);
+  assert.match(piano, /const nextTool = getPianoToolForViewport\(event\.matches, desktopTool\);\s*if \(tool === nextTool\) return;\s*tool = nextTool/);
   assert.ok(piano.includes('event.target.closest?.(".v2-note-resize")'));
   assert.match(piano, /"pointercancel"/);
   assert.match(piano, /role: "listbox"/);
