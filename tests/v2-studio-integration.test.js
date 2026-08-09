@@ -15,6 +15,7 @@ import {
 } from "../src/v2/ui/piano-roll.js";
 import {
   createPatternForPlaylistTrack,
+  createPlaylistSurface,
   createPlaylistPatternActivation,
   getPlaylistContextMenuPosition,
   getPlaylistMarqueeClipIds,
@@ -95,6 +96,18 @@ class FakeNode extends EventTarget {
 
   querySelector(selector) {
     if (selector.startsWith("#")) return this.find((node) => node.id === selector.slice(1));
+    const className = selector.match(/^\.([a-z0-9_-]+)/i)?.[1] ?? null;
+    const dataAttributes = [...selector.matchAll(/\[data-([a-z0-9-]+)="([^"]*)"\]/gi)]
+      .map(([, name, value]) => ({
+        name: name.replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase()),
+        value,
+      }));
+    if (className || dataAttributes.length > 0) {
+      return this.find((node) => (
+        (!className || String(node.className).split(/\s+/).includes(className))
+        && dataAttributes.every(({ name, value }) => node.dataset?.[name] === value)
+      ));
+    }
     return null;
   }
 
@@ -619,6 +632,69 @@ test("Playlist modifier-wheel scrolling follows the dominant axis and normalizes
   assert.equal(getPlaylistWheelScrollDelta({ deltaMode: 1, deltaY: 3 }), 120);
   assert.equal(getPlaylistWheelScrollDelta({ clientWidth: 800, deltaMode: 2, deltaY: -1 }), -800);
   assert.equal(getPlaylistWheelScrollDelta({ deltaY: Number.NaN }), 0);
+});
+
+test("Playlist Instrument Mute and Solo switches share canonical Track Mixer state", () => {
+  const projectState = createV2ProjectState();
+  const secondTrackId = projectState.addTrack("Bass");
+  const workspaceState = createWorkspaceState(projectState);
+  workspaceState.activatePlaylist();
+  const announcements = [];
+  const operations = [];
+  let instrumentOpenCount = 0;
+  projectState.addEventListener("change", (event) => operations.push(event.detail?.operation));
+
+  const surface = createPlaylistSurface({
+    announce: (message) => announcements.push(message),
+    onOpenInstrument: () => { instrumentOpenCount += 1; },
+    projectState,
+    workspaceState,
+  });
+  const findSwitch = (trackId, action) => surface.node.find(({ dataset }) => (
+    dataset.trackId === trackId && dataset.playlistTrackAction === action
+  ));
+
+  assert.equal(findSwitch("track-1", "mute").getAttribute("aria-pressed"), "false");
+  assert.equal(findSwitch("track-1", "solo").getAttribute("aria-pressed"), "false");
+
+  findSwitch("track-1", "mute").click();
+  assert.equal(projectState.getTrack("track-1").mixer.muted, true);
+  assert.equal(projectState.getTrack("track-1").mixer.solo, false);
+  assert.equal(findSwitch("track-1", "mute").getAttribute("aria-pressed"), "true");
+  assert.deepEqual(operations, ["set-track-mixer"]);
+  assert.equal(instrumentOpenCount, 0);
+  assert.equal(announcements.at(-1), "Pulse 1 muted.");
+
+  projectState.undo();
+  assert.equal(projectState.getTrack("track-1").mixer.muted, false);
+  assert.equal(findSwitch("track-1", "mute").getAttribute("aria-pressed"), "false");
+  projectState.redo();
+  assert.equal(findSwitch("track-1", "mute").getAttribute("aria-pressed"), "true");
+
+  findSwitch("track-1", "solo").click();
+  findSwitch(secondTrackId, "solo").click();
+  findSwitch(secondTrackId, "mute").click();
+  assert.equal(projectState.getTrack("track-1").mixer.solo, true);
+  assert.deepEqual(
+    (({ muted, solo }) => ({ muted, solo }))(projectState.getTrack(secondTrackId).mixer),
+    { muted: true, solo: true },
+  );
+  assert.equal(findSwitch(secondTrackId, "mute").getAttribute("aria-pressed"), "true");
+  assert.equal(findSwitch(secondTrackId, "solo").getAttribute("aria-pressed"), "true");
+  assert.equal(instrumentOpenCount, 0);
+  surface.dispose();
+});
+
+test("Playlist Track action rail wires labelled, ordered, focus-stable Mixer switches", async () => {
+  const playlist = await readFile(new URL("../src/v2/ui/playlist.js", import.meta.url), "utf8");
+
+  assert.match(playlist, /const TRACK_ACTION_ORDER = Object\.freeze\(\[\s*"select",\s*"instrument",\s*"mute",\s*"solo",\s*"move-up",\s*"move-down",\s*"remove",?\s*\]\)/);
+  assert.match(playlist, /"aria-label": `Mute \$\{track\.name\} Instrument`,\s*"aria-pressed": String\(track\.mixer\.muted\),\s*dataset: \{ playlistTrackAction: "mute", trackId: track\.id \}/);
+  assert.match(playlist, /"aria-label": `Solo \$\{track\.name\} Instrument`,\s*"aria-pressed": String\(track\.mixer\.solo\),\s*dataset: \{ playlistTrackAction: "solo", trackId: track\.id \}/);
+  assert.match(playlist, /const current = projectState\.getTrack\(track\.id\);\s*const next = !current\.mixer\[field\]/);
+  assert.match(playlist, /rememberFocus\(\{[\s\S]*?trackAction,[\s\S]*?trackId: track\.id,[\s\S]*?\}\);\s*mutateProject\(\(\) => projectState\.setTrackMixer\(track\.id, \{ \[field\]: next \}\)\)/);
+  assert.match(playlist, /for \(const toggle of \[mute, solo\]\) \{\s*toggle\.addEventListener\("contextmenu", \(event\) => \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\)/);
+  assert.match(playlist, /className: "v2-playlist-track-actions"[\s\S]*className: "v2-playlist-track-switches"[\s\S]*\[mute, solo\][\s\S]*className: "v2-playlist-track-management"[\s\S]*\[up, down, remove\]/);
 });
 
 test("Playlist context routing isolates clip, Instrument, and Track right-clicks", () => {

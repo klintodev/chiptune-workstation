@@ -61,6 +61,8 @@ This PRD owns these Mixer rules:
 - The default values and canonical serialization order in the schema contract are binding.
 - A persisted schema version never changes shape or meaning in place.
 
+Playlist's per-Instrument Mute and Solo switches are alternate views of the owning Track Mixer fields. They call the same Track Mixer command and reflect the same persisted state as the Mixer surface; they never add device-local mute/solo keys or a second audio path. Changes apply to the live graph without restarting transport, multiple solo selections remain valid and mute continues to override solo.
+
 ## Closed Effect registry
 
 The internal registry mirrors the Instrument contract: stable type/version, exact defaults/bounds, validation/migration, shared live/offline/public processor factory, UI factory and idempotent disposal. Lookup is side-effect free and never loads remote/project code.

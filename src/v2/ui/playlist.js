@@ -6,7 +6,15 @@ const SNAP_OPTIONS = Object.freeze({ "1/8": 48, "1/16": 24, "1/32": 12 });
 const LANE_HEIGHT = 66;
 const ADD_INSTRUMENT_ROW_HEIGHT = 44;
 const TRACK_HEADER_WIDTH = 320;
-const TRACK_ACTION_ORDER = Object.freeze(["select", "instrument", "move-up", "move-down", "remove"]);
+const TRACK_ACTION_ORDER = Object.freeze([
+  "select",
+  "instrument",
+  "mute",
+  "solo",
+  "move-up",
+  "move-down",
+  "remove",
+]);
 const PATTERN_DRAG_TYPE = "application/x-klinto-pattern-id";
 const PLAYLIST_DOUBLE_CLICK_DELAY_MS = 250;
 
@@ -1615,6 +1623,48 @@ export function createPlaylistSurface({
         createElement("span", { textContent: track.name, title: track.name }),
         createElement("small", { textContent: "Klinto Chip" }),
       ]);
+      const toggleTrackSwitch = (field, trackAction) => {
+        const current = projectState.getTrack(track.id);
+        const next = !current.mixer[field];
+        rememberFocus({
+          clipId: null,
+          tick: cursorTick(),
+          trackAction,
+          trackId: track.id,
+          trackIndex,
+        });
+        mutateProject(() => projectState.setTrackMixer(track.id, { [field]: next }));
+        announce(field === "muted"
+          ? `${current.name} ${next ? "muted" : "unmuted"}.`
+          : `${current.name} Solo ${next ? "on" : "off"}.`);
+        render();
+      };
+      const mute = createElement("button", {
+        "aria-label": `Mute ${track.name} Instrument`,
+        "aria-pressed": String(track.mixer.muted),
+        dataset: { playlistTrackAction: "mute", trackId: track.id },
+        tabIndex: -1,
+        textContent: "M",
+        title: `${track.mixer.muted ? "Unmute" : "Mute"} ${track.name}`,
+        type: "button",
+        onClick: () => toggleTrackSwitch("muted", "mute"),
+      });
+      const solo = createElement("button", {
+        "aria-label": `Solo ${track.name} Instrument`,
+        "aria-pressed": String(track.mixer.solo),
+        dataset: { playlistTrackAction: "solo", trackId: track.id },
+        tabIndex: -1,
+        textContent: "S",
+        title: `${track.mixer.solo ? "Disable Solo for" : "Solo"} ${track.name}`,
+        type: "button",
+        onClick: () => toggleTrackSwitch("solo", "solo"),
+      });
+      for (const toggle of [mute, solo]) {
+        toggle.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+      }
       const reorderTrack = (delta, trackAction) => {
         rememberFocus({
           clipId: null,
@@ -1664,7 +1714,17 @@ export function createPlaylistSurface({
         mutateProject(() => projectState.removeTrack(track.id, { allowClips: true }));
         render();
       });
-      trackHeader.append(trackFocus, instrument, up, down, remove);
+      const trackActionRail = createElement("div", {
+        className: "v2-playlist-track-actions",
+      }, [
+        createElement("div", {
+          className: "v2-playlist-track-switches",
+        }, [mute, solo]),
+        createElement("div", {
+          className: "v2-playlist-track-management",
+        }, [up, down, remove]),
+      ]);
+      trackHeader.append(trackFocus, instrument, trackActionRail);
       lane.append(trackHeader);
 
       for (const clip of track.clips) {

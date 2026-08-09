@@ -62,6 +62,12 @@ test("Piano Roll grid geometry and Mixer density remain visually bounded", async
   assert.match(css, /\.v2-insert-chain\s*{[^}]*margin-top:\s*6px/s);
   assert.match(css, /\.v2-playlist-add-instrument-row\s*{[^}]*position:\s*absolute[^}]*height:\s*44px/s);
   assert.match(css, /\.v2-playlist-add-instrument-cell\s*{[^}]*position:\s*sticky[^}]*left:\s*0[^}]*width:\s*310px/s);
+  assert.match(css, /\.v2-playlist-track-header\s*{[^}]*grid-template-columns:\s*minmax\(94px, 1\.15fr\) minmax\(98px, 1fr\) 84px;[^}]*width:\s*310px/s);
+  assert.match(css, /\.v2-playlist-track-actions\s*{[^}]*display:\s*grid;[^}]*grid-template-rows:\s*repeat\(2, 26px\);[^}]*height:\s*55px;[^}]*gap:\s*3px;/s);
+  assert.match(css, /\.v2-playlist-track-switches\s*{[^}]*grid-template-columns:\s*repeat\(2, 1fr\);/s);
+  assert.match(css, /\.v2-playlist-track-management\s*{[^}]*grid-template-columns:\s*repeat\(3, 1fr\);/s);
+  assert.match(css, /\.v2-playlist-track-switches button\[aria-pressed="true"\]\s*{[^}]*border-color:\s*var\(--v2-accent-strong\);[^}]*background:\s*var\(--v2-accent\);/s);
+  assert.match(css, /\.v2-workspace \.v2-playlist-track-switches button\[aria-pressed="true"\]:hover:not\(:disabled\),[\s\S]*:focus-visible\s*{[^}]*background:\s*var\(--v2-accent\);/s);
   assert.match(css, /\.v2-playlist-track-context-menu\s*{[^}]*position:\s*fixed[^}]*z-index:\s*250[^}]*max-width:\s*calc\(100vw - 16px\)/s);
   assert.match(css, /\.v2-playlist-track-context-menu button\[role="menuitem"\]\s*{[^}]*width:\s*100%[^}]*text-align:\s*left/s);
   assert.match(css, /@media \(max-width:\s*1400px\)\s*{[\s\S]*\.v2-brand-name,[\s\S]*\.v2-master-readout\s*{\s*display:\s*none/s);

@@ -870,7 +870,7 @@ body {
   z-index: 4;
   left: 0;
   display: grid;
-  grid-template-columns: minmax(94px, 1.15fr) minmax(98px, 1fr) repeat(3, 28px);
+  grid-template-columns: minmax(94px, 1.15fr) minmax(98px, 1fr) 84px;
   align-items: center;
   width: 310px;
   height: 100%;
@@ -913,6 +913,51 @@ body {
 
 .v2-playlist-track-focus[aria-pressed="true"] small {
   color: currentColor;
+}
+
+.v2-playlist-track-actions {
+  display: grid;
+  grid-template-rows: repeat(2, 26px);
+  min-width: 0;
+  height: 55px;
+  gap: 3px;
+}
+
+.v2-playlist-track-switches,
+.v2-playlist-track-management {
+  display: grid;
+  gap: 3px;
+}
+
+.v2-playlist-track-switches {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.v2-playlist-track-management {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.v2-playlist-track-actions button {
+  min-height: 26px !important;
+  padding: 0 3px;
+}
+
+.v2-playlist-track-switches button {
+  border-color: var(--v2-line-strong);
+  background: var(--surface-strong);
+}
+
+.v2-playlist-track-switches button[aria-pressed="true"] {
+  border-color: var(--v2-accent-strong);
+  background: var(--v2-accent);
+  color: #140b1c;
+}
+
+.v2-workspace .v2-playlist-track-switches button[aria-pressed="true"]:hover:not(:disabled),
+.v2-workspace .v2-playlist-track-switches button[aria-pressed="true"]:focus-visible {
+  border-color: var(--v2-accent-strong);
+  background: var(--v2-accent);
+  color: #140b1c;
 }
 
 .v2-playlist-add-instrument-row {
