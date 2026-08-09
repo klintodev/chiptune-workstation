@@ -27,6 +27,7 @@ import {
   normalizeInstrumentInstance,
 } from "./device-contracts.js";
 import {
+  V2DomainError,
   assertBoolean,
   assertDomainId,
   assertEnum,
@@ -84,7 +85,26 @@ function compareNotes(left, right) {
     || compareIds(left.id, right.id);
 }
 
-function normalizePattern(candidate) {
+function assertNotesDoNotOverlap(notes, patternId) {
+  let previous = null;
+  for (const note of notes) {
+    if (previous && rangesOverlap(
+      previous.startTick,
+      previous.startTick + previous.durationTicks,
+      note.startTick,
+      note.startTick + note.durationTicks,
+    )) {
+      throw new V2DomainError(
+        `Notes ${previous.id} and ${note.id} overlap in Pattern ${patternId}.`,
+        "PATTERN_NOTE_OVERLAP",
+        { noteIds: [previous.id, note.id], patternId },
+      );
+    }
+    previous = note;
+  }
+}
+
+export function normalizeV2Pattern(candidate) {
   assertExactKeys(candidate, ["id", "name", "lengthTicks", "notes"], "Pattern");
   assertDomainId(candidate.id, "Pattern id");
   assertName(candidate.name, `Pattern ${candidate.id} name`, MAX_PATTERN_NAME_LENGTH);
@@ -99,6 +119,7 @@ function normalizePattern(candidate) {
   }
   const noteIds = new Set();
   const notes = candidate.notes.map((note) => normalizeNote(note, candidate.id, noteIds)).sort(compareNotes);
+  assertNotesDoNotOverlap(notes, candidate.id);
   return {
     id: candidate.id,
     name: candidate.name,
@@ -203,7 +224,7 @@ export function canonicalizeV2Project(candidate) {
   }
   const patternIds = new Set();
   const patterns = candidate.patterns.map((pattern) => {
-    const normalized = normalizePattern(pattern);
+    const normalized = normalizeV2Pattern(pattern);
     if (patternIds.has(normalized.id)) throw new RangeError(`Project has duplicate Pattern id ${normalized.id}.`);
     patternIds.add(normalized.id);
     return normalized;

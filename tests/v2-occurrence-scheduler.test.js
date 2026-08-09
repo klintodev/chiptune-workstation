@@ -55,11 +55,12 @@ function createHarness(project = structuredClone(createDefaultV2Project()), opti
   };
 }
 
-test("canonical simultaneous submission retires the oldest voice before number seventeen", () => {
+test("canonical dense submission retires the oldest voice before number seventeen", () => {
   const project = structuredClone(createDefaultV2Project());
   project.patterns[0].notes = Array.from({ length: 17 }, (_, index) => (
-    note(`note-${String(index).padStart(2, "0")}`, 36 + index, 0, 384)
+    note(`note-${String(index).padStart(2, "0")}`, 36 + index, index, 1)
   ));
+  project.patterns[0].notes.push(note("silent-span", 60, 383, 1, 0));
   const harness = createHarness(project);
   assert.equal(harness.scheduler.play({ mode: "pattern" }), true);
   assert.equal(harness.scheduler.play({ mode: "pattern" }), false);
@@ -67,7 +68,7 @@ test("canonical simultaneous submission retires the oldest voice before number s
   assert.deepEqual(harness.scheduled.map(({ event }) => event.pitch), Array.from({ length: 17 }, (_, i) => 36 + i));
   assert.equal(harness.retired.length, 1);
   assert.equal(harness.retired[0].record, harness.scheduled[0]);
-  assert.equal(harness.retired[0].time, 10);
+  assert.equal(harness.retired[0].time, 10 + 16 / 192);
   assert.equal(harness.scheduler.getScheduledVoiceCount(), 16);
 });
 
@@ -139,7 +140,11 @@ test("tempo changes retain the tick playhead, cancel future submissions and rebu
 
 test("seek and stop release owned voices without leaving the scheduler running", () => {
   const project = structuredClone(createDefaultV2Project());
-  project.patterns[0].notes = [note("first", 60, 0, 384), note("middle", 64, 192, 24)];
+  project.patterns[0].notes = [
+    note("first", 60, 0, 192),
+    note("middle", 64, 192, 24),
+    note("silent-span", 60, 383, 1, 0),
+  ];
   const harness = createHarness(project, { lookAheadSeconds: 0.5 });
   harness.scheduler.play({ mode: "pattern" });
   assert.equal(harness.scheduled.length, 1);

@@ -113,7 +113,7 @@ schemaVersion, metadata, transport, patterns, tracks, mixer
 - `durationTicks`: integer â‰¥ 1.
 - `startTick + durationTicks <= 3,072`; the greatest note end equals `lengthTicks` for a non-empty Pattern.
 - `velocity`: 0â€¦1; zero is persisted but schedules no voice.
-- Notes are canonically serialized by `startTick`, then `pitch`, then `id`. Same-pitch overlap is valid.
+- Notes are canonically serialized by `startTick`, then `pitch`, then `id`. Each note occupies the half-open interval `[startTick, startTick + durationTicks)`, and a Pattern is monophonic: no two note intervals may intersect at any pitch. An end tick equal to the next note's start tick is valid touching, and both notes remain distinct. Chords and simultaneous polyphony are represented across separate Tracks, never by overlapping notes within one Pattern.
 - Pattern array order is user-visible. The final Pattern cannot be deleted.
 
 The 18-tick duration is intentionally valid: exact V1 Â¼/Â¾ gate endpoints need not align to V2's 12-tick minimum creation snap.

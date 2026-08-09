@@ -75,7 +75,7 @@ The primary user wants to create a musical idea quickly, hear it immediately, tu
 
 Core jobs:
 
-- write chords, melodies and bass lines with note lengths and velocity;
+- write melodies and bass lines with note lengths and velocity, and build chords across separate Tracks;
 - reuse a Pattern across tracks and song positions;
 - change the sound assigned to a track without rewriting notes;
 - hear a clear mix with a small number of useful effects;
@@ -116,7 +116,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 ### Composition
 
 - 96 PPQ shared musical time.
-- Polyphonic note events with start, duration, MIDI pitch and velocity.
+- Monophonic note events within each Pattern, with start, duration, MIDI pitch and velocity; simultaneous polyphony and chords use separate Tracks.
 - Launch snap values: 1/8, 1/16 and 1/32; default 1/16.
 - Pointer and desktop-keyboard creation, modifier-marquee multi-selection, group movement/resize/delete, exact-span duplicate-right, copy/paste, undo and redo.
 - Explicit audition Track, compact New/Duplicate/Rename/Delete Pattern actions and one-click Add to Playlist.

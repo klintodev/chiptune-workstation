@@ -31,6 +31,7 @@ import { normalizeV2Project } from "./migration.js";
 import {
   createDefaultV2Project,
   getV2ArrangementEndTick,
+  normalizeV2Pattern,
 } from "./project-schema.js";
 import { derivePatternLengthTicks, EMPTY_PATTERN_LENGTH_TICKS } from "./pattern-span.js";
 
@@ -158,6 +159,29 @@ function normalizeNoteIds(noteIds) {
   return [...new Set(noteIds)];
 }
 
+function prepareAddedNotes(pattern, noteInputs) {
+  if (!Array.isArray(noteInputs)) throw new TypeError("Note inputs must be an array.");
+  const allowed = new Set(["id", "pitch", "startTick", "durationTicks", "velocity"]);
+  const occupied = new Set(pattern.notes.map((candidate) => candidate.id));
+  return noteInputs.map((note, index) => {
+    if (!note || typeof note !== "object" || Array.isArray(note)) {
+      throw new TypeError(`Note input ${index + 1} must be an object.`);
+    }
+    const unknown = Object.keys(note).filter((key) => !allowed.has(key));
+    if (unknown.length > 0) throw new TypeError(`Note input has unknown keys: ${unknown.join(", ")}.`);
+    const id = note.id ?? nextDomainId("note", occupied);
+    if (occupied.has(id)) throw new RangeError(`Pattern ${pattern.id} has duplicate note id ${id}.`);
+    occupied.add(id);
+    return {
+      id,
+      pitch: note.pitch,
+      startTick: note.startTick,
+      durationTicks: note.durationTicks ?? DEFAULT_SNAP_TICKS,
+      velocity: note.velocity ?? 0.7,
+    };
+  });
+}
+
 function normalizeClipIds(clipIds) {
   if (typeof clipIds === "string") return [clipIds];
   if (!clipIds || typeof clipIds[Symbol.iterator] !== "function") {
@@ -243,10 +267,10 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
   function updatePattern(patternId, update, detail = {}) {
     const pattern = getPattern(patternId);
     const updatedPattern = update(pattern);
-    const nextPattern = updatedPattern === pattern ? pattern : {
+    const nextPattern = updatedPattern === pattern ? pattern : normalizeV2Pattern({
       ...updatedPattern,
       lengthTicks: derivePatternLengthTicks(updatedPattern.notes),
-    };
+    });
     if (nextPattern === pattern) return false;
     if (nextPattern.lengthTicks > pattern.lengthTicks) {
       for (const track of state.tracks) {
@@ -359,25 +383,28 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
   }
 
   function addNote(patternId, note) {
-    if (!note || typeof note !== "object" || Array.isArray(note)) throw new TypeError("Note input must be an object.");
-    const allowed = new Set(["id", "pitch", "startTick", "durationTicks", "velocity"]);
-    const unknown = Object.keys(note).filter((key) => !allowed.has(key));
-    if (unknown.length > 0) throw new TypeError(`Note input has unknown keys: ${unknown.join(", ")}.`);
     const pattern = getPattern(patternId);
-    const noteIds = new Set(pattern.notes.map((candidate) => candidate.id));
-    const id = note.id ?? nextDomainId("note", noteIds);
-    const nextNote = {
-      id,
-      pitch: note.pitch,
-      startTick: note.startTick,
-      durationTicks: note.durationTicks ?? DEFAULT_SNAP_TICKS,
-      velocity: note.velocity ?? 0.7,
-    };
+    const [nextNote] = prepareAddedNotes(pattern, [note]);
     updatePattern(patternId, (candidate) => ({ ...candidate, notes: [...candidate.notes, nextNote] }), {
       operation: "add-note",
-      noteId: id,
+      noteId: nextNote.id,
     });
-    return id;
+    return nextNote.id;
+  }
+
+  function addNotes(patternId, notes) {
+    const pattern = getPattern(patternId);
+    const additions = prepareAddedNotes(pattern, notes);
+    if (additions.length === 0) return Object.freeze([]);
+    const noteIds = Object.freeze(additions.map(({ id }) => id));
+    updatePattern(patternId, (candidate) => ({
+      ...candidate,
+      notes: [...candidate.notes, ...additions],
+    }), {
+      operation: "add-notes",
+      noteIds,
+    });
+    return noteIds;
   }
 
   function updateNote(patternId, noteId, changes) {
@@ -891,6 +918,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     addEffect,
     addEventListener: events.addEventListener.bind(events),
     addNote,
+    addNotes,
     addPatternToPlaylist,
     addTrack,
     beginHistoryGroup,

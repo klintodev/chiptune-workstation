@@ -12,7 +12,7 @@ This PRD owns every musical-time conversion required by V2: the content-derived 
 
 ## Product outcome
 
-A user can write chords and melodies, set note duration and velocity, audition through a chosen Track and add the linked Pattern to Playlist. The Piano Roll is the dominant first-run desktop window above the useful Playlist base and is fully operable with pointer or keyboard.
+A user can write melodies and bass lines, set note duration and velocity, audition through a chosen Track and add the linked Pattern to Playlist. Each Pattern is monophonic; users build chords and other simultaneous polyphony by arranging notes on separate Tracks. The Piano Roll is the dominant first-run desktop window above the useful Playlist base and is fully operable with pointer or keyboard.
 
 ## Pattern ownership and audition context
 
@@ -69,8 +69,8 @@ Each note contains:
 Invariants:
 
 - `startTick + durationTicks <= 3,072`; canonical `pattern.lengthTicks` becomes the greatest note end.
-- Notes of any pitch, including the same pitch, may overlap. Stable note/voice IDs distinguish occurrences; the existing voice cap remains the safety boundary.
-- Touching notes remain separate events.
+- Note spans are half-open tick intervals: `[startTick, startTick + durationTicks)`. A Pattern is monophonic, so no two note intervals may intersect, regardless of pitch.
+- Notes may touch end-to-start, because an end tick equal to another note's start tick does not overlap. Touching notes remain separate events with stable note/voice IDs; chords and simultaneous polyphony require separate Tracks.
 - Move, resize and velocity changes preserve ID; copy/duplicate creates a new ID.
 - Zero-velocity events remain valid/persisted but never trigger an audio voice, matching V1 behaviour.
 - The Track Instrument's octave offset is applied at playback; Klinto Chip must keep effective pitch within MIDI 12â€“136.
@@ -111,7 +111,7 @@ Migration is pure, deterministic, idempotent at the normalization boundary and n
 One normalized tick-to-occurrence projection is shared by Studio playback, public playback and offline export.
 
 - Convert ticks through constant BPM without cumulative step drift.
-- Schedule every occurrence entering the existing look-ahead window, including simultaneous and overlapping notes, under one deterministic 16-voice-per-Track arbitration policy.
+- Schedule every occurrence entering the existing look-ahead window, including simultaneous notes on separate Tracks and permitted Instrument release-tail overlap, under one deterministic 16-voice-per-Track arbitration policy.
 - Per Track, occurrences sort by absolute `startTick`, then pitch, note ID and clip ID before submission. The runtime retains V1's insertion-order cap: before the 17th trigger, retire the oldest inserted scheduled/sounding/releasing voice at the new occurrence time, then admit the new voice. Scheduled future and release-tail voices count until retired/ended. The shared projection/runtime applies this exact order in live, WAV and public playback.
 - Own voices by Project, transport mode, Track, clip, Pattern, note and occurrence identity.
 - Pattern mode loops at the Pattern's content-derived `lengthTicks` only while its contextual loop is engaged; otherwise it plays once. Song mode adds Pattern-relative tick to `clip.startTick`.
@@ -159,6 +159,8 @@ Launch tools:
 
 Every gesture previews a proposed change but commits one atomic domain command on completion. Invalid boundaries or caps reject the complete gesture and announce the reason. Pointer cancellation makes no change.
 
+The monophonic non-overlap invariant is enforced against the complete proposed Pattern for draw, add, move, transpose, resize, duplicate, paste and other batch edits, as well as import, migration and every local/cloud/public normalization boundary. A conflicting proposal is rejected rather than merged, trimmed or partially applied; the prior notes, selection, history and linked clips remain unchanged, and the editor explains that notes may touch but cannot overlap at any pitch.
+
 ## Keyboard and semantic editor contract
 
 The Piano Roll exposes one named composite editor entry point using managed cursor/active-descendant semantics or an equivalent testable model.
@@ -197,7 +199,7 @@ Desktop supports the full pointer and keyboard contract in its modeless window. 
 ### Musical/time foundation
 
 - V1 step fixtures map exactly to 24-tick boundaries; clips and loops move to ticks in the same normalized result, and direct `↻` enable targets the full current Pattern or Song according to playback mode.
-- A Pattern supports chords and overlapping same-pitch notes with distinct stable IDs.
+- A Pattern is monophonic: half-open note intervals may touch end-to-start but never overlap at any pitch. Chords and simultaneous polyphony use separate Tracks.
 - Pitch 36â€“112, duration, boundary, velocity and count validation rejects malformed input before audio activation.
 - Pattern increase preflights all linked clips; decrease removes/truncates disclosed notes as one undoable command.
 - Pattern, Song, loop, seek, tempo change, live, offline and public occurrence projections agree.
@@ -218,7 +220,7 @@ Desktop supports the full pointer and keyboard contract in its modeless window. 
 
 - Pure migration fixtures for Pattern, clip and loop time/mode, deterministic IDs, `rootOctave` removal and 6/18-tick legacy endpoint editing
 - Validation/property tests for event invariants, limits, ordering and automatic Pattern-span atomicity
-- Scheduler tests for chords, same-pitch overlap, deterministic simultaneous ordering/oldest-voice retirement, V1 direct whole-Song `↻` loop boundaries, tempo/seek/stop and the live-edit policy
+- Scheduler tests for touching sequential Pattern occurrences, simultaneous notes across separate Tracks, release-tail overlap, deterministic ordering/oldest-voice retirement, V1 direct whole-Song `↻` loop boundaries, tempo/seek/stop and the live-edit policy
 - Shared occurrence-projection parity tests for Pattern, Song, offline and public adapters
 - Manual desktop pointer and keyboard-command compose review covering create, pitch-rail and existing-note click-slop audition in every tool, explicit routing/non-mutation, Audio Setup fallback, zero-velocity and actual-drag/right-click suppression, title-click/Enter rename, title-focus and drag-handle preservation, `Mod`-marquee selection, group move, transpose, resize, velocity, right-click rules, `Mod+wheel`, group delete, repeated `Mod+B`, undo and focus/announcement checks, including absence of zoom buttons/Instrument launcher
 - 1366Ã—768 Playlist-under-window layout and 390Ã—844 single-fullscreen-surface smoke tests
@@ -251,7 +253,7 @@ These slices use feature-flagged in-memory fixtures or isolated development stor
 
 - 96 PPQ; 1/8, 1/16 and 1/32 creation snap only; default 1/16. Migrated 6/18-tick durations remain exact until explicitly resized.
 - Serialized Pattern pitch remains MIDI 36â€“112; octave offset is Track Instrument state.
-- Same-pitch overlaps are allowed and bounded by voice/count caps.
+- Pattern note spans are half-open and monophonic: notes may touch end-to-start but may never overlap at any pitch; chords require separate Tracks. Every edit and trust-boundary normalization rejects a conflicting complete proposal atomically without changing selection, history or linked clips.
 - Clip starts and loop bounds migrate with Pattern events in this foundation.
 - V1 `rootOctave` is removed from musical data; the view initializes deterministically.
 - Pattern span follows its notes exactly; growth preflights linked clips and shrinkage follows removal/move/shortening without a separate length action.

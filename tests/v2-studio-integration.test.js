@@ -1261,6 +1261,64 @@ test("Piano pointer audition stays isolated from editing gestures and keeps its 
   );
 });
 
+test("Piano overlap paths batch paste and preserve pointer/session atomicity", async () => {
+  const piano = await readFile(new URL("../src/v2/ui/piano-roll.js", import.meta.url), "utf8");
+  const sourceBlock = (startLabel, endLabel) => {
+    const start = piano.indexOf(startLabel);
+    const end = piano.indexOf(endLabel, start + startLabel.length);
+    assert.notEqual(start, -1, `missing source block: ${startLabel}`);
+    assert.notEqual(end, -1, `missing source boundary: ${endLabel}`);
+    return piano.slice(start, end);
+  };
+
+  const paste = sourceBlock("function pasteSelection", "function deleteSelection");
+  assert.equal(
+    paste.match(/projectState\.addNotes\(/g)?.length,
+    1,
+    "Paste must submit exactly one atomic note batch",
+  );
+  assert.doesNotMatch(paste, /projectState\.addNote\(/);
+  assert.doesNotMatch(paste, /beginHistoryGroup|endHistoryGroup/);
+
+  const update = sourceBlock("function updateSelectedNotes", "function moveSelection");
+  const projectCommit = update.indexOf("projectState.updatePattern");
+  const selectionCommit = update.indexOf("persistPointerSelection(ids)");
+  assert.ok(projectCommit >= 0 && projectCommit < selectionCommit);
+  assert.match(update, /selectOnSuccess/);
+
+  const moveAction = sourceBlock("function moveSelection", "function resizeSelection");
+  const resizeAction = sourceBlock("function resizeSelection", "function changeVelocity");
+  assert.match(moveAction, /ids\s*=\s*selectedNoteIds/);
+  assert.match(moveAction, /updateSelectedNotes\([\s\S]*?ids,\s*options\)/);
+  assert.match(resizeAction, /ids\s*=\s*selectedNoteIds/);
+  assert.match(resizeAction, /updateSelectedNotes\([\s\S]*?ids,\s*options/);
+
+  const moveGesture = sourceBlock("function startNoteMove", "function startNoteResize");
+  const resizeGesture = sourceBlock("function startNoteResize", "function startPitchAudition");
+  assert.match(
+    moveGesture,
+    /moveSelection\(deltaTick,\s*deltaPitch,\s*dragSelection,\s*\{\s*selectOnSuccess:\s*true\s*\}\)/,
+  );
+  assert.doesNotMatch(moveGesture, /persistPointerSelection\(/);
+  assert.match(
+    resizeGesture,
+    /resizeSelection\(deltaTick,\s*dragSelection,\s*\{\s*selectOnSuccess:\s*true\s*\}\)/,
+  );
+  assert.doesNotMatch(resizeGesture, /persistPointerSelection\(/);
+
+  const inspector = sourceBlock("function renderInspector", "function updatePlayhead");
+  const createAction = inspector.slice(
+    inspector.indexOf('textContent: "Create note here"'),
+    inspector.indexOf("return;"),
+  );
+  const createAttempt = createAction.indexOf("addNoteAt(cursorTick, cursorPitch)");
+  const createCatch = createAction.indexOf("catch (error)", createAttempt);
+  const createAnnouncement = createAction.indexOf("announce(", createCatch);
+  assert.ok(createAttempt >= 0 && createAttempt < createCatch);
+  assert.ok(createCatch < createAnnouncement);
+  assert.match(createAction.slice(createCatch), /renderEditor\(\)[\s\S]*?renderHeader\(\)/);
+});
+
 test("editor composites, shared playheads, opener routing, and replacement ownership are wired", async () => {
   const [piano, playlist, shell, studio, scheduler] = await Promise.all([
     readFile(new URL("../src/v2/ui/piano-roll.js", import.meta.url), "utf8"),

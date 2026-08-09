@@ -462,9 +462,9 @@ export function createPianoRollSurface({
     return noteId;
   }
 
-  function updateSelectedNotes(transform) {
+  function updateSelectedNotes(transform, ids = selectedNoteIds, { selectOnSuccess = false } = {}) {
     const pattern = activePattern();
-    const notes = uniqueSelectedNotes(pattern, selectedNoteIds);
+    const notes = uniqueSelectedNotes(pattern, ids);
     if (notes.length === 0) return false;
     const patches = new Map(notes.map((note) => [note.id, transform(note)]));
     mutateProject(() => projectState.updatePattern(pattern.id, (candidate) => ({
@@ -474,14 +474,15 @@ export function createPianoRollSurface({
         return patch ? { ...note, ...patch } : note;
       }),
     }), { operation: "update-notes" }));
+    if (selectOnSuccess) persistPointerSelection(ids);
     renderEditor();
     renderHeader();
     return true;
   }
 
-  function moveSelection(deltaTick, deltaPitch) {
+  function moveSelection(deltaTick, deltaPitch, ids = selectedNoteIds, options) {
     const pattern = activePattern();
-    const notes = uniqueSelectedNotes(pattern, selectedNoteIds);
+    const notes = uniqueSelectedNotes(pattern, ids);
     if (notes.some((note) => (
       note.startTick + deltaTick < 0
       || note.startTick + note.durationTicks + deltaTick > MAX_PATTERN_CONTENT_TICKS
@@ -491,17 +492,21 @@ export function createPianoRollSurface({
     return updateSelectedNotes((note) => ({
       startTick: note.startTick + deltaTick,
       pitch: note.pitch + deltaPitch,
-    }));
+    }), ids, options);
   }
 
-  function resizeSelection(deltaTick) {
+  function resizeSelection(deltaTick, ids = selectedNoteIds, options) {
     const pattern = activePattern();
-    const notes = uniqueSelectedNotes(pattern, selectedNoteIds);
+    const notes = uniqueSelectedNotes(pattern, ids);
     if (notes.some((note) => (
       note.durationTicks + deltaTick < 1
       || note.startTick + note.durationTicks + deltaTick > MAX_PATTERN_CONTENT_TICKS
     ))) throw new RangeError("The selected note would have an invalid duration.");
-    return updateSelectedNotes((note) => ({ durationTicks: note.durationTicks + deltaTick }));
+    return updateSelectedNotes(
+      (note) => ({ durationTicks: note.durationTicks + deltaTick }),
+      ids,
+      options,
+    );
   }
 
   function changeVelocity(delta) {
@@ -536,22 +541,15 @@ export function createPianoRollSurface({
     if (projectNoteCount + planned.length > MAX_NOTES_PER_PROJECT) {
       throw new RangeError(`A Project supports at most ${MAX_NOTES_PER_PROJECT} notes.`);
     }
-    const created = [];
-    mutateProject(() => {
-      projectState.beginHistoryGroup?.();
-      try {
-        for (const note of planned) {
-          created.push(projectState.addNote(pattern.id, {
-            pitch: note.pitch,
-            startTick: note.startTick,
-            durationTicks: note.durationTicks,
-            velocity: note.velocity,
-          }));
-        }
-      } finally {
-        projectState.endHistoryGroup?.();
-      }
-    });
+    const created = mutateProject(() => projectState.addNotes(
+      pattern.id,
+      planned.map((note) => ({
+        pitch: note.pitch,
+        startTick: note.startTick,
+        durationTicks: note.durationTicks,
+        velocity: note.velocity,
+      })),
+    ));
     selectNotes(created);
     renderHeader();
     return true;
@@ -830,8 +828,7 @@ export function createPianoRollSurface({
           }
           return;
         }
-        persistPointerSelection(dragSelection);
-        moveSelection(deltaTick, deltaPitch);
+        moveSelection(deltaTick, deltaPitch, dragSelection, { selectOnSuccess: true });
       },
       cancel: reset,
     });
@@ -887,8 +884,7 @@ export function createPianoRollSurface({
           }
           return;
         }
-        persistPointerSelection(dragSelection);
-        resizeSelection(deltaTick);
+        resizeSelection(deltaTick, dragSelection, { selectOnSuccess: true });
       },
       cancel: reset,
     });
@@ -1097,7 +1093,15 @@ export function createPianoRollSurface({
         className: "v2-mobile-note-action",
         textContent: "Create note here",
         type: "button",
-        onClick: () => addNoteAt(cursorTick, cursorPitch),
+        onClick: () => {
+          try {
+            addNoteAt(cursorTick, cursorPitch);
+          } catch (error) {
+            announce(error instanceof Error ? error.message : "The note could not be created.");
+            renderEditor();
+            renderHeader();
+          }
+        },
       }));
       return;
     }

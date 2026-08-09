@@ -12,12 +12,13 @@ import {
   ticksToSeconds,
 } from "../src/v2/domain/index.js";
 
-test("Pattern projection preserves chords/overlaps, canonical order, ownership and loop boundaries", () => {
+test("Pattern projection preserves touching notes, canonical order, ownership and loop boundaries", () => {
   const project = createV2ProjectState();
-  const high = project.addNote("pattern-1", { pitch: 67, startTick: 0, durationTicks: 48, velocity: 0.8 });
-  const lowB = project.addNote("pattern-1", { id: "note-b", pitch: 60, startTick: 0, durationTicks: 96, velocity: 0.7 });
   const lowA = project.addNote("pattern-1", { id: "note-a", pitch: 60, startTick: 0, durationTicks: 48, velocity: 0.6 });
-  project.addNote("pattern-1", { pitch: 64, startTick: 24, durationTicks: 24, velocity: 0 });
+  const lowB = project.addNote("pattern-1", { id: "note-b", pitch: 61, startTick: 48, durationTicks: 48, velocity: 0.7 });
+  const high = project.addNote("pattern-1", { pitch: 67, startTick: 96, durationTicks: 48, velocity: 0.8 });
+  project.addNote("pattern-1", { id: "note-touch", pitch: 60, startTick: 144, durationTicks: 48, velocity: 0.5 });
+  project.addNote("pattern-1", { pitch: 64, startTick: 192, durationTicks: 24, velocity: 0 });
 
   const occurrences = createPatternOccurrences(
     project.getState(),
@@ -26,9 +27,9 @@ test("Pattern projection preserves chords/overlaps, canonical order, ownership a
     { loop: true, iterations: 2 },
   );
 
-  assert.equal(occurrences.length, 6);
+  assert.equal(occurrences.length, 8);
   assert.deepEqual(occurrences.slice(0, 3).map(({ noteId }) => noteId), [lowA, lowB, high]);
-  assert.deepEqual(occurrences.slice(3).map(({ startTick }) => startTick), [96, 96, 96]);
+  assert.deepEqual(occurrences.map(({ startTick }) => startTick), [0, 48, 96, 144, 216, 264, 312, 360]);
   assert.equal(occurrences[0].mode, "pattern");
   assert.equal(occurrences[0].clipId, null);
   assert.equal(occurrences[0].endTick, 48);

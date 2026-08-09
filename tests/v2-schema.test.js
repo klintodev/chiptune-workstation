@@ -103,10 +103,10 @@ test("strict validation rejects unknown keys, unresolved links, device state, bo
 test("canonicalization sorts notes and clips while retaining Pattern, Track and Effect-chain order", () => {
   const project = structuredClone(createDefaultV2Project());
   project.patterns[0].notes = [
-    { id: "note-z", pitch: 60, startTick: 24, durationTicks: 24, velocity: 1 },
-    { id: "note-b", pitch: 64, startTick: 0, durationTicks: 24, velocity: 1 },
-    { id: "note-a", pitch: 64, startTick: 0, durationTicks: 24, velocity: 1 },
-    { id: "note-c", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
+    { id: "note-z", pitch: 60, startTick: 36, durationTicks: 24, velocity: 1 },
+    { id: "note-b", pitch: 64, startTick: 24, durationTicks: 12, velocity: 1 },
+    { id: "note-a", pitch: 64, startTick: 12, durationTicks: 12, velocity: 1 },
+    { id: "note-c", pitch: 60, startTick: 0, durationTicks: 12, velocity: 1 },
   ];
   project.tracks[0].clips = [
     { id: "clip-z", patternId: "pattern-1", startTick: 768 },
@@ -118,6 +118,48 @@ test("canonicalization sorts notes and clips while retaining Pattern, Track and 
 
   assert.deepEqual(normalized.patterns[0].notes.map(({ id }) => id), ["note-c", "note-a", "note-b", "note-z"]);
   assert.deepEqual(normalized.tracks[0].clips.map(({ id }) => id), ["clip-a", "clip-b", "clip-z"]);
+});
+
+test("notes may touch end to start but every intersecting interval is rejected", () => {
+  const valid = structuredClone(createDefaultV2Project());
+  valid.patterns[0].notes = [
+    { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 0 },
+    { id: "note-b", pitch: 64, startTick: 24, durationTicks: 24, velocity: 1 },
+    { id: "note-c", pitch: 60, startTick: 48, durationTicks: 48, velocity: 1 },
+  ];
+
+  const normalized = canonicalizeV2Project(valid);
+  assert.deepEqual(
+    normalized.patterns[0].notes.map(({ id }) => id),
+    ["note-a", "note-b", "note-c"],
+  );
+
+  const conflicts = [
+    [
+      { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
+      { id: "note-b", pitch: 60, startTick: 0, durationTicks: 12, velocity: 1 },
+    ],
+    [
+      { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
+      { id: "note-b", pitch: 64, startTick: 12, durationTicks: 24, velocity: 1 },
+    ],
+    [
+      { id: "note-a", pitch: 60, startTick: 0, durationTicks: 48, velocity: 1 },
+      { id: "note-b", pitch: 67, startTick: 12, durationTicks: 12, velocity: 0 },
+    ],
+  ];
+  for (const notes of conflicts) {
+    const candidate = structuredClone(createDefaultV2Project());
+    candidate.patterns[0].notes = notes;
+    assert.throws(() => canonicalizeV2Project(candidate), (error) => {
+      assert.equal(error.code, "PATTERN_NOTE_OVERLAP");
+      assert.deepEqual(error.details, {
+        noteIds: ["note-a", "note-b"],
+        patternId: "pattern-1",
+      });
+      return true;
+    });
+  }
 });
 
 test("schemas 2 through 6 migrate with exact ticks, parameters, ordering and deterministic ID repair", () => {
@@ -181,4 +223,28 @@ test("schema 1 follows the production Pattern-library migration before V7 conver
   assert.equal(migrated.patterns[0].notes[0].durationTicks, 18);
   assert.deepEqual(migrated.tracks[0].clips, [{ id: "clip-1", patternId: "pattern-1", startTick: 0 }]);
   assert.deepEqual(migrated.transport.loop, { enabled: false, mode: "custom", startTick: 0, endTick: 384 });
+});
+
+test("legacy full-gate repeats migrate as valid touching same-pitch notes", () => {
+  const source = legacyProject(6);
+  source.patterns[0].steps = [
+    { note: 60, gate: 1, volume: 0.7 },
+    { note: 60, gate: 1, volume: 0.7 },
+    null,
+    null,
+  ];
+
+  const migrated = migrateProjectToV7(source);
+
+  assert.deepEqual(
+    migrated.patterns[0].notes.map(({ pitch, startTick, durationTicks }) => ({
+      durationTicks,
+      pitch,
+      startTick,
+    })),
+    [
+      { durationTicks: 24, pitch: 60, startTick: 0 },
+      { durationTicks: 24, pitch: 60, startTick: 24 },
+    ],
+  );
 });

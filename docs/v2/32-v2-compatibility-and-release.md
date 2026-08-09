@@ -43,6 +43,8 @@ After activation:
 - an unshipped internal version may be consolidated before Beta only if it never entered ordinary user storage;
 - a version number is never reused for a different shape.
 
+V7 has not been activated or written to ordinary user storage, so its final monophonic Pattern invariant is consolidated before Beta without a schema bump: note spans are half-open, notes may touch end-to-start but may not overlap at any pitch, and chords require separate Tracks. Once V7 activates, this meaning is frozen and any later change follows the schema-increment rule above.
+
 ## V1 â†’ V2 migration
 
 Migration is a pure trust-boundary operation: clone/parse â†’ validate source envelope â†’ migrate â†’ deeply validate V7 â†’ activate. It never mutates or overwrites the original before successful V7 validation.
@@ -101,15 +103,16 @@ Fixtures cover V1 Project schemas 1 through 6 through the production migration c
 
 - empty/default Project;
 - every content-derived Pattern span and note boundary;
+- valid end-to-start touching at the same and different pitches, malformed interval overlap at the same and different pitches, and chords distributed across separate Tracks;
 - every waveform, octave and parameter boundary;
-- chords produced after migration only through distinct steps/Tracks, zero-velocity notes and maximum voice/count cases;
+- sequential notes produced from distinct migration steps, chords distributed across separate Tracks, zero-velocity notes and maximum voice/count cases;
 - multiple linked clips, touching clips, maximum song boundary and loop bounds;
 - multi-Track mute/solo/pan/volume/master combinations;
 - local JSON, cloud and public envelopes;
 - near-2 MB and near-hosted-size documents;
 - malformed numbers, duplicate IDs, missing references, oversized arrays and unknown types/versions.
 
-Each fixture asserts source immutability, canonical V7 result, repeated-normalization equality and expected audio occurrence projection.
+Each fixture asserts source immutability, canonical V7 result, repeated-normalization equality and expected audio occurrence projection. Any overlapping Pattern-note intervals are rejected at import and every local/cloud/public normalization boundary as complete proposals: no note, selection, history entry or linked clip is partially changed.
 
 ## Unsupported or malformed Project recovery
 

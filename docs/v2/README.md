@@ -53,7 +53,7 @@ No intermediate persisted V2 shape may escape into a normal user repository. If 
 V2 is complete only when a user can:
 
 1. Open or create a project into a clean Piano Roll-first workspace.
-2. Create and edit polyphonic, variable-duration notes with desktop pointer and keyboard access.
+2. Create and edit monophonic, variable-duration Pattern notes with desktop pointer and keyboard access, and build chords across separate Tracks.
 3. Audition the Pattern through an explicit track and Klinto Chip.
 4. Add that Pattern at the first valid snapped position at or after the Playlist insertion cursor, arrange linked clips and play Song mode.
 5. Mix tracks and master, insert Filter or Delay, and hear the same graph in live playback, WAV export and public playback.

@@ -11,10 +11,44 @@ function makeAudible(state, patternId = "pattern-1", pitch = 60, startTick = 0, 
   return state.addNote(patternId, { pitch, startTick, durationTicks, velocity: 0.7 });
 }
 
+function patternNote(id, pitch, startTick, durationTicks, velocity = 0.7) {
+  return { id, pitch, startTick, durationTicks, velocity };
+}
+
+function createProjectWithNotes(notes) {
+  const project = createV2ProjectState();
+  project.addNotes("pattern-1", notes);
+  return project;
+}
+
+function assertOverlapRejectedAtomically(project, action, { noteIds }) {
+  const beforeState = project.getState();
+  const beforeHistory = project.getHistoryState();
+  let changes = 0;
+  const handleChange = () => { changes += 1; };
+  project.addEventListener("change", handleChange);
+  try {
+    assert.throws(action, (error) => {
+      assert.equal(error instanceof V2DomainError, true);
+      assert.equal(error.code, "PATTERN_NOTE_OVERLAP");
+      assert.deepEqual(error.details, {
+        noteIds,
+        patternId: "pattern-1",
+      });
+      return true;
+    });
+  } finally {
+    project.removeEventListener("change", handleChange);
+  }
+  assert.equal(project.getState(), beforeState);
+  assert.deepEqual(project.getHistoryState(), beforeHistory);
+  assert.equal(changes, 0);
+}
+
 test("note commands are immutable, atomic, canonically ordered and history-backed", () => {
   const project = createV2ProjectState();
   const original = project.getState();
-  const high = project.addNote("pattern-1", { pitch: 67, startTick: 0, durationTicks: 24, velocity: 0.8 });
+  const high = project.addNote("pattern-1", { pitch: 67, startTick: 24, durationTicks: 24, velocity: 0.8 });
   const low = project.addNote("pattern-1", { pitch: 60, startTick: 0, durationTicks: 18, velocity: 0.6 });
 
   assert.equal(Object.isFrozen(project.getState()), true);
@@ -23,7 +57,7 @@ test("note commands are immutable, atomic, canonically ordered and history-backe
   assert.throws(() => project.updateNote("pattern-1", low, { pitch: 113 }), RangeError);
   assert.equal(project.getPattern().notes.find(({ id }) => id === low).pitch, 60);
 
-  const copies = project.duplicateNotes("pattern-1", [low, high], { deltaTicks: 24, deltaPitch: 1 });
+  const copies = project.duplicateNotes("pattern-1", [low, high], { deltaTicks: 48, deltaPitch: 1 });
   assert.equal(copies.length, 2);
   assert.equal(project.getPattern().notes.length, 4);
   project.removeNotes("pattern-1", copies);
@@ -31,6 +65,134 @@ test("note commands are immutable, atomic, canonically ordered and history-backe
   assert.equal(project.getPattern().notes.length, 4);
   project.redo();
   assert.equal(project.getPattern().notes.length, 2);
+});
+
+test("addNotes accepts touching notes at different pitches as one undoable commit", () => {
+  const project = createV2ProjectState();
+  const before = project.getState();
+  const changes = [];
+  project.addEventListener("change", (event) => changes.push(event.detail));
+
+  const noteIds = project.addNotes("pattern-1", [
+    patternNote("note-touch-left", 60, 0, 24),
+    patternNote("note-touch-middle", 64, 24, 24),
+    patternNote("note-touch-right", 60, 48, 12),
+  ]);
+
+  assert.deepEqual(noteIds, ["note-touch-left", "note-touch-middle", "note-touch-right"]);
+  assert.equal(Object.isFrozen(noteIds), true);
+  assert.deepEqual(project.getPattern().notes.map(({ id }) => id), [
+    "note-touch-left",
+    "note-touch-middle",
+    "note-touch-right",
+  ]);
+  assert.equal(project.getPattern().lengthTicks, 60);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].operation, "add-notes");
+  assert.deepEqual(changes[0].noteIds, noteIds);
+  assert.deepEqual(project.getHistoryState(), { canRedo: false, canUndo: true });
+
+  const committed = project.getState();
+  assert.equal(project.undo(), true);
+  assert.deepEqual(project.getState(), before);
+  assert.deepEqual(project.getHistoryState(), { canRedo: true, canUndo: false });
+  assert.equal(project.undo(), false, "the complete batch should occupy one undo step");
+  assert.equal(project.redo(), true);
+  assert.deepEqual(project.getState(), committed);
+  assert.deepEqual(changes.map(({ operation }) => operation), ["add-notes", "undo", "redo"]);
+});
+
+test("addNote and addNotes reject overlap at different pitches without partial changes", () => {
+  const project = createProjectWithNotes([
+    patternNote("note-anchor", 60, 0, 24),
+  ]);
+
+  assertOverlapRejectedAtomically(
+    project,
+    () => project.addNote("pattern-1", patternNote("note-add-overlap", 67, 23, 12)),
+    { noteIds: ["note-anchor", "note-add-overlap"] },
+  );
+
+  const emptyProject = createV2ProjectState();
+  assertOverlapRejectedAtomically(
+    emptyProject,
+    () => emptyProject.addNotes("pattern-1", [
+      patternNote("note-valid-prefix", 67, 48, 24),
+      patternNote("note-batch-left", 60, 0, 24),
+      patternNote("note-batch-overlap", 72, 12, 12),
+    ]),
+    { noteIds: ["note-batch-left", "note-batch-overlap"] },
+  );
+  assert.deepEqual(emptyProject.getPattern().notes, [], "no valid batch prefix may be committed");
+});
+
+test("note overlap validation wins before linked-clip growth conflicts", () => {
+  const project = createProjectWithNotes([
+    patternNote("note-anchor", 60, 0, 24),
+  ]);
+  const blockerPatternId = project.createPattern("Blocker");
+  project.addNote(blockerPatternId, patternNote("note-blocker", 72, 0, 24));
+  project.addClip("track-1", "pattern-1", 0);
+  project.addClip("track-1", blockerPatternId, 48);
+
+  assertOverlapRejectedAtomically(
+    project,
+    () => project.addNote("pattern-1", patternNote("note-overlap-and-growth", 67, 12, 48)),
+    { noteIds: ["note-anchor", "note-overlap-and-growth"] },
+  );
+});
+
+test("start and duration updates reject Pattern-wide overlap with deterministic details", () => {
+  const project = createProjectWithNotes([
+    patternNote("note-left", 60, 0, 24),
+    patternNote("note-middle", 61, 24, 24),
+    patternNote("note-right", 60, 48, 24),
+  ]);
+
+  assertOverlapRejectedAtomically(
+    project,
+    () => project.updateNote("pattern-1", "note-right", { startTick: 47 }),
+    { noteIds: ["note-middle", "note-right"] },
+  );
+  assertOverlapRejectedAtomically(
+    project,
+    () => project.updateNote("pattern-1", "note-left", { durationTicks: 25 }),
+    { noteIds: ["note-left", "note-middle"] },
+  );
+});
+
+test("generic multi-note updates reject the complete batch when one transformed note overlaps", () => {
+  const project = createProjectWithNotes([
+    patternNote("note-anchor", 60, 0, 24),
+    patternNote("note-batch-a", 62, 48, 12),
+    patternNote("note-batch-b", 64, 72, 12),
+  ]);
+
+  assertOverlapRejectedAtomically(
+    project,
+    () => project.updatePattern("pattern-1", (pattern) => ({
+      ...pattern,
+      notes: pattern.notes.map((note) => {
+        if (note.id === "note-batch-a") return { ...note, startTick: 12 };
+        if (note.id === "note-batch-b") return { ...note, startTick: 96 };
+        return note;
+      }),
+    }), { operation: "update-notes" }),
+    { noteIds: ["note-anchor", "note-batch-a"] },
+  );
+});
+
+test("duplicateNotes rejects an overlapping copy without consuming history or emitting changes", () => {
+  const project = createProjectWithNotes([
+    patternNote("note-source", 60, 0, 24),
+  ]);
+
+  assertOverlapRejectedAtomically(
+    project,
+    () => project.duplicateNotes("pattern-1", ["note-source"], { deltaPitch: 7, deltaTicks: 12 }),
+    { noteIds: ["note-source", "note-1"] },
+  );
+  assert.deepEqual(project.getPattern().notes.map(({ id }) => id), ["note-source"]);
 });
 
 test("Pattern rename trims once, preserves musical content, and is undoable", () => {
