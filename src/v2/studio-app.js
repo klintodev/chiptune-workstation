@@ -139,6 +139,7 @@ function pianoSurfaceDescriptor(workspace, project) {
   return {
     kind: "piano-roll",
     patternId: pattern.id,
+    patternName: pattern.name,
     name: `${pattern.name}, Piano Roll`,
   };
 }
@@ -474,6 +475,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
         focusEntry: owner.node.querySelector(".v2-piano-canvas"),
         dispose: owner.dispose,
         getLauncher: (device) => resolveSurfaceDeviceLauncher(owner.node, device),
+        requestPatternRename: owner.requestPatternRename,
       };
     }
     if (surface.kind === "playlist") {
@@ -689,7 +691,10 @@ export async function createV2StudioApp({ document: documentLike = document } = 
   function openPianoOverlay(descriptor, { focusEntry = false, replace = false } = {}) {
     if (!descriptor) return closePianoOverlay();
     if (!replace && pianoOverlay?.descriptor.patternId === descriptor.patternId) {
-      pianoOverlay.title.textContent = descriptor.name;
+      pianoOverlay.title.setAttribute("aria-label", descriptor.name);
+      pianoOverlay.titleAction.textContent = descriptor.name;
+      pianoOverlay.titleAction.setAttribute("aria-label", `Rename ${descriptor.patternName}`);
+      pianoOverlay.titleAction.title = `Rename ${descriptor.patternName}`;
       pianoOverlay.descriptor = descriptor;
       dom.editorHost.setAttribute("aria-label", descriptor.name);
       if (focusEntry) {
@@ -708,7 +713,14 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     header.className = "v2-floating-window-header";
     const title = documentLike.createElement("h2");
     title.className = "v2-floating-window-title";
-    title.textContent = descriptor.name;
+    title.setAttribute("aria-label", descriptor.name);
+    const titleAction = documentLike.createElement("button");
+    titleAction.className = "v2-floating-window-title-action";
+    titleAction.type = "button";
+    titleAction.textContent = descriptor.name;
+    titleAction.setAttribute("aria-label", `Rename ${descriptor.patternName}`);
+    titleAction.title = `Rename ${descriptor.patternName}`;
+    title.append(titleAction);
     const close = documentLike.createElement("button");
     close.className = "v2-floating-window-close";
     close.type = "button";
@@ -730,6 +742,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
       dragController,
       owner,
       title,
+      titleAction,
       windowLifecycle,
     };
     windowNode.addEventListener("pointerdown", () => raiseFloatingLayer("piano-roll"), {
@@ -738,6 +751,9 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     close.addEventListener("click", () => {
       workspaceState.activatePlaylist();
       queueMicrotask(() => focusSurfaceButton("playlist"));
+    }, { signal: windowLifecycle.signal });
+    titleAction.addEventListener("click", () => {
+      owner.requestPatternRename?.(titleAction);
     }, { signal: windowLifecycle.signal });
     synchronizeLayerExposure();
     if (focusEntry) focusPianoOverlay();
@@ -943,6 +959,9 @@ export async function createV2StudioApp({ document: documentLike = document } = 
         });
       } else {
         workspaceState.repairProject(projectState, { reason: `${operation ?? "project"}/repair` });
+      }
+      if (pianoOverlay) {
+        synchronizePianoOverlay(workspaceState.getState(), project);
       }
       const visibleDevice = surfaceHost.getSnapshot().device;
       if (visibleDevice) {

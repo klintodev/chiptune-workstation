@@ -11,6 +11,7 @@ import {
   getPianoDuplicateDeltaTicks,
   getPianoMarqueeNoteIds,
   isPianoDuplicateShortcut,
+  renamePianoPattern,
 } from "../src/v2/ui/piano-roll.js";
 import {
   createPatternForPlaylistTrack,
@@ -1027,6 +1028,91 @@ test("Piano Roll and Playlist write canonical snap keys", async () => {
   assert.doesNotMatch(pianoRoll, /updatePatternSession\(\{ snapTicks \}\)/);
   assert.match(playlist, /setSession\(\{ snap: snapValue \}\)/);
   assert.doesNotMatch(playlist, /setSession\(\{ snapTicks \}\)/);
+});
+
+test("Piano Pattern rename request cancels safely and reports canonical results", () => {
+  const announcements = [];
+  const projectState = createV2ProjectState();
+
+  assert.equal(renamePianoPattern({
+    announce: (message) => announcements.push(message),
+    patternId: "pattern-1",
+    projectState,
+    requestedName: null,
+  }), false);
+  assert.equal(projectState.getPattern("pattern-1").name, "Pattern 1");
+  assert.deepEqual(announcements, []);
+
+  assert.equal(renamePianoPattern({
+    announce: (message) => announcements.push(message),
+    patternId: "pattern-1",
+    projectState,
+    requestedName: "  Lead Arp  ",
+  }), true);
+  assert.equal(projectState.getPattern("pattern-1").name, "Lead Arp");
+  assert.deepEqual(announcements, ["Renamed Pattern to Lead Arp."]);
+
+  assert.equal(renamePianoPattern({
+    announce: (message) => announcements.push(message),
+    patternId: "pattern-1",
+    projectState,
+    requestedName: "Lead Arp",
+  }), false);
+  assert.equal(announcements.length, 1);
+
+  const renamed = projectState.getState();
+  assert.equal(renamePianoPattern({
+    announce: (message) => announcements.push(message),
+    patternId: "pattern-1",
+    projectState,
+    requestedName: "   ",
+  }), false);
+  assert.equal(projectState.getState(), renamed);
+  assert.deepEqual(announcements, [
+    "Renamed Pattern to Lead Arp.",
+    "Pattern name must contain 1 to 32 characters.",
+  ]);
+});
+
+test("visible Piano Roll title delegates rename and refreshes the existing overlay", async () => {
+  const [piano, studio] = await Promise.all([
+    readFile(new URL("../src/v2/ui/piano-roll.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/v2/studio-app.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(piano, /requestPatternName = \(pattern\) => globalThis\.prompt\?\.\("Pattern name", pattern\.name\)/);
+  assert.match(piano, /function requestPatternRename\(returnFocus = canvas\)/);
+  assert.match(piano, /requestedName = requestPatternName\(pattern\)/);
+  assert.match(piano, /renamePianoPattern\(\{\s*announce,\s*patternId: pattern\.id,\s*projectState,\s*requestedName,\s*\}\)/);
+  assert.match(piano, /rename\.addEventListener\("click", \(\) => requestPatternRename\(rename\)\)/);
+  assert.match(piano, /requestPatternRename,\s*\}\);/);
+
+  assert.match(studio, /patternName: pattern\.name,\s*name: `\$\{pattern\.name\}, Piano Roll`/);
+  assert.match(studio, /titleAction\.className = "v2-floating-window-title-action"/);
+  assert.match(studio, /titleAction\.setAttribute\("aria-label", `Rename \$\{descriptor\.patternName\}`\)/);
+  assert.match(studio, /titleAction\.addEventListener\("click", \(\) => \{\s*owner\.requestPatternRename\?\.\(titleAction\)/);
+
+  const openOverlay = studio.slice(
+    studio.indexOf("function openPianoOverlay"),
+    studio.indexOf("function synchronizePianoOverlay"),
+  );
+  const samePatternStart = openOverlay.indexOf(
+    "if (!replace && pianoOverlay?.descriptor.patternId === descriptor.patternId)",
+  );
+  const samePatternUpdate = openOverlay.slice(
+    samePatternStart,
+    openOverlay.indexOf("closePianoOverlay()", samePatternStart),
+  );
+  assert.match(samePatternUpdate, /pianoOverlay\.titleAction\.textContent = descriptor\.name/);
+  assert.match(samePatternUpdate, /pianoOverlay\.descriptor = descriptor/);
+  assert.match(samePatternUpdate, /dom\.editorHost\.setAttribute\("aria-label", descriptor\.name\)/);
+  assert.match(samePatternUpdate, /return false/);
+
+  const projectChange = studio.slice(
+    studio.indexOf("function handleProjectChange(event)"),
+    studio.indexOf('projectState.addEventListener("change", handleProjectChange)'),
+  );
+  assert.match(projectChange, /if \(pianoOverlay\) \{\s*synchronizePianoOverlay\(workspaceState\.getState\(\), project\)/);
 });
 
 test("Playlist Pattern double-click opens instead of rebuilding on the first click", () => {

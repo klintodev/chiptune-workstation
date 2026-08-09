@@ -33,6 +33,47 @@ test("note commands are immutable, atomic, canonically ordered and history-backe
   assert.equal(project.getPattern().notes.length, 2);
 });
 
+test("Pattern rename trims once, preserves musical content, and is undoable", () => {
+  const project = createV2ProjectState();
+  makeAudible(project, "pattern-1", 64, 48, 36);
+  project.addClip("track-1", "pattern-1", 0);
+  const originalPattern = project.getPattern("pattern-1");
+  const originalClips = project.getTrack("track-1").clips;
+  const changes = [];
+  project.addEventListener("change", (event) => changes.push(event.detail));
+
+  assert.equal(project.renamePattern("pattern-1", "  Lead Arp  "), true);
+  const renamedPattern = project.getPattern("pattern-1");
+  assert.equal(renamedPattern.name, "Lead Arp");
+  assert.equal(renamedPattern.id, originalPattern.id);
+  assert.equal(renamedPattern.lengthTicks, originalPattern.lengthTicks);
+  assert.deepEqual(renamedPattern.notes, originalPattern.notes);
+  assert.deepEqual(project.getTrack("track-1").clips, originalClips);
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].operation, "rename-pattern");
+  assert.equal(changes[0].patternId, "pattern-1");
+
+  const renamed = project.getState();
+  assert.equal(project.renamePattern("pattern-1", "Lead Arp"), false);
+  assert.equal(project.getState(), renamed);
+  assert.equal(changes.length, 1);
+  assert.throws(() => project.renamePattern("pattern-1", "   "), TypeError);
+  assert.throws(() => project.renamePattern("pattern-1", "x".repeat(33)), TypeError);
+  assert.throws(() => project.renamePattern("missing-pattern", "Bass"), RangeError);
+  assert.equal(project.getState(), renamed);
+  assert.equal(changes.length, 1);
+
+  assert.equal(project.undo(), true);
+  assert.equal(project.getPattern("pattern-1").name, "Pattern 1");
+  assert.equal(project.getPattern("pattern-1").lengthTicks, originalPattern.lengthTicks);
+  assert.deepEqual(project.getPattern("pattern-1").notes, originalPattern.notes);
+  assert.deepEqual(project.getTrack("track-1").clips, originalClips);
+  assert.equal(project.redo(), true);
+  assert.equal(project.getPattern("pattern-1").name, "Lead Arp");
+  assert.deepEqual(project.getPattern("pattern-1").notes, originalPattern.notes);
+  assert.deepEqual(project.getTrack("track-1").clips, originalClips);
+});
+
 test("Track rename is the undoable owner name for its Instrument and Mixer channel", () => {
   const project = createV2ProjectState();
   const original = project.getState();

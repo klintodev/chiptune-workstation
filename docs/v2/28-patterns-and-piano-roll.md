@@ -141,7 +141,7 @@ Only these groups remain permanently visible:
 - active tool and snap;
 - Add to Playlist.
 
-History is grouped; Piano Roll zoom has no buttons and is controlled only by `Mod+wheel` over the editor. The Pattern switcher menu owns New, Duplicate, Rename and Delete, while Playlist's Track context menu exposes the same canonical New command with the clicked Track as audition/destination context. New creates an empty automatically sized `Pattern N`, activates its Piano Roll, preserves the chosen valid audition Track and focuses the editor as one undoable command. At 64 Patterns, New/Duplicate are disabled with a reason. Delete is disabled for the final Pattern; undoing creation closes the removed surface and restores the prior Pattern/switcher focus. The audition-Track control changes destination only: Piano Roll contains no `Open Instrument` action or other Instrument launcher. The header does not duplicate transport, Mixer or Project controls.
+History is grouped; Piano Roll zoom has no buttons and is controlled only by `Mod+wheel` over the editor. The Pattern actions menu owns New, Duplicate, Rename and Delete. Pointer activation or Enter on the visible Piano Roll title invokes that same canonical Rename command; Space continues to control global transport, and the remaining title bar remains the window drag handle. Playlist's Track context menu exposes the same canonical New command with the clicked Track as audition/destination context. New creates an empty automatically sized `Pattern N`, activates its Piano Roll, preserves the chosen valid audition Track and focuses the editor as one undoable command. At 64 Patterns, New/Duplicate are disabled with a reason. Delete is disabled for the final Pattern; undoing creation closes the removed surface and restores the prior Pattern/switcher focus. The audition-Track control changes destination only: Piano Roll contains no `Open Instrument` action or other Instrument launcher. The header does not duplicate transport, Mixer or Project controls.
 
 ### Editor
 
@@ -166,7 +166,7 @@ The Piano Roll exposes one named composite editor entry point using managed curs
 - With a note selected, `Mod+Left/Right` moves its start by one snap while preserving duration; `Mod+Up/Down` transposes one semitone; `Mod+Shift+Left/Right` shortens/extends the end by one snap delta; `[`/`]` changes velocity by 0.05 within 0â€¦1. Invalid boundary/pitch/duration edits reject atomically and announce why.
 - Escape clears selection and returns the managed cursor to the note start. Delete/Backspace removes every selected note only while the editor owns focus and never triggers browser navigation.
 - `Mod+B` duplicates the selected bounding block immediately to its right using the exact span from the earliest selected start to the latest selected end. It preserves pitches, durations, velocities and internal gaps, selects the copies so the command can repeat, ignores key repeat, and commits or rejects atomically without changing the current selection on failure.
-- Space controls transport only from the editor/background; native controls and text fields retain native Space/Enter behaviour.
+- Space controls transport throughout Studio except while typing in a text field. The Piano Roll title's rename action is activated by pointer or Enter so title focus does not displace the global Space command.
 - `Mod+C`, `Mod+V`, `Mod+Z` and platform redo follow conventions; commands are ignored in incompatible text fields. Launch does not assign other Shift/arrow combinations.
 - While the editor owns focus, editor commands take precedence over computer-key audition. Audition requires an explicit visible mode or non-conflicting mapping and can always be exited.
 
@@ -205,6 +205,7 @@ Desktop supports the full pointer and keyboard contract in its modeless window. 
 - A new desktop Project opens Pattern 1 Piano Roll above visible Playlist; no second Piano Roll, device or Mixer competes with it.
 - Pointer and keyboard journeys create, `Mod`-marquee select, move, resize, change velocity, delete the complete selection, duplicate it right with `Mod+B`, repeat the duplicate and undo notes on desktop.
 - `Mod+wheel` zooms without zoom buttons; empty right-click is suppressed/no-op, note right-click deletes, and Piano Roll exposes no Instrument launcher.
+- Clicking the visible Piano Roll title or focusing it and pressing Enter invokes the same canonical Pattern rename as Pattern actions; success updates every Pattern label in place and is undoable, while cancel/no-op/invalid input preserves data, window position and title focus. The rest of the title bar remains draggable and Space remains transport.
 - Open-from-clip changes audition Track; ordinary surface return preserves it; Track removal repairs it without closing the Pattern.
 - Active-note delete/move/pitch change releases the owned voice without stuck notes or unrelated cut-offs.
 - New/Duplicate/Rename/Delete obey the 64-Pattern cap and final-Pattern rule; undo of active-Pattern creation/deletion repairs the surface and focuses a visible Pattern control.
@@ -216,7 +217,7 @@ Desktop supports the full pointer and keyboard contract in its modeless window. 
 - Validation/property tests for event invariants, limits, ordering and automatic Pattern-span atomicity
 - Scheduler tests for chords, same-pitch overlap, deterministic simultaneous ordering/oldest-voice retirement, V1 direct whole-Song `↻` loop boundaries, tempo/seek/stop and the live-edit policy
 - Shared occurrence-projection parity tests for Pattern, Song, offline and public adapters
-- Manual desktop pointer and keyboard-command compose review covering create, `Mod`-marquee selection, group move, transpose, resize, velocity, right-click rules, `Mod+wheel`, group delete, repeated `Mod+B`, undo and focus/announcement checks, including absence of zoom buttons/Instrument launcher
+- Manual desktop pointer and keyboard-command compose review covering create, title-click/Enter rename, title-focus and drag-handle preservation, `Mod`-marquee selection, group move, transpose, resize, velocity, right-click rules, `Mod+wheel`, group delete, repeated `Mod+B`, undo and focus/announcement checks, including absence of zoom buttons/Instrument launcher
 - 1366Ã—768 Playlist-under-window layout and 390Ã—844 single-fullscreen-surface smoke tests
 - Lifecycle/leak coverage for Pattern/Track/Project deletion and surface switching
 
@@ -256,6 +257,7 @@ These slices use feature-flagged in-memory fixtures or isolated development stor
 - Playback mode and Playlist insertion cursor are session state; Pattern playback never moves the insertion cursor.
 - The direct `↻` control toggles the complete current playback context: the active Pattern in Pattern mode or the full arrangement in Song mode.
 - Piano Roll uses `Mod+wheel` zoom with no zoom buttons or Instrument launcher; empty right-click is suppressed and note right-click deletes.
+- The visible Piano Roll title exposes canonical Pattern rename on pointer activation or Enter; Space remains the global transport command and the remaining title bar remains draggable.
 - Piano Roll `Mod`-drag from empty grid space selects a note range regardless of active tool; Delete removes that complete selection and `Mod+B` duplicates its exact bounding block to the right, selecting the copies.
 - A Project always retains at least one Pattern.
 - Normal release/effect tails may cross Pattern boundaries; gates may not.

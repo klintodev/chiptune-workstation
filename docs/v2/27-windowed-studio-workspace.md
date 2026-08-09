@@ -46,7 +46,7 @@ Pattern and Track selection use compact contextual controls in Piano Roll, Playl
 
 ### 3. Piano Roll window
 
-At most one Piano Roll is visible above Playlist. It is modeless, draggable from its title bar, fixed-size and non-resizable. Opening a Pattern from the library or a clip reuses the window for that stable Pattern identity and focuses its editor. Close hides presentation only; it does not delete the Pattern.
+At most one Piano Roll is visible above Playlist. It is modeless, fixed-size and non-resizable. Its visible Pattern title is an explicit rename control: pointer activation or Enter invokes the canonical Pattern rename command, while Space retains its global transport meaning. The remaining title bar is the bounded window drag handle. Opening a Pattern from the library or a clip reuses the window for that stable Pattern identity and focuses its editor. Close hides presentation only; it does not delete the Pattern.
 
 The Piano Roll may remain open while the user edits Playlist or a device. It closes when its Pattern is deleted or when exclusive Mixer is activated; returning from Mixer restores the safe composition context rather than persisted geometry.
 
@@ -115,7 +115,7 @@ Visual acceptance at 1366Ã—768 requires:
 - the Piano Roll is visually dominant while leaving useful Playlist context visible;
 - the inline Pattern-library details open by default; bounded movement applies only to Piano Roll and device windows;
 - no duplicate project, transport, Pattern or Track controls; the intentional inline Master slider remains available alongside Mixer;
-- Piano Roll persistent header contains only Pattern identity, audition Track, active tool/snap and Add to Playlist; history and destructive actions are grouped, with no zoom buttons or Instrument launcher;
+- Piano Roll persistent header contains only Pattern identity, audition Track, active tool/snap and Add to Playlist; its Pattern title exposes the canonical rename action without consuming the remaining drag handle, and history/destructive actions are grouped, with no zoom buttons or Instrument launcher;
 - opening a device does not reveal another permanent navigation rail or panel;
 - dragging never changes approved fixed window size and does not produce page scrolling.
 
@@ -159,6 +159,7 @@ No window state, focus target, size, drag position or DOM identifier is saved in
 
 - A new project at 1366Ã—768 shows compact shell, Playlist base with expanded Pattern-library details and Pattern 1 Piano Roll; Mixer, device and visualiser are absent.
 - Piano Roll and device can each be dragged within bounds without resizing or changing Project data; reloading restores their approved defaults.
+- Clicking the Piano Roll title or focusing it and pressing Enter renames the active Pattern through the canonical command, preserves the window position and returns focus to the same title; dragging the rest of the title bar still moves the window and Space still toggles transport.
 - A Playlist ruler seek becomes the Song playback cue; the first Stop returns there and the second Stop returns to tick 0, including after Pause/Resume.
 - Pattern library collapses inline within Playlist and has no geometry to restore.
 - Opening Klinto Chip focuses its named editor; opening an Effect replaces it; closing returns to a valid visible origin while Piano Roll and Playlist remain available.

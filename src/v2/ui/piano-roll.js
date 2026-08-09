@@ -54,6 +54,27 @@ export function getPianoDuplicateDeltaTicks(notes) {
   return Math.max(1, lastTick - firstTick);
 }
 
+export function renamePianoPattern({
+  announce = () => {},
+  patternId,
+  projectState,
+  requestedName,
+} = {}) {
+  if (requestedName === null || requestedName === undefined) return false;
+  if (!projectState?.getPattern || !projectState?.renamePattern) {
+    throw new TypeError("Renaming a Piano Roll Pattern requires Project state.");
+  }
+  try {
+    const changed = projectState.renamePattern(patternId, requestedName);
+    if (!changed) return false;
+    announce(`Renamed Pattern to ${projectState.getPattern(patternId).name}.`);
+    return true;
+  } catch (error) {
+    announce(error instanceof Error ? error.message : "The Pattern could not be renamed.");
+    return false;
+  }
+}
+
 function noteLabel(note) {
   return `${formatMidiPitch(note.pitch)}, ${formatTickPosition(note.startTick)}, ${formatDurationTicks(note.durationTicks)}, velocity ${formatPercent(note.velocity)}`;
 }
@@ -165,6 +186,7 @@ export function createPianoRollSurface({
   onAddToPlaylist = () => {},
   onTransportToggle = () => {},
   projectState,
+  requestPatternName = (pattern) => globalThis.prompt?.("Pattern name", pattern.name),
   getTransportFrame = () => null,
   transportFrameSource = null,
   workspaceState,
@@ -233,6 +255,34 @@ export function createPianoRollSurface({
     const project = snapshot();
     return project.patterns.find(({ id }) => id === activePatternId())
       ?? project.patterns[0];
+  }
+
+  function restoreRenameFocus(target) {
+    queueMicrotask(() => {
+      if (disposed) return;
+      const next = target?.isConnected ? target : canvas;
+      next.focus?.({ preventScroll: true });
+    });
+  }
+
+  function requestPatternRename(returnFocus = canvas) {
+    const pattern = activePattern();
+    let requestedName;
+    try {
+      requestedName = requestPatternName(pattern);
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "The Pattern name could not be requested.");
+      restoreRenameFocus(returnFocus);
+      return false;
+    }
+    const changed = renamePianoPattern({
+      announce,
+      patternId: pattern.id,
+      projectState,
+      requestedName,
+    });
+    restoreRenameFocus(returnFocus);
+    return changed;
   }
 
   function editorEndTick(pattern = activePattern()) {
@@ -1209,10 +1259,7 @@ export function createPianoRollSurface({
       workspaceState.setActivePattern?.(id);
     });
     const rename = createElement("button", { textContent: "Rename Pattern", type: "button" });
-    rename.addEventListener("click", () => {
-      const name = globalThis.prompt?.("Pattern name", pattern.name);
-      if (name !== null && name !== undefined) projectState.renamePattern(pattern.id, name);
-    });
+    rename.addEventListener("click", () => requestPatternRename(rename));
     const remove = createElement("button", {
       className: "v2-danger-button",
       disabled: project.patterns.length === 1,
@@ -1330,5 +1377,6 @@ export function createPianoRollSurface({
     focus: () => title.focus({ preventScroll: true }),
     node,
     render,
+    requestPatternRename,
   });
 }
