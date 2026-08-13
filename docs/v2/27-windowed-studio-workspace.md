@@ -21,7 +21,7 @@ A new desktop project opens Playlist with its inline Pattern-library `<details>`
 On desktop the shell is one row with a maximum height of 72 CSS pixels. It contains only:
 
 - compact project identity and save status;
-- Return to start, Play/Pause, two-stage Stop (return to the playback cue, then return to tick 0) and the direct contextual V1 `↻` whole-Pattern/whole-Song loop toggle;
+- Return to start, Play/Pause, two-stage Stop (return to the playback cue, then return to tick 0) and the direct contextual V1 `↻` toggle for the active Pattern's whole-bar performance span or the whole Song;
 - Pattern/Song mode;
 - compact tempo control plus the always-inline V1 Master slider and readout;
 - audio setup appears when playback requires it, without a persistent Ready/status button;
@@ -37,7 +37,7 @@ The shell never contains a visualiser, Pattern step grid, arrangement overview, 
 On desktop, Playlist fills the content area as the persistent base and contains a default-expanded, collapsible Pattern-library `<details>` section. Only one Piano Roll and at most one Instrument or Effect may appear as bounded modeless windows above it.
 
 - The inline Pattern library may remain expanded while the Piano Roll and one device window coexist above Playlist.
-- Their approved sizes are fixed; title-bar dragging changes only bounded session position and never musical data.
+- Their approved sizes are fixed; title-bar dragging outside embedded controls changes only bounded session position and never musical data.
 - Mixer is the only exclusive primary surface. Activating it removes Playlist and every modeless window from layout, tab order and the accessibility tree.
 - Leaving Mixer restores a safe Playlist composition stack without stopping audio. Session state preserves valid Pattern viewport, selection and audition Track context.
 - Composition windows hidden by exclusive Mixer perform no animation-frame or measurement work.
@@ -46,7 +46,7 @@ Pattern and Track selection use compact contextual controls in Piano Roll, Playl
 
 ### 3. Piano Roll window
 
-At most one Piano Roll is visible above Playlist. It is modeless, fixed-size and non-resizable. Its visible Pattern title is an explicit rename control: pointer activation or Enter invokes the canonical Pattern rename command, while Space retains its global transport meaning. The remaining title bar is the bounded window drag handle. Opening a Pattern from the library or a clip reuses the window for that stable Pattern identity and focuses its editor. Close hides presentation only; it does not delete the Pattern.
+At most one Piano Roll is visible above Playlist. It is modeless, fixed-size and non-resizable. Its title contains an always-visible text input for the canonical Pattern name. Enter or moving focus away commits one valid changed name, Escape restores the saved name, and Space types normally while the input is focused. Pattern actions Rename focuses and selects this same input. The remaining title bar is the bounded window drag handle; interacting with the input never moves the window. Opening a Pattern from the library or a clip reuses the window for that stable Pattern identity and focuses its editor. Close hides presentation only; it does not delete the Pattern.
 
 The Piano Roll may remain open while the user edits Playlist or a device. It closes when its Pattern is deleted or when exclusive Mixer is activated; returning from Mixer restores the safe composition context rather than persisted geometry.
 
@@ -115,7 +115,7 @@ Visual acceptance at 1366Ã—768 requires:
 - the Piano Roll is visually dominant while leaving useful Playlist context visible;
 - the inline Pattern-library details open by default; bounded movement applies only to Piano Roll and device windows;
 - no duplicate project, transport, Pattern or Track controls; the intentional inline Master slider remains available alongside Mixer;
-- Piano Roll persistent header contains only Pattern identity, audition Track, active tool/snap and Add to Playlist; its Pattern title exposes the canonical rename action without consuming the remaining drag handle, and history/destructive actions are grouped, with no zoom buttons or Instrument launcher;
+- Piano Roll persistent header contains only Pattern identity, audition Track, active tool/snap and Add to Playlist; its Pattern identity is an always-visible editable text field without consuming the remaining drag handle, and history/destructive actions are grouped, with no zoom buttons or Instrument launcher;
 - opening a device does not reveal another permanent navigation rail or panel;
 - dragging never changes approved fixed window size and does not produce page scrolling.
 
@@ -159,7 +159,7 @@ No window state, focus target, size, drag position or DOM identifier is saved in
 
 - A new project at 1366Ã—768 shows compact shell, Playlist base with expanded Pattern-library details and Pattern 1 Piano Roll; Mixer, device and visualiser are absent.
 - Piano Roll and device can each be dragged within bounds without resizing or changing Project data; reloading restores their approved defaults.
-- Clicking the Piano Roll title or focusing it and pressing Enter renames the active Pattern through the canonical command, preserves the window position and returns focus to the same title; dragging the rest of the title bar still moves the window and Space still toggles transport.
+- Editing the always-visible Piano Roll name field and pressing Enter or moving focus away renames the active Pattern through the canonical command; Escape restores the saved value. The edit preserves window position, Pattern actions Rename focuses/selects the same field, dragging outside the field still moves the window, and Space types in the field instead of toggling transport.
 - A Playlist ruler seek becomes the Song playback cue; the first Stop returns there and the second Stop returns to tick 0, including after Pause/Resume.
 - Pattern library collapses inline within Playlist and has no geometry to restore.
 - Opening Klinto Chip focuses its named editor; opening an Effect replaces it; closing returns to a valid visible origin while Piano Roll and Playlist remain available.

@@ -43,7 +43,7 @@ After activation:
 - an unshipped internal version may be consolidated before Beta only if it never entered ordinary user storage;
 - a version number is never reused for a different shape.
 
-V7 has not been activated or written to ordinary user storage, so its final monophonic Pattern invariant is consolidated before Beta without a schema bump: note spans are half-open, notes may touch end-to-start but may not overlap at any pitch, and chords require separate Tracks. Once V7 activates, this meaning is frozen and any later change follows the schema-increment rule above.
+V7 has not been activated or written to ordinary user storage, so its final Pattern overlap invariant is consolidated before Beta without a schema bump: note spans are half-open, notes on the same pitch may touch end-to-start but may not overlap, and notes at different pitches may overlap to form chords within one Pattern. Once V7 activates, this meaning is frozen and any later change follows the schema-increment rule above.
 
 ## V1 â†’ V2 migration
 
@@ -56,6 +56,7 @@ Migration is a pure trust-boundary operation: clone/parse â†’ validate sour
 - Clip `startStep * 24` â†’ `startTick`.
 - Loop step bounds Ã— 24 â†’ exclusive tick bounds; preserve `transport.loop.mode` exactly and retain arrangement-mode auto-follow behaviour.
 - Pattern/Song playback mode is not migrated or persisted; a new/opened session starts in Pattern mode.
+- Pattern mode derives a non-persisted whole-bar performance end from final V7 `lengthTicks`: `ceil(lengthTicks / 384) * 384`. Empty Patterns therefore perform one silent bar, and content already ending on a bar boundary adds no further bar. This derivation does not change migrated Pattern data, linked clip width or Song timing.
 - Note/clip ordering becomes canonical and deterministic.
 - `rootOctave` is removed from musical data; initial view derives from first note or C4 and is not part of audio parity.
 
@@ -95,24 +96,24 @@ For audio fixtures:
 - WAV parity renders at the production 44.1 kHz export rate. Deterministic offline fixtures use a maximum absolute sample difference of â‰¤ 1e-5 and RMS difference of â‰¤ 1e-6 after identical normalization;
 - a deliberately changed test environment must re-baseline through reviewed evidence, never silently widen tolerances;
 - unseeded noise is not sample-identical: compare occurrence schedule, graph/configuration, envelope, gain, duration and bounded spectral/RMS characteristics;
-- release tails may cross a Pattern boundary exactly as in V1 and are compared separately from gate duration.
+- release and Effect tails may ring through Pattern performance padding and cross a Pattern/clip boundary exactly as in V1; they are compared separately from stored gate duration.
 
 ## Fixture matrix
 
 Fixtures cover V1 Project schemas 1 through 6 through the production migration chain, plus documented legacy aliases, including:
 
 - empty/default Project;
-- every content-derived Pattern span and note boundary;
-- valid end-to-start touching at the same and different pitches, malformed interval overlap at the same and different pitches, and chords distributed across separate Tracks;
+- every content-derived Pattern span and note boundary, plus empty, partial-final-bar and exact-bar Pattern performance boundaries;
+- valid end-to-start touching, valid cross-pitch overlaps including chords, and malformed same-pitch interval overlap;
 - every waveform, octave and parameter boundary;
-- sequential notes produced from distinct migration steps, chords distributed across separate Tracks, zero-velocity notes and maximum voice/count cases;
+- sequential notes produced from distinct migration steps, chords within one Pattern, zero-velocity notes and maximum voice/count cases;
 - multiple linked clips, touching clips, maximum song boundary and loop bounds;
 - multi-Track mute/solo/pan/volume/master combinations;
 - local JSON, cloud and public envelopes;
 - near-2 MB and near-hosted-size documents;
 - malformed numbers, duplicate IDs, missing references, oversized arrays and unknown types/versions.
 
-Each fixture asserts source immutability, canonical V7 result, repeated-normalization equality and expected audio occurrence projection. Any overlapping Pattern-note intervals are rejected at import and every local/cloud/public normalization boundary as complete proposals: no note, selection, history entry or linked clip is partially changed.
+Each fixture asserts source immutability, canonical V7 result, repeated-normalization equality and expected audio occurrence projection. Any same-pitch overlapping Pattern-note intervals are rejected at import and every local/cloud/public normalization boundary as complete proposals: no note, selection, history entry or linked clip is partially changed. Cross-pitch overlaps remain valid.
 
 ## Unsupported or malformed Project recovery
 
@@ -157,7 +158,7 @@ Rules must not claim to deeply validate arbitrary nested arrays when that is not
 
 - Studio, public player and offline export consume PRD 28's occurrence projection and PRDs 29â€“30's closed device/graph definitions.
 - No route keeps an independent switch statement for waveform/effect semantics.
-- Pattern and Song timing, clip links, tempo, Instrument parameters, Track/master mix and insert order agree.
+- Pattern and Song timing, clip links, tempo, Instrument parameters, Track/master mix and insert order agree. Pattern one-shot and loop playback share the same bar-rounded performance boundary, while Song clips retain exact content-derived duration.
 - WAV renders the arrangement once and ignores transport-loop repetition.
 - Compute bounded Instrument plus serial Track/master tails, then enforce the existing ten-minute absolute limit before creating offline buffers.
 - Public visitor volume is a transient post-master output gain, not persisted and not applied to WAV.

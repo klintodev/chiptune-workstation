@@ -2,6 +2,7 @@ import {
   MAX_TRACK_VOICES,
   createPatternOccurrences,
   createSongOccurrences,
+  getPatternPlaybackEndTick,
   getV2ArrangementEndTick,
   normalizeV2Project,
   ticksToSeconds,
@@ -131,19 +132,19 @@ export function createRenderPlan(projectCandidate, {
   assertTick(fromTick, "Render fromTick");
   const project = normalizeV2Project(projectCandidate);
   const bpm = project.transport.bpm;
-  let contentEndTick;
+  let playbackEndTick;
   let selectedTrack = null;
   if (mode === "pattern") {
     const pattern = project.patterns.find((candidate) => candidate.id === patternId);
     if (!pattern) throw new RangeError(`Unknown Pattern: ${patternId}.`);
     selectedTrack = getTrack(project, trackId);
-    contentEndTick = pattern.lengthTicks;
+    playbackEndTick = getPatternPlaybackEndTick(pattern);
   } else {
-    contentEndTick = getV2ArrangementEndTick(project);
+    playbackEndTick = getV2ArrangementEndTick(project);
   }
-  const resolvedToTick = toTick ?? contentEndTick;
+  const resolvedToTick = toTick ?? playbackEndTick;
   assertTick(resolvedToTick, "Render toTick");
-  if (resolvedToTick < fromTick || resolvedToTick > contentEndTick) {
+  if (resolvedToTick < fromTick || resolvedToTick > playbackEndTick) {
     throw new RangeError("Render range is outside the playback content.");
   }
   const occurrences = createOneShotOccurrences(project, {
@@ -207,7 +208,7 @@ export function createPlaybackOccurrences(projectCandidate, {
     if (!pattern) throw new RangeError(`Unknown Pattern: ${patternId}.`);
     getTrack(project, trackId);
     loopStart = 0;
-    loopEnd = pattern.lengthTicks;
+    loopEnd = getPatternPlaybackEndTick(pattern);
     looping = true;
   } else {
     const arrangementEnd = getV2ArrangementEndTick(project);

@@ -85,9 +85,10 @@ function compareNotes(left, right) {
     || compareIds(left.id, right.id);
 }
 
-function assertNotesDoNotOverlap(notes, patternId) {
-  let previous = null;
+function assertSamePitchNotesDoNotOverlap(notes, patternId) {
+  const previousByPitch = new Map();
   for (const note of notes) {
+    const previous = previousByPitch.get(note.pitch);
     if (previous && rangesOverlap(
       previous.startTick,
       previous.startTick + previous.durationTicks,
@@ -100,7 +101,7 @@ function assertNotesDoNotOverlap(notes, patternId) {
         { noteIds: [previous.id, note.id], patternId },
       );
     }
-    previous = note;
+    previousByPitch.set(note.pitch, note);
   }
 }
 
@@ -119,7 +120,7 @@ export function normalizeV2Pattern(candidate) {
   }
   const noteIds = new Set();
   const notes = candidate.notes.map((note) => normalizeNote(note, candidate.id, noteIds)).sort(compareNotes);
-  assertNotesDoNotOverlap(notes, candidate.id);
+  assertSamePitchNotesDoNotOverlap(notes, candidate.id);
   return {
     id: candidate.id,
     name: candidate.name,

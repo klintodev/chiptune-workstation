@@ -75,7 +75,7 @@ The primary user wants to create a musical idea quickly, hear it immediately, tu
 
 Core jobs:
 
-- write melodies and bass lines with note lengths and velocity, and build chords across separate Tracks;
+- write melodies, bass lines and chords with note lengths and velocity, including simultaneous notes at different pitches within one Pattern;
 - reuse a Pattern across tracks and song positions;
 - change the sound assigned to a track without rewriting notes;
 - hear a clear mix with a small number of useful effects;
@@ -116,7 +116,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 ### Composition
 
 - 96 PPQ shared musical time.
-- Monophonic note events within each Pattern, with start, duration, MIDI pitch and velocity; simultaneous polyphony and chords use separate Tracks.
+- Note events within each Pattern have start, duration, MIDI pitch and velocity. Notes at different pitches may overlap for chords and simultaneous polyphony; same-pitch half-open spans may touch end-to-start but may not overlap.
 - Launch snap values: 1/8, 1/16 and 1/32; default 1/16.
 - Pointer and desktop-keyboard creation, modifier-marquee multi-selection, group movement/resize/delete, exact-span duplicate-right, copy/paste, undo and redo.
 - Explicit audition Track, compact New/Duplicate/Rename/Delete Pattern actions and one-click Add to Playlist.
@@ -187,7 +187,7 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 
 - Project create, rename, switch, delete and local autosave
 - JSON download/import and project validation
-- Pattern and Song playback, constant tempo and a direct contextual V1 `↻` control that loops the whole current Pattern or Song
+- Pattern and Song playback, constant tempo and a direct contextual V1 `↻` control that loops the active Pattern's whole-bar performance span or the whole Song; Pattern performance padding does not change its exact content-derived clip span
 - Up to 64 Patterns, eight Tracks and the existing bounded arrangement duration
 - Existing waveform and envelope behaviour
 - Track volume, pan, mute and solo; the V1 inline Master slider/readout

@@ -55,10 +55,10 @@ function createHarness(project = structuredClone(createDefaultV2Project()), opti
   };
 }
 
-test("canonical dense submission retires the oldest voice before number seventeen", () => {
+test("a canonical seventeen-note chord retires the oldest voice before voice seventeen", () => {
   const project = structuredClone(createDefaultV2Project());
   project.patterns[0].notes = Array.from({ length: 17 }, (_, index) => (
-    note(`note-${String(index).padStart(2, "0")}`, 36 + index, index, 1)
+    note(`note-${String(index).padStart(2, "0")}`, 36 + index, 0, 1)
   ));
   project.patterns[0].notes.push(note("silent-span", 60, 383, 1, 0));
   const harness = createHarness(project);
@@ -68,7 +68,7 @@ test("canonical dense submission retires the oldest voice before number seventee
   assert.deepEqual(harness.scheduled.map(({ event }) => event.pitch), Array.from({ length: 17 }, (_, i) => 36 + i));
   assert.equal(harness.retired.length, 1);
   assert.equal(harness.retired[0].record, harness.scheduled[0]);
-  assert.equal(harness.retired[0].time, 10 + 16 / 192);
+  assert.equal(harness.retired[0].time, 10);
   assert.equal(harness.scheduler.getScheduledVoiceCount(), 16);
 });
 
@@ -105,7 +105,36 @@ test("Pattern loop wrap keeps canonical identity and clips gates at the boundary
   assert.deepEqual(harness.scheduled.map(({ event }) => event.playbackDurationTicks), [1, 1]);
 });
 
-test("disabled Pattern looping plays the entire Pattern once and stops at its content end", () => {
+test("a short Pattern loop performs its trailing silence before repeating at the next bar", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.patterns[0].notes = [note("pulse", 60, 0, 24)];
+  const harness = createHarness(project, { lookAheadSeconds: 0.5 });
+
+  harness.scheduler.play({ mode: "pattern" });
+  assert.deepEqual(harness.scheduled.map(({ event }) => event.startTime), [10]);
+
+  harness.setAudioTime(10.5);
+  assert.equal(harness.scheduler.getPlayheadTick(), 96);
+  harness.intervalCallback();
+  assert.equal(harness.scheduled.length, 1);
+
+  harness.setAudioTime(11.99);
+  harness.intervalCallback();
+  assert.deepEqual(harness.scheduled.map(({ event }) => event.startTime), [10, 12]);
+  assert.equal(harness.scheduler.getState().status, "playing");
+});
+
+test("the silent Pattern tail is seekable and its full-bar end remains exclusive", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.patterns[0].notes = [note("pulse", 60, 0, 24)];
+  const harness = createHarness(project);
+
+  assert.equal(harness.scheduler.seek(300), true);
+  assert.equal(harness.scheduler.getPlayheadTick(), 300);
+  assert.throws(() => harness.scheduler.seek(384), /outside the playback range/);
+});
+
+test("disabled Pattern looping plays once through the complete containing bar", () => {
   const project = structuredClone(createDefaultV2Project());
   project.patterns[0].notes = [note("once", 60, 0, 24)];
   const harness = createHarness(project, { getPatternLoopEnabled: () => false });
@@ -115,8 +144,55 @@ test("disabled Pattern looping plays the entire Pattern once and stops at its co
   harness.setAudioTime(10.13);
   harness.intervalCallback();
 
+  assert.equal(harness.scheduler.getState().status, "playing");
+  harness.setAudioTime(11.99);
+  harness.intervalCallback();
+  assert.equal(harness.scheduler.getState().status, "playing");
+
+  harness.setAudioTime(12);
+  harness.intervalCallback();
   assert.equal(harness.scheduler.getState().status, "stopped");
   assert.equal(harness.scheduled.length, 1);
+});
+
+test("a paused Pattern cue is repaired when an edit removes its trailing bar", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.patterns[0].notes = [note("late", 60, 500, 24)];
+  const harness = createHarness(project, { getPatternLoopEnabled: () => false });
+
+  assert.equal(harness.scheduler.play({ mode: "pattern", startTick: 500 }), true);
+  assert.equal(harness.scheduler.pause(), true);
+  assert.equal(harness.scheduler.getState().retainedTick, 500);
+
+  project.patterns[0].notes = [note("short", 60, 0, 24)];
+  assert.equal(harness.scheduler.syncProject(project), true);
+  assert.equal(harness.scheduler.getState().retainedTick, 383);
+  assert.equal(harness.scheduler.play({ mode: "pattern" }), true);
+  assert.equal(harness.scheduler.stop(), true);
+  assert.equal(harness.scheduler.getState().retainedTick, 383);
+});
+
+test("a paused cue is repaired when the active Pattern changes to a shorter performance span", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.patterns[0].notes = [note("late", 60, 500, 24)];
+  project.patterns.push({
+    id: "pattern-2",
+    lengthTicks: 24,
+    name: "Pattern 2",
+    notes: [note("short", 64, 0, 24)],
+  });
+  let activePatternId = "pattern-1";
+  const harness = createHarness(project, {
+    getPatternId: () => activePatternId,
+    getPatternLoopEnabled: () => false,
+  });
+
+  assert.equal(harness.scheduler.play({ mode: "pattern", startTick: 500 }), true);
+  assert.equal(harness.scheduler.pause(), true);
+  activePatternId = "pattern-2";
+  assert.equal(harness.scheduler.syncProject(project), true);
+  assert.equal(harness.scheduler.getState().retainedTick, 383);
+  assert.equal(harness.scheduler.play({ mode: "pattern" }), true);
 });
 
 test("tempo changes retain the tick playhead, cancel future submissions and rebuild once", () => {

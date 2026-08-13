@@ -23,14 +23,27 @@ export function derivePatternLengthTicks(patternOrNotes) {
 }
 
 /**
+ * Pattern playback completes the 4/4 bar containing the final note. This is a
+ * transport boundary only: persisted Pattern length and Playlist clip width
+ * remain content-derived.
+ */
+export function getPatternPlaybackEndTick(patternOrNotes) {
+  const barTicks = PPQ * 4;
+  const contentEndTick = derivePatternLengthTicks(patternOrNotes);
+  const playbackEndTick = Math.ceil(contentEndTick / barTicks) * barTicks;
+  return Math.min(MAX_PATTERN_CONTENT_TICKS, Math.max(barTicks, playbackEndTick));
+}
+
+/**
  * The editor always leaves writable grid after the musical content. This is a
  * viewport concern only; it never becomes part of the Pattern's duration.
  */
 export function getPatternEditorEndTick(patternOrNotes) {
   const contentEndTick = derivePatternLengthTicks(patternOrNotes);
   const paddedEndTick = Math.ceil((contentEndTick + PPQ) / PPQ) * PPQ;
+  const playbackEndTick = getPatternPlaybackEndTick(patternOrNotes);
   return Math.min(
     MAX_PATTERN_CONTENT_TICKS,
-    Math.max(DEFAULT_PATTERN_EDITOR_END_TICKS, paddedEndTick),
+    Math.max(DEFAULT_PATTERN_EDITOR_END_TICKS, paddedEndTick, playbackEndTick),
   );
 }

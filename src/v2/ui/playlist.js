@@ -1,3 +1,4 @@
+import { MAX_TRACK_NAME_LENGTH } from "../domain/constants.js";
 import { clearElement, createElement } from "./dom.js";
 import { formatDurationTicks, formatTickPosition } from "./music-format.js";
 
@@ -17,6 +18,32 @@ const TRACK_ACTION_ORDER = Object.freeze([
 ]);
 const PATTERN_DRAG_TYPE = "application/x-klinto-pattern-id";
 const PLAYLIST_DOUBLE_CLICK_DELAY_MS = 250;
+let playlistSurfaceSequence = 0;
+
+export function getPlaylistNotePreviewGeometry(pattern) {
+  const notes = Array.isArray(pattern?.notes)
+    ? pattern.notes.filter(({ velocity }) => Number(velocity) > 0)
+    : [];
+  const lengthTicks = Number(pattern?.lengthTicks);
+  if (notes.length === 0 || !Number.isFinite(lengthTicks) || lengthTicks <= 0) {
+    return Object.freeze([]);
+  }
+  const lowestPitch = Math.min(...notes.map(({ pitch }) => pitch));
+  const highestPitch = Math.max(...notes.map(({ pitch }) => pitch));
+  const pitchSpan = Math.max(12, highestPitch - lowestPitch + 2);
+  const pitchCentre = (lowestPitch + highestPitch) / 2;
+  const previewFloor = pitchCentre - pitchSpan / 2;
+  return Object.freeze(notes.map((note) => {
+    const pitchPosition = Math.max(0, Math.min(1, (note.pitch - previewFloor) / pitchSpan));
+    return Object.freeze({
+      height: 7,
+      opacity: Math.max(0.35, Math.min(1, 0.35 + note.velocity * 0.65)),
+      width: note.durationTicks / lengthTicks * 100,
+      x: note.startTick / lengthTicks * 100,
+      y: 86 - pitchPosition * 72,
+    });
+  }));
+}
 
 export function createPlaylistPatternActivation({
   cancel = (handle) => globalThis.clearTimeout(handle),
@@ -121,6 +148,7 @@ export function routePlaylistContextMenu(event, options = {}) {
   const onClip = options.onClip ?? (() => {});
   const onTrack = options.onTrack ?? (() => {});
   const onInstrument = options.onInstrument ?? onTrack;
+  if (event?.target?.closest?.("input, textarea, [contenteditable='true']")) return false;
   const clip = event?.target?.closest?.(".v2-playlist-clip");
   const instrument = event?.target?.closest?.(".v2-playlist-instrument");
   const lane = event?.target?.closest?.(".v2-playlist-lane");
@@ -294,15 +322,16 @@ export function createPlaylistSurface({
   onAddPattern = null,
   onOpenInstrument = () => {},
   onOpenPattern = () => {},
+  onRenamePattern = () => {},
   onSeek = (tick) => tick,
   onTransportToggle = () => {},
-  promptInstrumentName = (track) => globalThis.prompt?.("Instrument name", track.name),
   projectState,
   getTransportFrame = () => null,
   transportFrameSource = null,
   workspaceState,
 }) {
   const lifecycle = new AbortController();
+  const notePreviewPrefix = `v2-playlist-note-preview-${playlistSurfaceSequence += 1}`;
   let disposed = false;
   let localProjectMutationDepth = 0;
   let localWorkspaceMutationDepth = 0;
@@ -316,6 +345,8 @@ export function createPlaylistSurface({
   let trackContextMenu = null;
   let trackContextReturnFocus = null;
   let trackContextTrackId = null;
+  let trackNameEdit = null;
+  let suppressTrackNameBlur = false;
 
   const title = createElement("h2", { id: "v2-playlist-title", className: "v2-surface-title", textContent: "Playlist", tabIndex: -1 });
   const header = createElement("div", { className: "v2-surface-header v2-playlist-header" });
@@ -338,6 +369,18 @@ export function createPlaylistSurface({
     "aria-labelledby": title.id,
     dataset: { primarySurface: "playlist" },
   }, [header, patternLibrary, scroller, inspector]);
+  const createSvgElement = (tagName) => (
+    node.ownerDocument?.createElementNS?.("http://www.w3.org/2000/svg", tagName)
+    ?? createElement(tagName)
+  );
+  const previewDefinitions = createSvgElement("svg");
+  previewDefinitions.setAttribute("aria-hidden", "true");
+  previewDefinitions.setAttribute("class", "v2-playlist-note-preview-definitions");
+  const previewDefs = createSvgElement("defs");
+  previewDefinitions.append(previewDefs);
+  node.append(previewDefinitions);
+  const previewSymbolCache = new Map();
+  let previewSymbolSequence = 0;
 
   node.addEventListener("wheel", (event) => {
     if (!event.ctrlKey && !event.metaKey) return;
@@ -522,30 +565,78 @@ export function createPlaylistSurface({
   }
 
   function requestInstrumentRename(trackId) {
-    const state = project();
-    const trackIndex = state.tracks.findIndex(({ id }) => id === trackId);
-    const track = state.tracks[trackIndex];
+    const track = project().tracks.find(({ id }) => id === trackId);
     if (!track) return false;
-    let requestedName;
+    closeTrackContextMenu();
+    return focusTrackNameInput(track.id, { select: true });
+  }
+
+  function findTrackNameInput(trackId) {
+    return timeline.querySelector(
+      `.v2-playlist-track-name-input[data-track-id="${selectorId(trackId)}"]`,
+    );
+  }
+
+  function focusTrackNameInput(trackId, { select = false } = {}) {
+    const input = findTrackNameInput(trackId);
+    if (!input) return false;
+    input.focus({ preventScroll: true });
+    if (select) input.select?.();
+    return true;
+  }
+
+  function commitTrackNameEdit(trackId, {
+    restoreInputFocus = true,
+  } = {}) {
+    const edit = trackNameEdit;
+    if (!edit || edit.trackId !== trackId || edit.committing) return false;
+    const input = findTrackNameInput(trackId);
+    if (input) edit.draft = input.value;
+    edit.committing = true;
     try {
-      requestedName = promptInstrumentName(track);
-      if (requestedName === null || requestedName === undefined) return false;
-      return renamePlaylistInstrument({
-        announce,
-        mutate: (action) => mutateProject(action),
-        projectState,
-        render: () => {
-          rememberFocus({ clipId: null, trackAction: "instrument", trackId, trackIndex });
-          render();
-        },
-        requestedName,
-        trackId,
-      });
+      const changed = mutateProject(() => projectState.renameTrack(trackId, edit.draft));
+      const resolvedName = projectState.getTrack(trackId).name;
+      edit.committing = false;
+      edit.draft = resolvedName;
+      edit.invalid = false;
+      edit.focusPending = false;
+      edit.selectPending = false;
+      if (input) {
+        input.value = resolvedName;
+        input.removeAttribute("aria-invalid");
+      }
+      if (changed) announce(`Renamed Track to ${resolvedName}.`);
+      synchronizePlaylistNames();
+      if (restoreInputFocus) input?.focus?.({ preventScroll: true });
+      else trackNameEdit = null;
+      return true;
     } catch (error) {
+      edit.committing = false;
+      edit.focusPending = true;
+      edit.invalid = true;
+      edit.selectPending = true;
+      input?.setAttribute("aria-invalid", "true");
       announce(error.message);
-      focusTrackAction(trackId, "instrument");
+      globalThis.setTimeout?.(() => {
+        if (!disposed && trackNameEdit === edit) {
+          edit.focusPending = false;
+          edit.selectPending = false;
+          focusTrackNameInput(trackId, { select: true });
+        }
+      }, 0);
       return false;
     }
+  }
+
+  function restoreTrackNameValue(trackId) {
+    const input = findTrackNameInput(trackId);
+    const track = project().tracks.find(({ id }) => id === trackId);
+    if (!input || !track) return false;
+    trackNameEdit = null;
+    input.value = track.name;
+    input.removeAttribute("aria-invalid");
+    input.select?.();
+    return true;
   }
 
   function duplicateInstrumentForTrack(sourceTrackId) {
@@ -641,6 +732,7 @@ export function createPlaylistSurface({
   }
 
   function openTrackContextMenu(event, trackId, { instrumentTarget = false } = {}) {
+    const returnToTrackName = Boolean(event.target?.closest?.(".v2-playlist-track-name-input"));
     const track = project().tracks.find(({ id }) => id === trackId);
     if (!track) return false;
     closeTrackContextMenu();
@@ -648,7 +740,9 @@ export function createPlaylistSurface({
     const patternCountAtOpen = project().patterns.length;
     const trackCapReached = project().tracks.length >= 8;
     trackContextTrackId = track.id;
-    trackContextReturnFocus = event.target?.closest?.("button")
+    trackContextReturnFocus = returnToTrackName
+      ? findTrackNameInput(track.id)
+      : event.target?.closest?.("button")
       ?? node.querySelector(`.v2-playlist-track-focus[data-track-id="${selectorId(track.id)}"]`);
     contextMenu.menu.dataset.trackId = track.id;
     contextMenu.menu.setAttribute(
@@ -1455,13 +1549,8 @@ export function createPlaylistSurface({
         textContent: "Rename Pattern",
         type: "button",
         onClick: () => {
-          const name = globalThis.prompt?.("Pattern name", pattern.name);
-          if (name === null || name === undefined) return;
           try {
-            mutateProject(() => projectState.renamePattern(pattern.id, name));
-            announce(`Renamed Pattern to ${projectState.getPattern(pattern.id).name}.`);
-            render();
-            focusPatternLibraryItem(pattern.id);
+            onRenamePattern(pattern.id, destination.id);
           } catch (error) {
             announce(error.message);
           }
@@ -1494,6 +1583,136 @@ export function createPlaylistSurface({
     }
     list.append(createSelectedPatternCard());
     patternLibrary.append(libraryHeader, help, list);
+  }
+
+  function synchronizePlaylistNames() {
+    if (disposed) return false;
+    const state = project();
+    const activeElement = node.ownerDocument?.activeElement;
+    const tracksById = new Map(state.tracks.map((track) => [track.id, track]));
+    const patternsById = new Map(state.patterns.map((pattern) => [pattern.id, pattern]));
+    const destination = tracksById.get(destinationTrackId()) ?? state.tracks[0];
+
+    const picker = patternLibrary.querySelector(".v2-pattern-library-select");
+    for (const option of picker?.querySelectorAll?.("option") ?? []) {
+      const optionPattern = patternsById.get(option.value);
+      if (optionPattern) option.textContent = optionPattern.name;
+    }
+
+    const item = patternLibrary.querySelector(".v2-pattern-library-item");
+    const selectedPattern = patternsById.get(item?.dataset.patternLibraryId);
+    if (item && selectedPattern && destination) {
+      const dragPattern = item.querySelector(".v2-pattern-library-drag");
+      const audible = selectedPattern.notes.some(({ velocity }) => velocity > 0);
+      if (dragPattern) {
+        dragPattern.setAttribute(
+          "aria-label",
+          `${selectedPattern.name}, ${formatPatternSpan(selectedPattern)}. Double-click to edit or drag to a Playlist Track`,
+        );
+        dragPattern.title = `Double-click to edit ${selectedPattern.name}, or drag it to a Playlist Track`;
+        const label = dragPattern.querySelector("strong");
+        if (label) label.textContent = selectedPattern.name;
+      }
+      const add = item.querySelector(".v2-pattern-library-add");
+      if (add) {
+        const label = audible
+          ? `Add ${selectedPattern.name} to ${destination.name} at or after ${formatTickPosition(cursorTick())}`
+          : `Cannot add ${selectedPattern.name}: add an audible note first`;
+        add.setAttribute("aria-label", label);
+        add.title = audible
+          ? label
+          : `${selectedPattern.name} needs an audible note before it can be added`;
+      }
+      const actionSummary = item.querySelector(".v2-pattern-library-actions > summary");
+      if (actionSummary) {
+        actionSummary.setAttribute("aria-label", `Actions for ${selectedPattern.name}`);
+        actionSummary.title = `Actions for ${selectedPattern.name}`;
+      }
+    }
+    const help = patternLibrary.querySelector("#v2-pattern-library-help");
+    if (help && destination) {
+      help.textContent = `Choose a Pattern, then double-click the selected card to edit it, drag it into a Track, or use Add to place it at the ${destination.name} cursor.`;
+    }
+
+    for (const track of state.tracks) {
+      const lane = timeline.querySelector(
+        `.v2-playlist-lane[data-track-id="${selectorId(track.id)}"]`,
+      );
+      if (!lane) continue;
+      const input = lane.querySelector(".v2-playlist-track-name-input");
+      const preserveDraft = input === activeElement && trackNameEdit?.trackId === track.id;
+      if (input) {
+        input.setAttribute("aria-label", `Track name for ${track.name}`);
+        if (!preserveDraft) input.value = track.name;
+      }
+      const trackHeader = lane.querySelector(".v2-playlist-track-header");
+      trackHeader?.setAttribute("aria-label", track.name);
+      const trackFocus = lane.querySelector(".v2-playlist-track-focus");
+      if (trackFocus) {
+        trackFocus.setAttribute("aria-label", `Use ${track.name} as the Playlist destination`);
+        trackFocus.title = `Use ${track.name} as the destination for new Playlist clips`;
+      }
+      const instrument = lane.querySelector(".v2-playlist-instrument");
+      if (instrument) {
+        instrument.setAttribute("aria-label", `Open ${track.name} Klinto Chip instrument`);
+        instrument.title = `Open ${track.name} Klinto Chip instrument`;
+        const ownerLabel = instrument.querySelector("span");
+        if (ownerLabel) {
+          ownerLabel.textContent = track.name;
+          ownerLabel.title = track.name;
+        }
+      }
+      const mute = lane.querySelector('[data-playlist-track-action="mute"]');
+      if (mute) {
+        mute.setAttribute("aria-label", `Mute ${track.name} Instrument`);
+        mute.title = `${track.mixer.muted ? "Unmute" : "Mute"} ${track.name}`;
+      }
+      const solo = lane.querySelector('[data-playlist-track-action="solo"]');
+      if (solo) {
+        solo.setAttribute("aria-label", `Solo ${track.name} Instrument`);
+        solo.title = `${track.mixer.solo ? "Disable Solo for" : "Solo"} ${track.name}`;
+      }
+      lane.querySelector('[data-playlist-track-action="move-up"]')
+        ?.setAttribute("aria-label", `Move ${track.name} up`);
+      lane.querySelector('[data-playlist-track-action="move-down"]')
+        ?.setAttribute("aria-label", `Move ${track.name} down`);
+      lane.querySelector('[data-playlist-track-action="remove"]')
+        ?.setAttribute("aria-label", `Remove ${track.name}`);
+    }
+
+    for (const clipButton of timeline.querySelectorAll(".v2-playlist-clip[data-clip-id]")) {
+      const found = findClip(state, clipButton.dataset.clipId);
+      if (!found) continue;
+      const pattern = patternsById.get(found.clip.patternId);
+      if (!pattern) continue;
+      const selected = clipButton.getAttribute("aria-selected") === "true";
+      clipButton.setAttribute(
+        "aria-label",
+        `${clipLabel(state, found.track, found.clip)}${selected ? ", selected" : ""}`,
+      );
+      const patternLabel = clipButton.querySelector("strong");
+      if (patternLabel) patternLabel.textContent = pattern.name;
+    }
+
+    const cursor = timeline.querySelector(".v2-playlist-cursor");
+    if (cursor && destination) {
+      cursor.setAttribute("aria-label", `${formatTickPosition(cursorTick())}, ${destination.name}`);
+    }
+    const inspectorSummary = inspector.querySelector("p");
+    const selected = findClip(state, selectedClipId());
+    if (inspectorSummary && !selected && destination) {
+      inspectorSummary.textContent = `${destination.name} Â· insertion cursor ${formatTickPosition(cursorTick())}`;
+    }
+    if (selected && selectedClipIds().length === 1) {
+      const selectedLabel = inspector.querySelector("strong");
+      if (selectedLabel) selectedLabel.textContent = clipLabel(state, selected.track, selected.clip);
+      const trackSelect = inspector.querySelector('select[aria-label="Selected clip Track"]');
+      for (const option of trackSelect?.querySelectorAll?.("option") ?? []) {
+        const optionTrack = tracksById.get(option.value);
+        if (optionTrack) option.textContent = optionTrack.name;
+      }
+    }
+    return true;
   }
 
   function renderInspector() {
@@ -1584,6 +1803,17 @@ export function createPlaylistSurface({
     if (disposed) return;
     closeTrackContextMenu();
     const state = project();
+    const patternsById = new Map(state.patterns.map((pattern) => [pattern.id, pattern]));
+    if (trackNameEdit && !state.tracks.some(({ id }) => id === trackNameEdit.trackId)) {
+      trackNameEdit = null;
+    }
+    const activeTrackNameInput = node.ownerDocument?.activeElement?.closest?.(
+      ".v2-playlist-track-name-input",
+    );
+    if (trackNameEdit && activeTrackNameInput?.dataset.trackId === trackNameEdit.trackId) {
+      trackNameEdit.focusPending = true;
+    }
+    suppressTrackNameBlur = true;
     snapTicks = SNAP_OPTIONS[session().snap] ?? SNAP_OPTIONS["1/16"];
     const selectedId = selectedClipId();
     const selectedIds = new Set(selectedClipIds());
@@ -1594,6 +1824,60 @@ export function createPlaylistSurface({
     timeline.setAttribute("aria-rowcount", String(state.tracks.length + 1));
     playheadElement = null;
     clearElement(timeline);
+
+    const previewSymbols = new Map();
+    const usedPatternIds = new Set(state.tracks.flatMap(({ clips }) => (
+      clips.map(({ patternId }) => patternId)
+    )));
+    for (const [patternId, cached] of previewSymbolCache) {
+      if (usedPatternIds.has(patternId)) continue;
+      cached.symbol.remove();
+      previewSymbolCache.delete(patternId);
+    }
+    state.patterns.forEach((pattern) => {
+      if (!usedPatternIds.has(pattern.id)) return;
+      const cached = previewSymbolCache.get(pattern.id);
+      if (cached?.pattern === pattern) {
+        previewSymbols.set(pattern.id, cached.symbolId);
+        return;
+      }
+      const signature = `${pattern.lengthTicks}|${pattern.notes.map((note) => (
+        `${note.startTick},${note.durationTicks},${note.pitch},${note.velocity}`
+      )).join(";")}`;
+      if (cached?.signature === signature) {
+        cached.pattern = pattern;
+        previewSymbols.set(pattern.id, cached.symbolId);
+        return;
+      }
+      const geometry = getPlaylistNotePreviewGeometry(pattern);
+      if (geometry.length === 0) {
+        cached?.symbol.remove();
+        previewSymbolCache.delete(pattern.id);
+        return;
+      }
+      const symbolId = cached?.symbolId
+        ?? `${notePreviewPrefix}-${previewSymbolSequence += 1}`;
+      const symbol = cached?.symbol ?? createSvgElement("symbol");
+      symbol.replaceChildren();
+      symbol.setAttribute("id", symbolId);
+      symbol.setAttribute("viewBox", "0 0 100 100");
+      symbol.setAttribute("preserveAspectRatio", "none");
+      for (const note of geometry) {
+        const stroke = createSvgElement("rect");
+        stroke.setAttribute("x", String(note.x));
+        stroke.setAttribute("y", String(note.y));
+        stroke.setAttribute("width", String(Math.min(100 - note.x, note.width)));
+        stroke.setAttribute("height", String(note.height));
+        stroke.setAttribute("opacity", String(note.opacity));
+        stroke.setAttribute("stroke", "currentColor");
+        stroke.setAttribute("stroke-width", "0.75");
+        stroke.setAttribute("vector-effect", "non-scaling-stroke");
+        symbol.append(stroke);
+      }
+      if (!cached) previewDefs.append(symbol);
+      previewSymbolCache.set(pattern.id, { pattern, signature, symbol, symbolId });
+      previewSymbols.set(pattern.id, symbolId);
+    });
 
     const ruler = createElement("div", {
       "aria-hidden": "true",
@@ -1656,6 +1940,70 @@ export function createPlaylistSurface({
         dataset: { trackId: track.id },
         role: "rowheader",
       });
+      const activeTrackNameEdit = trackNameEdit?.trackId === track.id ? trackNameEdit : null;
+      const trackNameInput = createElement("input", {
+        "aria-invalid": activeTrackNameEdit?.invalid ? "true" : undefined,
+        "aria-label": `Track name for ${track.name}`,
+        autocomplete: "off",
+        className: "v2-playlist-track-name-input",
+        dataset: { trackId: track.id },
+        maxLength: MAX_TRACK_NAME_LENGTH,
+        spellcheck: false,
+        type: "text",
+        value: activeTrackNameEdit?.draft ?? track.name,
+      });
+      trackNameInput.addEventListener("focus", () => {
+        if (trackNameEdit && trackNameEdit.trackId !== track.id) {
+          const previousTrack = project().tracks.find(({ id }) => id === trackNameEdit.trackId);
+          const previousInput = findTrackNameInput(trackNameEdit.trackId);
+          if (previousTrack && previousInput) {
+            previousInput.value = previousTrack.name;
+            previousInput.removeAttribute("aria-invalid");
+          }
+        }
+        if (trackNameEdit?.trackId !== track.id) {
+          trackNameEdit = {
+            committing: false,
+            draft: trackNameInput.value,
+            focusPending: false,
+            invalid: false,
+            selectPending: false,
+            trackId: track.id,
+          };
+        }
+      });
+      trackNameInput.addEventListener("input", () => {
+        if (trackNameEdit?.trackId !== track.id) {
+          trackNameEdit = {
+            committing: false,
+            draft: trackNameInput.value,
+            focusPending: false,
+            invalid: false,
+            selectPending: false,
+            trackId: track.id,
+          };
+        } else {
+          trackNameEdit.draft = trackNameInput.value;
+          trackNameEdit.invalid = false;
+        }
+        trackNameInput.removeAttribute("aria-invalid");
+      });
+      trackNameInput.addEventListener("keydown", (event) => {
+        event.stopPropagation();
+        if (event.isComposing) return;
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commitTrackNameEdit(track.id);
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          restoreTrackNameValue(track.id);
+        }
+      });
+      trackNameInput.addEventListener("blur", () => {
+        if (!suppressTrackNameBlur && trackNameEdit?.trackId === track.id) {
+          commitTrackNameEdit(track.id, { restoreInputFocus: false });
+        }
+      });
       const trackFocus = createElement("button", {
         "aria-label": `Use ${track.name} as the Playlist destination`,
         "aria-pressed": String(track.id === destinationTrackId()),
@@ -1664,18 +2012,17 @@ export function createPlaylistSurface({
         tabIndex: -1,
         title: `Use ${track.name} as the destination for new Playlist clips`,
         type: "button",
-      }, [
-        createElement("span", { textContent: track.name, title: track.name }),
-        createElement("small", {
-          textContent: track.id === destinationTrackId() ? "Destination" : "Choose track",
-        }),
-      ]);
+        textContent: track.id === destinationTrackId() ? "Destination" : "Choose track",
+      });
       trackFocus.addEventListener("click", () => {
         rememberFocus({ clipId: null, trackAction: "select", trackId: track.id, trackIndex });
         setSession({ destinationTrackId: track.id, selectedClipId: null });
         announce(`${track.name} is the destination for new Playlist clips.`);
         render();
       });
+      const trackIdentity = createElement("div", {
+        className: "v2-playlist-track-identity",
+      }, [trackNameInput, trackFocus]);
       const instrument = createElement("button", {
         "aria-label": `Open ${track.name} Klinto Chip instrument`,
         className: "v2-device-launcher v2-playlist-instrument",
@@ -1789,12 +2136,30 @@ export function createPlaylistSurface({
           className: "v2-playlist-track-management",
         }, [up, down, remove]),
       ]);
-      trackHeader.append(trackFocus, instrument, trackActionRail);
+      trackHeader.append(trackIdentity, instrument, trackActionRail);
       lane.append(trackHeader);
 
       for (const clip of track.clips) {
-        const pattern = state.patterns.find(({ id }) => id === clip.patternId);
+        const pattern = patternsById.get(clip.patternId);
         const isSelected = selectedIds.has(clip.id);
+        const previewSymbolId = previewSymbols.get(pattern.id);
+        const notePreview = previewSymbolId ? createSvgElement("svg") : null;
+        if (notePreview) {
+          notePreview.setAttribute("aria-hidden", "true");
+          notePreview.setAttribute("class", "v2-playlist-clip-note-preview");
+          notePreview.setAttribute("focusable", "false");
+          notePreview.setAttribute("preserveAspectRatio", "none");
+          notePreview.setAttribute("viewBox", "0 0 100 100");
+          const use = createSvgElement("use");
+          use.setAttribute("href", `#${previewSymbolId}`);
+          notePreview.append(use);
+        }
+        const clipLabelElement = createElement("span", {
+          className: "v2-playlist-clip-label",
+        }, [
+          createElement("strong", { textContent: pattern.name }),
+          createElement("small", { textContent: formatDurationTicks(pattern.lengthTicks) }),
+        ]);
         const button = createElement("button", {
           className: `v2-playlist-clip${isSelected ? " is-selected" : ""}`,
           id: `v2-playlist-clip-${clip.id}`,
@@ -1808,7 +2173,7 @@ export function createPlaylistSurface({
             left: `${TRACK_HEADER_WIDTH + clip.startTick * pixelsPerTick}px`,
             width: `${Math.max(8, pattern.lengthTicks * pixelsPerTick)}px`,
           },
-        }, [createElement("strong", { textContent: pattern.name }), createElement("small", { textContent: formatDurationTicks(pattern.lengthTicks) })]);
+        }, notePreview ? [notePreview, clipLabelElement] : [clipLabelElement]);
         const found = { clip, track };
         bindClipPointer(button, found);
         const activation = createPlaylistPatternActivation({
@@ -1887,7 +2252,16 @@ export function createPlaylistSurface({
     timeline.setAttribute("aria-activedescendant", selectedId ? `v2-playlist-clip-${selectedId}` : cursor.id);
     updatePlayhead();
     renderInspector();
-    restorePendingFocus();
+    suppressTrackNameBlur = false;
+    if (trackNameEdit?.focusPending) {
+      const select = trackNameEdit.selectPending;
+      trackNameEdit.focusPending = false;
+      trackNameEdit.selectPending = false;
+      pendingFocus = null;
+      focusTrackNameInput(trackNameEdit.trackId, { select });
+    } else {
+      restorePendingFocus();
+    }
   }
 
   function render() {
@@ -1979,6 +2353,10 @@ export function createPlaylistSurface({
   const replacementOperations = new Set(["open-project", "replace", "create-project-from-template"]);
   const handleProjectChange = (event) => {
     if (localProjectMutationDepth > 0 || replacementOperations.has(event?.detail?.operation)) return;
+    if (["rename-pattern", "rename-track"].includes(event?.detail?.operation)) {
+      synchronizePlaylistNames();
+      return;
+    }
     render();
   };
   const handleWorkspaceChange = (event) => {
@@ -2008,8 +2386,11 @@ export function createPlaylistSurface({
     dispose() {
       if (disposed) return;
       disposed = true;
+      suppressTrackNameBlur = true;
+      trackNameEdit = null;
       closeTrackContextMenu();
       trackContextMenu?.menu.remove();
+      previewSymbolCache.clear();
       lifecycle.abort();
       projectState.removeEventListener("change", handleProjectChange);
       workspaceState.removeEventListener?.("change", handleWorkspaceChange);

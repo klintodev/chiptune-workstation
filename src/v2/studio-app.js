@@ -11,6 +11,8 @@ import { createDeviceRuntimeRegistry } from "./audio/runtime-registry.js";
 import { createKlintoChipSynthRuntime } from "./audio/klinto-chip-synth.js";
 import { createV2KeyboardAudition } from "./audio/keyboard-audition.js";
 import { createV2Scheduler } from "./audio/occurrence-scheduler.js";
+import { MAX_PATTERN_NAME_LENGTH } from "./domain/constants.js";
+import { getPatternPlaybackEndTick } from "./domain/pattern-span.js";
 import { createV2ProjectState } from "./domain/project-state.js";
 import { normalizeV2Project } from "./domain/schema.js";
 import {
@@ -470,6 +472,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
           }
           return keyboardAudition.previewNote(context);
         },
+        onRequestPatternRename: beginPianoTitleRename,
         onOpenInstrument: openTrackInstrument,
         onTransportToggle: toggleTransport,
         projectState,
@@ -507,6 +510,11 @@ export async function createV2StudioApp({ document: documentLike = document } = 
         onOpenPattern(patternId, trackId) {
           workspaceState.activatePianoRoll(patternId, { auditionTrackId: trackId });
           workspaceState.setAuditionTrack(patternId, trackId);
+        },
+        onRenamePattern(patternId, trackId) {
+          workspaceState.activatePianoRoll(patternId, { auditionTrackId: trackId });
+          workspaceState.setAuditionTrack(patternId, trackId);
+          queueMicrotask(() => beginPianoTitleRename());
         },
         onSeek(tick) {
           const arrangementEndTick = projectState.getArrangementEndTick();
@@ -674,6 +682,60 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     return button ?? null;
   }
 
+  function synchronizePianoTitle(overlay, descriptor) {
+    overlay.title.setAttribute("aria-label", descriptor.name);
+    overlay.titleInput.setAttribute("aria-label", `Rename ${descriptor.patternName}`);
+    if (overlay.titleDirty) return;
+    overlay.titleInput.value = descriptor.patternName;
+    overlay.titleInput.setCustomValidity("");
+    overlay.titleInput.removeAttribute("aria-invalid");
+  }
+
+  function restorePianoTitleInput(overlay = pianoOverlay) {
+    if (!overlay || pianoOverlay !== overlay) return false;
+    overlay.titleDirty = false;
+    synchronizePianoTitle(overlay, overlay.descriptor);
+    overlay.titleInput.select();
+    return true;
+  }
+
+  function commitPianoTitleRename(overlay = pianoOverlay) {
+    if (!overlay || pianoOverlay !== overlay) return false;
+    let changed;
+    try {
+      changed = projectState.renamePattern(
+        overlay.descriptor.patternId,
+        overlay.titleInput.value,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "The Pattern could not be renamed.";
+      overlay.titleInput.setCustomValidity(message);
+      overlay.titleInput.setAttribute("aria-invalid", "true");
+      announce(message);
+      queueMicrotask(() => {
+        if (pianoOverlay !== overlay) return;
+        overlay.titleInput.focus({ preventScroll: true });
+        overlay.titleInput.select();
+      });
+      return false;
+    }
+    if (changed) announce(`Renamed Pattern to ${projectState.getPattern(
+      overlay.descriptor.patternId,
+    ).name}.`);
+    overlay.titleDirty = false;
+    synchronizePianoTitle(overlay, overlay.descriptor);
+    return changed;
+  }
+
+  function beginPianoTitleRename() {
+    const overlay = pianoOverlay;
+    if (!overlay) return false;
+    raiseFloatingLayer("piano-roll");
+    overlay.titleInput.focus({ preventScroll: true });
+    overlay.titleInput.select();
+    return true;
+  }
+
   function closePianoOverlay({ restoreFocus = false } = {}) {
     if (!pianoOverlay) {
       dom.editorHost.replaceChildren();
@@ -698,11 +760,8 @@ export async function createV2StudioApp({ document: documentLike = document } = 
   function openPianoOverlay(descriptor, { focusEntry = false, replace = false } = {}) {
     if (!descriptor) return closePianoOverlay();
     if (!replace && pianoOverlay?.descriptor.patternId === descriptor.patternId) {
-      pianoOverlay.title.setAttribute("aria-label", descriptor.name);
-      pianoOverlay.titleAction.textContent = descriptor.name;
-      pianoOverlay.titleAction.setAttribute("aria-label", `Rename ${descriptor.patternName}`);
-      pianoOverlay.titleAction.title = `Rename ${descriptor.patternName}`;
       pianoOverlay.descriptor = descriptor;
+      synchronizePianoTitle(pianoOverlay, descriptor);
       dom.editorHost.setAttribute("aria-label", descriptor.name);
       if (focusEntry) {
         synchronizeLayerExposure();
@@ -721,13 +780,20 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     const title = documentLike.createElement("h2");
     title.className = "v2-floating-window-title";
     title.setAttribute("aria-label", descriptor.name);
-    const titleAction = documentLike.createElement("button");
-    titleAction.className = "v2-floating-window-title-action";
-    titleAction.type = "button";
-    titleAction.textContent = descriptor.name;
-    titleAction.setAttribute("aria-label", `Rename ${descriptor.patternName}`);
-    titleAction.title = `Rename ${descriptor.patternName}`;
-    title.append(titleAction);
+    const titleInput = documentLike.createElement("input");
+    titleInput.className = "v2-floating-window-title-input";
+    titleInput.type = "text";
+    titleInput.maxLength = MAX_PATTERN_NAME_LENGTH;
+    titleInput.autocomplete = "off";
+    titleInput.enterKeyHint = "done";
+    titleInput.spellcheck = false;
+    const titleContext = documentLike.createElement("span");
+    titleContext.className = "v2-floating-window-title-context";
+    titleContext.textContent = ", Piano Roll";
+    const titleEditor = documentLike.createElement("span");
+    titleEditor.className = "v2-floating-window-title-editor";
+    titleEditor.append(titleInput, titleContext);
+    title.append(titleEditor);
     const close = documentLike.createElement("button");
     close.className = "v2-floating-window-close";
     close.type = "button";
@@ -749,7 +815,8 @@ export async function createV2StudioApp({ document: documentLike = document } = 
       dragController,
       owner,
       title,
-      titleAction,
+      titleDirty: false,
+      titleInput,
       windowLifecycle,
     };
     windowNode.addEventListener("pointerdown", () => raiseFloatingLayer("piano-roll"), {
@@ -759,9 +826,27 @@ export async function createV2StudioApp({ document: documentLike = document } = 
       workspaceState.activatePlaylist();
       queueMicrotask(() => focusSurfaceButton("playlist"));
     }, { signal: windowLifecycle.signal });
-    titleAction.addEventListener("click", () => {
-      owner.requestPatternRename?.(titleAction);
+    titleInput.addEventListener("input", () => {
+      if (pianoOverlay?.titleInput === titleInput) pianoOverlay.titleDirty = true;
+      titleInput.setCustomValidity("");
+      titleInput.removeAttribute("aria-invalid");
     }, { signal: windowLifecycle.signal });
+    titleInput.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.isComposing) return;
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commitPianoTitleRename(pianoOverlay);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        restorePianoTitleInput(pianoOverlay);
+      }
+    }, { signal: windowLifecycle.signal });
+    titleInput.addEventListener("blur", () => {
+      if (pianoOverlay?.titleInput !== titleInput) return;
+      commitPianoTitleRename(pianoOverlay);
+    }, { signal: windowLifecycle.signal });
+    synchronizePianoTitle(pianoOverlay, descriptor);
     synchronizeLayerExposure();
     if (focusEntry) focusPianoOverlay();
     else if (!surfaceHost?.getSnapshot().device) raiseFloatingLayer("piano-roll");
@@ -800,9 +885,12 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     if (synchronizingProject || synchronizingPatternContext) return false;
     const transportState = scheduler.getState();
     const workspace = workspaceState.getState();
-    if (transportState.status !== "playing"
-      || transportState.mode !== "pattern"
+    if (transportState.mode !== "pattern"
       || workspace.playback.mode !== "pattern") return false;
+    if (transportState.status === "paused") {
+      return scheduler.syncProject(projectState.getState());
+    }
+    if (transportState.status !== "playing") return false;
     const patternId = workspace.activePatternId;
     const trackId = workspace.patternSurfaces[patternId]?.auditionTrackId;
     if (transportState.patternId === patternId && transportState.trackId === trackId) return false;
@@ -811,7 +899,8 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     if (!pattern || !project.tracks.some(({ id }) => id === trackId)) return false;
     const playhead = scheduler.getPlayheadTick();
     const sourceTick = Number.isFinite(playhead) ? Math.floor(playhead) : 0;
-    const startTick = ((sourceTick % pattern.lengthTicks) + pattern.lengthTicks) % pattern.lengthTicks;
+    const playbackEndTick = getPatternPlaybackEndTick(pattern);
+    const startTick = ((sourceTick % playbackEndTick) + playbackEndTick) % playbackEndTick;
     synchronizingPatternContext = true;
     try {
       scheduler.stop();

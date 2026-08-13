@@ -47,7 +47,7 @@ Every Playlist Instrument row exposes compact Mute and Solo switches. They are a
 
 Right-click routing uses the most specific target under the pointer: a clip first, its Klinto Chip Instrument launcher second, then the remaining Track header or empty lane. Every handled route suppresses the browser menu. A clip keeps its direct-delete command. The Instrument launcher opens the Track-scoped menu in the order Rename Instrument, Duplicate Instrument, New Pattern; the remaining Track area exposes New Pattern only.
 
-Rename Instrument edits the owning Track's canonical persisted `name`; it does not add `instrument.name`, mutate `instrument.instanceId` or rename the immutable Klinto Chip product/type. The shared name updates the Instrument launcher's owner line, Track header, Mixer channel, device-window title and contextual labels live while the same Instrument/runtime remains open. A valid changed name is trimmed, bounded to the Track-name contract and commits one undo/autosave entry. Cancel, an unchanged trimmed value or invalid input commits nothing. After success, cancel or validation failure, focus returns to the same stable Instrument launcher or the documented Track fallback.
+Each Track header always exposes its canonical name in a text input beside a separate Destination/Choose track button. Editing that input never changes the Playlist destination. Enter or blur trims, validates and commits a changed value as one undo/autosave entry; Escape restores the canonical value without a mutation. Invalid input remains editable and is announced. Rename Instrument focuses and selects this same visible input rather than opening a prompt. A committed name updates the Instrument launcher's owner line, Track header, Mixer channel, device-window title and contextual labels live while preserving `instrument.instanceId`, the immutable Klinto Chip product/type and the same Instrument runtime. Rerenders preserve an active draft and input focus.
 
 Duplicate Instrument creates an independent Track immediately below the source so the one-Track/one-Instrument invariant remains intact. It copies the Klinto Chip type, version and full parameter snapshot, allocates fresh Track and Instrument instance IDs and derives a bounded unique owner name such as `Pulse 1 copy`. It deliberately does not copy clips, Effects or Track Mixer volume/pan/mute/solo; those collections are empty and the Mixer starts at its defaults. The source Instrument and runtime are not changed or reopened.
 
@@ -69,6 +69,18 @@ A clip contains stable `id`, `patternId` and integer `startTick`; destination is
 - A note edit that grows the Pattern follows PRD 28's all-linked-clip preflight and rejects atomically on overlap/boundary failure.
 - A note edit that shrinks the Pattern shortens linked clips in place and cannot create an overlap.
 - Clip move/duplicate preserves the Pattern link. There is no per-clip note data, stretch, transpose, gain or independent variant in V2.
+
+### Clip note previews
+
+Every Playlist clip contains a bounded, non-interactive miniature of the audible notes in its linked Pattern.
+
+- Horizontal position is the exact Pattern interval `[0, pattern.lengthTicks)`: note onset maps from `startTick`, note width maps from `durationTicks`, and rests stay empty. Pattern-mode whole-bar performance padding is not shown because Playlist clips retain exact Song timing.
+- Vertical position derives deterministically from stored pitch. Higher notes appear higher, lower notes appear lower, equal pitches align and simultaneous notes stack as chords. A single-pitch Pattern is centred, and every linked copy uses the same mapping.
+- Notes with `velocity === 0` produce no mark. Audible velocity may change emphasis but never timing or pitch geometry.
+- The preview is derived presentation only: it adds no Project/session state, history entry, focus stop, pointer target or accessible-name noise. Track Instrument octave does not rewrite it.
+- Pattern edits, undo/redo, import and replacement update every linked preview from the committed Pattern snapshot. Moving or duplicating a clip preserves the linked preview.
+- Rendering is shared per used Pattern and reused by linked clips, so the maximum Project note/clip limits do not multiply note geometry per occurrence.
+- The preview stays within the existing clip/lane height. Pattern name/duration, selection/focus treatment, playhead and every clip gesture remain legible and operable above it.
 
 ## Add to Playlist
 
@@ -111,9 +123,9 @@ Empty-lane left-click adds the active Pattern at the exact snapped position on t
 - `playlistCursorTick` is session-local insertion/navigation state. It defaults to 0, changes only through explicit Playlist navigation/seek or successful Add, and never advances during Pattern playback.
 - Pattern phase, Song transport playhead and Playlist insertion cursor are distinct values. An explicit Song seek sets Song playhead and insertion cursor together; playback advances only the playhead.
 - Clicking the bar/beat ruler performs an explicit seek to the nearest active Playlist snap, switches transport to Song mode and sets both the Song playhead and Playlist insertion cursor without adding a clip.
-- Pattern mode auditions the active Pattern through its `auditionTrackId` and does not traverse clips.
+- Pattern mode auditions the active Pattern through its `auditionTrackId` over PRD 28's session-derived whole-bar performance span and does not traverse clips. Its trailing performance padding does not change linked clip width or Song timing.
 - Song mode schedules all valid clips through their destination Track chains.
-- Stop, return-to-start, seek, tempo and mode switch retain V1 semantics projected into ticks. The first Stop during playback returns to the start of that playback pass; a ruler seek replaces that return point, and it survives Pause/Resume. Stop remains available at a non-zero return point, and activating it again—such as the second click of a double-click—returns the scheduler, every playhead and the Playlist cursor to tick 0. The direct `↻` control enables a whole-Song arrangement loop over `[0, currentSongEnd)` or disables it; Pattern playback repeats independently.
+- Stop, return-to-start, seek, tempo and mode switch retain V1 semantics projected into ticks. The first Stop during playback returns to the start of that playback pass; a ruler seek replaces that return point, and it survives Pause/Resume. Stop remains available at a non-zero return point, and activating it again—such as the second click of a double-click—returns the scheduler, every playhead and the Playlist cursor to tick 0. The direct `↻` control enables a whole-Song arrangement loop over `[0, currentSongEnd)` or disables it; Pattern playback independently repeats its bar-rounded performance span.
 - Loop uses PRD 28's exclusive tick bounds plus retained `custom | arrangement` mode and does not duplicate Effect state at wrap.
 - Visual playhead animation is silent to assistive technology and owned by one disposable loop.
 
@@ -175,11 +187,13 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 - Selecting a Pattern in the library and clicking an empty Track position adds that Pattern exactly at the snapped click position without changing existing clip-click behavior.
 - Double-clicking either the selected Pattern card or a Playlist clip opens that Pattern in the reusable Piano Roll for editing; a single clip click only selects it.
 - Creating a Pattern from either the Playlist library or a Track's context menu immediately opens the newly created Pattern in the Piano Roll; the Track menu binds audition/destination to the clicked Track without creating a clip.
-- Right-clicking a Klinto Chip launcher exposes Rename Instrument, Duplicate Instrument and then New Pattern; a successful rename changes the canonical Track name in one undoable command, keeps the stable Instrument identity/type/runtime, updates all live owner labels and restores focus to the launcher. Cancel, no-op and validation failure preserve data and focus.
+- Every Track name is an always-visible input with Enter/blur commit and Escape restore, independent from the adjacent Destination/Choose track button. Right-clicking a Klinto Chip launcher exposes Rename Instrument, Duplicate Instrument and then New Pattern; Rename focuses/selects that input. A successful rename changes the canonical Track name in one undoable command, keeps the stable Instrument identity/type/runtime and updates all live owner labels. Cancel, no-op and validation failure preserve data, and an active draft/focus survives unrelated rerenders.
 - Duplicate Instrument creates and focuses a source-adjacent Track with a bounded unique owner name, copied Klinto Chip parameters and fresh identities, while leaving its Mixer at defaults and its Effects/clips empty. It does not open the device, commits once, restores the same copy through redo and is disabled without mutation at eight Tracks.
 - Playlist Mute and Solo switches update the same Track Mixer state shown by the Mixer, apply during playback without restarting transport, retain focus through render and undo/redo, and preserve multi-solo with mute-overrides-solo semantics.
 - Pattern-library cog Rename/Duplicate/Delete actions obey caps, final-Pattern rules, atomic history and focus repair.
 - Pattern growth caused by note content rejects when any linked clip would become invalid; content shrinkage shortens all linked clips.
+- A Pattern containing rests, ascending/descending notes, sustained notes and chords shows proportional timing/duration and vertical pitch movement in every linked clip. Zero-velocity notes add no mark, and rejected Pattern edits leave previews unchanged.
+- Editing note timing, duration, pitch, velocity or membership refreshes every linked preview; moving and duplicating clips preserve it without creating per-clip note data or extra history.
 - Track removal closes its devices, keeps Pattern surfaces and repairs audition Track.
 - Pattern removal deletes linked clips and closes only that Pattern surface.
 - Final-clip and final-clip-Track removal leave visible, valid focus and no gap.
@@ -196,10 +210,12 @@ At approximately 390Ã—844, Playlist is the sole exposed fullscreen surface an
 
 - Domain tests for overlap, boundary, audible-Pattern disabled state, cursor scan/advance, two-Pattern placement, group move/duplicate-right preflight and atomic failure
 - Pattern-content-span/linked-clip tests and Track/Pattern deletion/undo lifecycle tests
-- Shared scheduler projection tests for Pattern/Song/loop/ruler-seek/tempo plus first-Stop return and second-Stop reset across Pause/Resume
+- Pure preview-geometry coverage for onset, duration, rests, pitch ordering, a single pitch, chords, zero velocity and end-boundary clipping; shared-definition coverage proves repeated clips reuse one Pattern geometry
+- Shared scheduler projection tests for Pattern/Song/loop/ruler-seek/tempo, including empty, partial-final-bar and exact-bar Pattern performance boundaries, plus first-Stop return and second-Stop reset across Pause/Resume
 - Manual desktop compose â†’ Add â†’ arrange â†’ open Pattern journey with focus/announcement checkpoints
 - Final-clip/final-Track focus fallback and exclusive-Mixer/narrow-width hidden-tree tests
-- Pattern-library default-expanded/collapse/dropdown/scalable selected-card/cog-action, marquee/group-drag, shortcut and right-click routing coverage, including clip > Instrument > Track priority, Track-menu positioning/dismissal, clicked-Track binding, Rename Instrument validation/undo/focus/live-label behaviour, Duplicate Instrument copy boundaries/name/identity/order/cap/undo/destination/focus behaviour, Playlist/Mixer mute-solo state mirroring and clip-delete isolation, plus manual interaction review
+- Pattern-library default-expanded/collapse/dropdown/scalable selected-card/cog-action, marquee/group-drag, shortcut and right-click routing coverage, including clip > Instrument > Track priority, Track-menu positioning/dismissal, clicked-Track binding, always-visible Track-name Enter/blur/Escape validation/draft/focus/rerender behaviour, Rename Instrument focus hand-off and undo/live-label behaviour, Duplicate Instrument copy boundaries/name/identity/order/cap/undo/destination/focus behaviour, Playlist/Mixer mute-solo state mirroring and clip-delete isolation, plus manual interaction review
+- Clip-preview visual checks at minimum/maximum zoom, selected/unselected clips, playhead overlap, forced colours and narrow Playlist widths; previews must remain contained, legible and unable to intercept clip interactions
 - 1366Ã—768 layout plus 390Ã—844 reduced mobile smoke
 - Save/reload/import/export fixtures after PRD 32 activation
 

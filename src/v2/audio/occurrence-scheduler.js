@@ -3,6 +3,7 @@ import {
   MAX_TRACK_VOICES,
   MIN_BPM,
   getV2ArrangementEndTick,
+  getPatternPlaybackEndTick,
   isV2TrackAudible,
   normalizeV2Project,
   secondsToTicks,
@@ -37,7 +38,7 @@ function getPlaybackBounds(project, mode, patternId, patternLoopEnabled = true) 
     const pattern = project.patterns.find((candidate) => candidate.id === patternId);
     if (!pattern) throw new RangeError(`Unknown Pattern: ${patternId}.`);
     return Object.freeze({
-      endTick: pattern.lengthTicks,
+      endTick: getPatternPlaybackEndTick(pattern),
       looping: patternLoopEnabled,
       startTick: 0,
     });
@@ -499,7 +500,20 @@ export function createOccurrenceScheduler({
 
   function syncProject(projectCandidate = getProject()) {
     const project = normalizeV2Project(projectCandidate);
-    if (!session) return false;
+    if (!session) {
+      if (mode !== "pattern") return false;
+      const patternId = getPatternId();
+      if (!project.patterns.some((pattern) => pattern.id === patternId)) return false;
+      const bounds = getPlaybackBounds(project, mode, patternId, getPatternLoopEnabled());
+      const maximumTick = Math.max(bounds.startTick, bounds.endTick - 1);
+      const nextRetainedTick = Math.min(maximumTick, Math.max(bounds.startTick, retainedTick));
+      const nextReturnTick = Math.min(maximumTick, Math.max(bounds.startTick, returnTick));
+      if (nextRetainedTick === retainedTick && nextReturnTick === returnTick) return false;
+      retainedTick = nextRetainedTick;
+      returnTick = nextReturnTick;
+      emit();
+      return true;
+    }
     const activeSession = session;
     const now = getAudioTime();
     const currentSourceTick = getSourceTick(activeSession, now);

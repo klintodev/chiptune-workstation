@@ -81,6 +81,7 @@ schemaVersion, metadata, transport, patterns, tracks, mixer
 - `endTick`: integer 1â€¦6,144 and greater than `startTick`.
 - In `arrangement` mode while enabled, the domain layer automatically sets the loop to `[0, arrangementEndTick)` as clips change. Removing the final clip sets `enabled: false`, keeps `mode: "arrangement"`, sets `startTick: 0`, and retains the previous valid `endTick` (so `endTick > startTick` remains true), matching V1. Adding a later clip does not silently re-enable looping; the user must enable it, at which point `endTick` becomes the current arrangement end.
 - Pattern/Song playback mode and live playheads are session state, not persisted. New/open/reload defaults to Pattern mode. Successful Add to Playlist switches the current session to Song mode.
+- Pattern mode also derives a non-persisted `patternPerformanceEndTick = ceil(pattern.lengthTicks / 384) * 384`, relative to Pattern tick 0. It is the exclusive end for both one-shot and looped Pattern performance. An empty Pattern's technical `lengthTicks` of 1 therefore performs one silent bar; a Pattern ending exactly on a bar boundary adds no extra bar. This session/runtime value never changes serialized Pattern data, linked clip width or Song timing.
 - Master volume is not transport state in V7.
 
 ## Patterns
@@ -105,7 +106,7 @@ schemaVersion, metadata, transport, patterns, tracks, mixer
 ```
 
 - Object keys are exactly `id, name, lengthTicks, notes`.
-- `lengthTicks`: canonical derived value `max(1, max(note.startTick + note.durationTicks))`, bounded to 1â€¦3,072. It is never user-selected; normalization rewrites stale supplied values.
+- `lengthTicks`: canonical derived value `max(1, max(note.startTick + note.durationTicks))`, bounded to 1â€¦3,072. It is never user-selected; normalization rewrites stale supplied values, and Pattern performance padding is never included in it.
 - `notes`: 0â€“1,024 per Pattern and 0â€“8,192 across the Project.
 - Note keys are exactly `id, pitch, startTick, durationTicks, velocity`.
 - `pitch`: integer MIDI 36â€¦112.
@@ -113,7 +114,7 @@ schemaVersion, metadata, transport, patterns, tracks, mixer
 - `durationTicks`: integer â‰¥ 1.
 - `startTick + durationTicks <= 3,072`; the greatest note end equals `lengthTicks` for a non-empty Pattern.
 - `velocity`: 0â€¦1; zero is persisted but schedules no voice.
-- Notes are canonically serialized by `startTick`, then `pitch`, then `id`. Each note occupies the half-open interval `[startTick, startTick + durationTicks)`, and a Pattern is monophonic: no two note intervals may intersect at any pitch. An end tick equal to the next note's start tick is valid touching, and both notes remain distinct. Chords and simultaneous polyphony are represented across separate Tracks, never by overlapping notes within one Pattern.
+- Notes are canonically serialized by `startTick`, then `pitch`, then `id`. Each note occupies the half-open interval `[startTick, startTick + durationTicks)`. Notes on the same pitch may not intersect; an end tick equal to the next same-pitch note's start tick is valid touching, and both notes remain distinct. Notes at different pitches may overlap, allowing chords and simultaneous polyphony within one Pattern.
 - Pattern array order is user-visible. The final Pattern cannot be deleted.
 
 The 18-tick duration is intentionally valid: exact V1 Â¼/Â¾ gate endpoints need not align to V2's 12-tick minimum creation snap.
@@ -253,7 +254,7 @@ Schemas 1â€“6 first use the existing production migration chain to normaliz
 ## Default V7 Project
 
 - Title `Untitled chiptune`; BPM 120; custom loop disabled at 0â€¦384.
-- Pattern `pattern-1`, name `Pattern 1`, derived technical length 1, no notes; the editor still exposes a normal writable grid.
+- Pattern `pattern-1`, name `Pattern 1`, derived technical length 1, no notes; the editor still exposes a normal writable grid and Pattern mode performs one silent 384-tick bar.
 - Track `track-1`, name `Pulse 1`, Klinto Chip defaults above, Mixer volume 1/pan 0/not muted/not solo/no Effects, no clips.
 - Master volume 0.35, no Effects.
 - Session opens Pattern 1 Piano Roll in Pattern mode with Track 1 as `auditionTrackId`; session state is not serialized.

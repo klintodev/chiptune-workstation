@@ -12,6 +12,7 @@ import {
   compareIds,
   deepFreeze,
 } from "./domain-utils.js";
+import { getPatternPlaybackEndTick } from "./pattern-span.js";
 import { normalizeV2Project } from "./migration.js";
 import { getV2ArrangementEndTick } from "./project-schema.js";
 
@@ -122,18 +123,19 @@ export function createPatternOccurrences(project, patternId, trackId, options = 
     throw new RangeError(`Unknown Track: ${trackId}.`);
   }
   const looping = options.loop === true;
+  const playbackEndTick = getPatternPlaybackEndTick(pattern);
   const defaultEnd = looping && Number.isInteger(options.iterations)
-    ? pattern.lengthTicks * options.iterations
-    : pattern.lengthTicks;
+    ? playbackEndTick * options.iterations
+    : playbackEndTick;
   if (options.iterations !== undefined) assertInteger(options.iterations, "Pattern iterations", 1);
   const { fromTick, toTick } = resolveRange(options, defaultEnd);
   if (toTick === fromTick) return Object.freeze([]);
 
-  const firstIteration = looping ? Math.floor(fromTick / pattern.lengthTicks) : 0;
-  const finalIteration = looping ? Math.floor((toTick - 1) / pattern.lengthTicks) : 0;
+  const firstIteration = looping ? Math.floor(fromTick / playbackEndTick) : 0;
+  const finalIteration = looping ? Math.floor((toTick - 1) / playbackEndTick) : 0;
   const occurrences = [];
   for (let iteration = firstIteration; iteration <= finalIteration; iteration += 1) {
-    const offset = looping ? iteration * pattern.lengthTicks : 0;
+    const offset = looping ? iteration * playbackEndTick : 0;
     for (const note of pattern.notes) {
       if (note.velocity === 0) continue;
       const startTick = offset + note.startTick;

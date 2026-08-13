@@ -36,6 +36,8 @@ test("Pattern and Song plans share canonical timing, ownership and synthesis par
   });
   assert.deepEqual(pattern.events.map(({ noteId }) => noteId), ["note-a", "note-b", "note-c"]);
   assert.deepEqual(pattern.events.map(({ effectivePitch }) => effectivePitch), [72, 76, 79]);
+  assert.equal(pattern.toTick, 384);
+  assert.equal(pattern.contentDurationSeconds, 2);
   assert.equal(pattern.events[0].startSeconds, 0);
   assert.equal(pattern.events[0].durationSeconds, 0.125);
   assert.deepEqual(pattern.events[0].ownership, {
@@ -53,14 +55,32 @@ test("Pattern and Song plans share canonical timing, ownership and synthesis par
   assert.equal(song.events[0].startSeconds, 0.25);
   assert.equal(song.events[0].clipId, "clip-1");
   assert.equal(song.toTick, 120);
+  assert.equal(song.contentDurationSeconds, 0.625);
   assert.equal(RENDER_PLAN_ADAPTERS.live, RENDER_PLAN_ADAPTERS.offline);
   assert.equal(RENDER_PLAN_ADAPTERS.live, RENDER_PLAN_ADAPTERS.public);
 });
 
-test("the pure plan pins oldest-inserted retirement after the sixteenth Track voice", () => {
+test("Pattern playback repeats only after the complete containing bar", () => {
+  const project = fixture();
+  project.patterns[0].notes = [note("pulse", 60, 0, 24)];
+
+  const occurrences = createPlaybackOccurrences(project, {
+    fromTransportTick: 0,
+    mode: "pattern",
+    patternId: "pattern-1",
+    toTransportTick: 769,
+    trackId: "track-1",
+  });
+
+  assert.deepEqual(occurrences.map(({ transportTick }) => transportTick), [0, 384, 768]);
+  assert.deepEqual(occurrences.map(({ playbackDurationTicks }) => playbackDurationTicks), [24, 24, 24]);
+  assert.equal(new Set(occurrences.map(({ occurrenceId }) => occurrenceId)).size, 3);
+});
+
+test("the pure plan pins oldest-inserted retirement for a seventeen-note chord", () => {
   const project = fixture();
   project.patterns[0].notes = Array.from({ length: 17 }, (_, index) => (
-    note(`note-${String(index).padStart(2, "0")}`, 36 + index, index, 1)
+    note(`note-${String(index).padStart(2, "0")}`, 36 + index, 0, 1)
   ));
   project.tracks[0].instrument.params.releaseSeconds = 3;
   const plan = createRenderPlan(project, {

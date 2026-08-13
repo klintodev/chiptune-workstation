@@ -120,41 +120,59 @@ test("canonicalization sorts notes and clips while retaining Pattern, Track and 
   assert.deepEqual(normalized.tracks[0].clips.map(({ id }) => id), ["clip-a", "clip-b", "clip-z"]);
 });
 
-test("notes may touch end to start but every intersecting interval is rejected", () => {
+test("notes may form chords and touch at the same pitch, but same-pitch intersections are rejected", () => {
   const valid = structuredClone(createDefaultV2Project());
   valid.patterns[0].notes = [
     { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 0 },
-    { id: "note-b", pitch: 64, startTick: 24, durationTicks: 24, velocity: 1 },
-    { id: "note-c", pitch: 60, startTick: 48, durationTicks: 48, velocity: 1 },
+    { id: "note-b", pitch: 64, startTick: 0, durationTicks: 48, velocity: 1 },
+    { id: "note-c", pitch: 67, startTick: 12, durationTicks: 12, velocity: 1 },
+    { id: "note-d", pitch: 60, startTick: 24, durationTicks: 24, velocity: 1 },
   ];
 
   const normalized = canonicalizeV2Project(valid);
   assert.deepEqual(
     normalized.patterns[0].notes.map(({ id }) => id),
-    ["note-a", "note-b", "note-c"],
+    ["note-a", "note-b", "note-c", "note-d"],
   );
 
   const conflicts = [
-    [
-      { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
-      { id: "note-b", pitch: 60, startTick: 0, durationTicks: 12, velocity: 1 },
-    ],
-    [
-      { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
-      { id: "note-b", pitch: 64, startTick: 12, durationTicks: 24, velocity: 1 },
-    ],
-    [
-      { id: "note-a", pitch: 60, startTick: 0, durationTicks: 48, velocity: 1 },
-      { id: "note-b", pitch: 67, startTick: 12, durationTicks: 12, velocity: 0 },
-    ],
+    {
+      noteIds: ["note-a", "note-b"],
+      notes: [
+        { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
+        { id: "note-b", pitch: 60, startTick: 0, durationTicks: 12, velocity: 1 },
+      ],
+    },
+    {
+      noteIds: ["note-a", "note-b"],
+      notes: [
+        { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
+        { id: "note-b", pitch: 60, startTick: 12, durationTicks: 24, velocity: 1 },
+      ],
+    },
+    {
+      noteIds: ["note-a", "note-b"],
+      notes: [
+        { id: "note-a", pitch: 60, startTick: 0, durationTicks: 48, velocity: 1 },
+        { id: "note-b", pitch: 60, startTick: 12, durationTicks: 12, velocity: 0 },
+      ],
+    },
+    {
+      noteIds: ["note-a", "note-c"],
+      notes: [
+        { id: "note-a", pitch: 60, startTick: 0, durationTicks: 48, velocity: 1 },
+        { id: "note-b", pitch: 64, startTick: 12, durationTicks: 1, velocity: 1 },
+        { id: "note-c", pitch: 60, startTick: 24, durationTicks: 12, velocity: 1 },
+      ],
+    },
   ];
-  for (const notes of conflicts) {
+  for (const { noteIds, notes } of conflicts) {
     const candidate = structuredClone(createDefaultV2Project());
     candidate.patterns[0].notes = notes;
     assert.throws(() => canonicalizeV2Project(candidate), (error) => {
       assert.equal(error.code, "PATTERN_NOTE_OVERLAP");
       assert.deepEqual(error.details, {
-        noteIds: ["note-a", "note-b"],
+        noteIds,
         patternId: "pattern-1",
       });
       return true;

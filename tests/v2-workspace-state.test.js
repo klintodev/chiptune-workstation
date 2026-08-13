@@ -16,13 +16,13 @@ function createProject({ id = "project-a" } = {}) {
       {
         id: "pattern-1",
         name: "Pattern 1",
-        lengthTicks: 384,
+        lengthTicks: 24,
         notes: [{ id: "note-1", pitch: 60, startTick: 0, durationTicks: 24, velocity: 0.8 }],
       },
       {
         id: "pattern-2",
         name: "Pattern 2",
-        lengthTicks: 192,
+        lengthTicks: 48,
         notes: [{ id: "note-2", pitch: 64, startTick: 24, durationTicks: 24, velocity: 0.7 }],
       },
     ],
@@ -82,6 +82,16 @@ test("initial workspace is deeply immutable, safe, and separate from Project JSO
   assert.throws(() => state.patternSurfaces["pattern-1"].selection.push("note-1"), TypeError);
   assert.equal(JSON.stringify(project), projectJson);
   assert.equal("workspace" in project, false);
+});
+
+test("a short Pattern playhead remains addressable through its complete performance bar", () => {
+  const workspace = createWorkspaceState(createProject());
+
+  workspace.setPlayback({ patternPlayheadTick: 300 });
+  assert.equal(workspace.getState().playback.patternPlayheadTick, 300);
+
+  workspace.setPlayback({ patternPlayheadTick: 999 });
+  assert.equal(workspace.getState().playback.patternPlayheadTick, 383);
 });
 
 test("Pattern identities retain independent selection, cursor, viewport, and audition Track", () => {
@@ -223,7 +233,7 @@ test("clip, Effect, Mixer, and transport state repair by stable identity", () =>
   assert.equal(workspace.getState().device.instanceId, "effect-3");
   assert.equal(workspace.getState().device.slotIndex, 0);
   assert.equal(workspace.getState().mixer.channelId, "master");
-  assert.equal(workspace.getState().playback.patternPlayheadTick, 384);
+  assert.equal(workspace.getState().playback.patternPlayheadTick, 383);
   assert.equal(workspace.getState().playback.patternLoopEnabled, false);
   assert.equal(workspace.getState().playback.songPlayheadTick, 6_144);
 

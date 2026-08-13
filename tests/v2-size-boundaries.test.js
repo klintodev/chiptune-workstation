@@ -269,12 +269,12 @@ test("malformed and oversized collections fail equivalently at local, cloud, and
       },
     },
     {
-      name: "note overlap",
+      name: "same-pitch note overlap",
       expected: /overlap in Pattern pattern-1/,
       mutate(document) {
         document.project.patterns[0].notes = [
           { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
-          { id: "note-b", pitch: 64, startTick: 12, durationTicks: 24, velocity: 1 },
+          { id: "note-b", pitch: 60, startTick: 12, durationTicks: 24, velocity: 1 },
         ];
       },
     },

@@ -1,4 +1,7 @@
-import { getPatternEditorEndTick } from "../domain/pattern-span.js";
+import {
+  getPatternEditorEndTick,
+  getPatternPlaybackEndTick,
+} from "../domain/pattern-span.js";
 
 const PRIMARY_KIND_SET = new Set(["piano-roll", "playlist", "mixer"]);
 const DEVICE_KIND_SET = new Set(["instrument", "effect"]);
@@ -64,11 +67,6 @@ function assertProject(project) {
 function clampInteger(value, minimum, maximum, fallback = minimum) {
   const candidate = Number.isInteger(value) ? value : fallback;
   return Math.min(maximum, Math.max(minimum, candidate));
-}
-
-function patternLength(pattern) {
-  if (Number.isInteger(pattern?.lengthTicks) && pattern.lengthTicks > 0) return pattern.lengthTicks;
-  return 384;
 }
 
 function noteIds(pattern) {
@@ -301,7 +299,7 @@ export function repairWorkspaceState(state, project, {
       patternPlayheadTick: clampInteger(
         sourcePlayback.patternPlayheadTick,
         0,
-        patternLength(activePattern),
+        getPatternPlaybackEndTick(activePattern) - 1,
         0,
       ),
       songPlayheadTick: clampInteger(sourcePlayback.songPlayheadTick, 0, SONG_END_TICK, 0),

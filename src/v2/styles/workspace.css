@@ -223,9 +223,16 @@
   white-space: nowrap;
 }
 
-.v2-floating-window-title-action {
-  display: block;
+.v2-floating-window-title-editor {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
   max-inline-size: 100%;
+  gap: 4px;
+}
+
+.v2-floating-window-title-context {
+  flex: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

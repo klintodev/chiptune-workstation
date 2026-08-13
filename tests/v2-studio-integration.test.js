@@ -21,6 +21,7 @@ import {
   duplicatePlaylistInstrument,
   getPlaylistContextMenuPosition,
   getPlaylistMarqueeClipIds,
+  getPlaylistNotePreviewGeometry,
   getPlaylistRulerSeekTick,
   getPlaylistWheelScrollDelta,
   getSnappedPlaylistDropTick,
@@ -111,6 +112,43 @@ class FakeNode extends EventTarget {
       ));
     }
     return null;
+  }
+
+  querySelectorAll(selector) {
+    const terminalSelector = selector.trim().split(/\s*>\s*|\s+/).at(-1);
+    const tagName = terminalSelector.match(/^[a-z][a-z0-9-]*/i)?.[0]?.toUpperCase() ?? null;
+    const id = terminalSelector.match(/#([a-z0-9_-]+)/i)?.[1] ?? null;
+    const classNames = [...terminalSelector.matchAll(/\.([a-z0-9_-]+)/gi)]
+      .map(([, className]) => className);
+    const attributes = [...terminalSelector.matchAll(/\[([a-z0-9-]+)(?:="([^"]*)")?\]/gi)]
+      .map(([, name, value]) => ({ name, value }));
+    const matches = (node) => (
+      (!tagName || node.tagName === tagName)
+      && (!id || node.id === id)
+      && classNames.every((className) => (
+        String(node.className).split(/\s+/).includes(className)
+      ))
+      && attributes.every(({ name, value }) => {
+        if (name.startsWith("data-")) {
+          const dataName = name.slice(5).replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase());
+          return value === undefined
+            ? Object.hasOwn(node.dataset ?? {}, dataName)
+            : node.dataset?.[dataName] === value;
+        }
+        if (name === "open") return value === undefined ? Boolean(node.open) : String(node.open) === value;
+        const actual = node.getAttribute?.(name);
+        return value === undefined ? actual !== null : actual === value;
+      })
+    );
+    const results = [];
+    const visit = (node) => {
+      for (const child of node.children ?? []) {
+        if (matches(child)) results.push(child);
+        visit(child);
+      }
+    };
+    visit(this);
+    return results;
   }
 
   find(predicate) {
@@ -645,6 +683,66 @@ test("Playlist modifier-wheel scrolling follows the dominant axis and normalizes
   assert.equal(getPlaylistWheelScrollDelta({ deltaY: Number.NaN }), 0);
 });
 
+test("Playlist note previews map timing, pitch, velocity, and reuse Pattern geometry", () => {
+  const geometry = getPlaylistNotePreviewGeometry({
+    lengthTicks: 100,
+    notes: [
+      { durationTicks: 25, pitch: 60, startTick: 0, velocity: 0.5 },
+      { durationTicks: 10, pitch: 72, startTick: 50, velocity: 1 },
+      { durationTicks: 20, pitch: 60, startTick: 50, velocity: 0.75 },
+      { durationTicks: 10, pitch: 67, startTick: 90, velocity: 0 },
+    ],
+  });
+  assert.equal(Object.isFrozen(geometry), true);
+  assert.equal(geometry.length, 3, "zero-velocity notes should not produce preview marks");
+  assert.deepEqual(
+    geometry.map(({ width, x }) => ({ width, x })),
+    [{ width: 25, x: 0 }, { width: 10, x: 50 }, { width: 20, x: 50 }],
+  );
+  assert.ok(geometry[1].y < geometry[0].y, "higher pitches should render higher");
+  assert.equal(geometry[2].y, geometry[0].y, "equal pitches should align");
+  assert.ok(geometry[1].opacity > geometry[0].opacity, "velocity should control emphasis");
+  assert.equal(getPlaylistNotePreviewGeometry({ lengthTicks: 24, notes: [] }).length, 0);
+
+  const projectState = createV2ProjectState();
+  const noteIds = projectState.addNotes("pattern-1", [
+    { durationTicks: 24, pitch: 60, startTick: 0, velocity: 0.7 },
+    { durationTicks: 24, pitch: 64, startTick: 0, velocity: 0.8 },
+  ]);
+  projectState.addClip("track-1", "pattern-1", 0);
+  projectState.addClip("track-1", "pattern-1", 24);
+  const workspaceState = createWorkspaceState(projectState);
+  const surface = createPlaylistSurface({ projectState, workspaceState });
+  const symbolBefore = surface.node.querySelectorAll("symbol")[0];
+  assert.ok(symbolBefore);
+  assert.equal(surface.node.querySelectorAll("rect").length, 2);
+  assert.equal(surface.node.querySelectorAll("use").length, 2);
+  assert.deepEqual(
+    surface.node.querySelectorAll("use").map((use) => use.getAttribute("href")),
+    [`#${symbolBefore.getAttribute("id")}`, `#${symbolBefore.getAttribute("id")}`],
+  );
+
+  surface.node.find(({ dataset }) => (
+    dataset.trackId === "track-1" && dataset.playlistTrackAction === "mute"
+  )).click();
+  assert.equal(surface.node.querySelectorAll("symbol")[0], symbolBefore);
+  assert.equal(surface.node.querySelectorAll("rect").length, 2);
+  assert.equal(surface.node.querySelectorAll("use").length, 2);
+
+  const firstRectBefore = symbolBefore.querySelectorAll("rect")[0];
+  const firstYBefore = firstRectBefore.getAttribute("y");
+  projectState.updateNote("pattern-1", noteIds[0], { pitch: 55 });
+  const symbolAfterEdit = surface.node.querySelectorAll("symbol")[0];
+  assert.equal(symbolAfterEdit, symbolBefore, "Pattern edits should refresh the retained symbol");
+  assert.notEqual(symbolAfterEdit.querySelectorAll("rect")[0], firstRectBefore);
+  assert.notEqual(symbolAfterEdit.querySelectorAll("rect")[0].getAttribute("y"), firstYBefore);
+  assert.deepEqual(
+    surface.node.querySelectorAll("use").map((use) => use.getAttribute("href")),
+    [`#${symbolBefore.getAttribute("id")}`, `#${symbolBefore.getAttribute("id")}`],
+  );
+  surface.dispose();
+});
+
 test("Playlist Instrument Mute and Solo switches share canonical Track Mixer state", () => {
   const projectState = createV2ProjectState();
   const secondTrackId = projectState.addTrack("Bass");
@@ -696,6 +794,56 @@ test("Playlist Instrument Mute and Solo switches share canonical Track Mixer sta
   surface.dispose();
 });
 
+test("Playlist Track names are always-visible inputs with commit and restore semantics", () => {
+  const projectState = createV2ProjectState();
+  const workspaceState = createWorkspaceState(projectState);
+  workspaceState.activatePlaylist();
+  const announcements = [];
+  const operations = [];
+  projectState.addEventListener("change", (event) => operations.push(event.detail?.operation));
+
+  const surface = createPlaylistSurface({
+    announce: (message) => announcements.push(message),
+    projectState,
+    workspaceState,
+  });
+  const findNameInput = () => surface.node.find(({ className, dataset }) => (
+    String(className).split(/\s+/).includes("v2-playlist-track-name-input")
+      && dataset.trackId === "track-1"
+  ));
+  const dispatchKey = (target, key) => {
+    const event = new Event("keydown", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "key", { value: key });
+    target.dispatchEvent(event);
+  };
+
+  let input = findNameInput();
+  assert.equal(input.value, "Pulse 1");
+  assert.equal(input.getAttribute("maxLength"), "32");
+  input.focus();
+  input.dispatchEvent(new Event("focus"));
+  input.value = "  Lead Track  ";
+  input.dispatchEvent(new Event("input"));
+  dispatchKey(input, "Enter");
+
+  assert.equal(projectState.getTrack("track-1").name, "Lead Track");
+  assert.deepEqual(operations, ["rename-track"]);
+  assert.equal(announcements.at(-1), "Renamed Track to Lead Track.");
+  assert.equal(findNameInput(), input, "committing a name must not rebuild the Playlist row");
+  input = findNameInput();
+  assert.equal(input.value, "Lead Track");
+
+  input.focus();
+  input.dispatchEvent(new Event("focus"));
+  input.value = "Discard this";
+  input.dispatchEvent(new Event("input"));
+  dispatchKey(input, "Escape");
+  assert.equal(input.value, "Lead Track");
+  assert.equal(projectState.getTrack("track-1").name, "Lead Track");
+  assert.deepEqual(operations, ["rename-track"]);
+  surface.dispose();
+});
+
 test("Playlist Track action rail wires labelled, ordered, focus-stable Mixer switches", async () => {
   const playlist = await readFile(new URL("../src/v2/ui/playlist.js", import.meta.url), "utf8");
 
@@ -708,13 +856,14 @@ test("Playlist Track action rail wires labelled, ordered, focus-stable Mixer swi
   assert.match(playlist, /className: "v2-playlist-track-actions"[\s\S]*className: "v2-playlist-track-switches"[\s\S]*\[mute, solo\][\s\S]*className: "v2-playlist-track-management"[\s\S]*\[up, down, remove\]/);
 });
 
-test("Playlist context routing isolates clip, Instrument, and Track right-clicks", () => {
-  const createTarget = ({ clipId = null, instrumentTrackId = null, trackId = null } = {}) => {
+test("Playlist context routing isolates editable text, clip, Instrument, and Track right-clicks", () => {
+  const createTarget = ({ clipId = null, editable = false, instrumentTrackId = null, trackId = null } = {}) => {
     const clip = clipId ? { dataset: { clipId } } : null;
     const instrument = instrumentTrackId ? { dataset: { trackId: instrumentTrackId } } : null;
     const lane = trackId ? { dataset: { trackId } } : null;
     return {
       closest(selector) {
+        if (selector === "input, textarea, [contenteditable='true']") return editable ? {} : null;
         if (selector === ".v2-playlist-clip") return clip;
         if (selector === ".v2-playlist-instrument") return instrument;
         if (selector === ".v2-playlist-lane") return lane;
@@ -751,6 +900,13 @@ test("Playlist context routing isolates clip, Instrument, and Track right-clicks
     trackId: "track-2",
   })), handlers), true);
   assert.deepEqual(calls, ["prevent", "stop", "instrument:track-2"]);
+
+  calls.length = 0;
+  assert.equal(routePlaylistContextMenu(createEvent(createTarget({
+    editable: true,
+    trackId: "track-2",
+  })), handlers), false);
+  assert.deepEqual(calls, []);
 
   calls.length = 0;
   assert.equal(routePlaylistContextMenu(createEvent(createTarget()), handlers), false);
@@ -1213,17 +1369,22 @@ test("visible Piano Roll title delegates rename and refreshes the existing overl
     readFile(new URL("../src/v2/studio-app.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(piano, /requestPatternName = \(pattern\) => globalThis\.prompt\?\.\("Pattern name", pattern\.name\)/);
+  assert.match(piano, /onRequestPatternRename = \(\) => false/);
   assert.match(piano, /function requestPatternRename\(returnFocus = canvas\)/);
-  assert.match(piano, /requestedName = requestPatternName\(pattern\)/);
-  assert.match(piano, /renamePianoPattern\(\{\s*announce,\s*patternId: pattern\.id,\s*projectState,\s*requestedName,\s*\}\)/);
-  assert.match(piano, /rename\.addEventListener\("click", \(\) => requestPatternRename\(rename\)\)/);
+  assert.match(piano, /return onRequestPatternRename\(returnFocus\) \?\? false/);
+  assert.match(piano, /rename\.addEventListener\("click", \(\) => \{\s*actions\.open = false;\s*requestPatternRename\(rename\)/);
   assert.match(piano, /requestPatternRename,\s*\}\);/);
+  assert.match(piano, /if \(\["rename-pattern", "rename-track"\]\.includes\(event\?\.detail\?\.operation\)\) \{\s*synchronizePianoNames\(\);\s*return;/);
+  assert.doesNotMatch(piano, /globalThis\.prompt/);
 
   assert.match(studio, /patternName: pattern\.name,\s*name: `\$\{pattern\.name\}, Piano Roll`/);
-  assert.match(studio, /titleAction\.className = "v2-floating-window-title-action"/);
-  assert.match(studio, /titleAction\.setAttribute\("aria-label", `Rename \$\{descriptor\.patternName\}`\)/);
-  assert.match(studio, /titleAction\.addEventListener\("click", \(\) => \{\s*owner\.requestPatternRename\?\.\(titleAction\)/);
+  assert.match(studio, /titleInput\.className = "v2-floating-window-title-input"/);
+  assert.match(studio, /titleInput\.maxLength = MAX_PATTERN_NAME_LENGTH/);
+  assert.match(studio, /titleContext\.textContent = ", Piano Roll"/);
+  assert.match(studio, /titleInput\.addEventListener\("keydown",[\s\S]*event\.key === "Enter"[\s\S]*commitPianoTitleRename[\s\S]*event\.key === "Escape"[\s\S]*restorePianoTitleInput/);
+  assert.match(studio, /titleInput\.addEventListener\("blur",[\s\S]*commitPianoTitleRename/);
+  assert.match(studio, /function beginPianoTitleRename\(\)[\s\S]*raiseFloatingLayer\("piano-roll"\)[\s\S]*titleInput\.focus[\s\S]*titleInput\.select/);
+  assert.doesNotMatch(studio, /v2-floating-window-title-action/);
 
   const openOverlay = studio.slice(
     studio.indexOf("function openPianoOverlay"),
@@ -1236,8 +1397,8 @@ test("visible Piano Roll title delegates rename and refreshes the existing overl
     samePatternStart,
     openOverlay.indexOf("closePianoOverlay()", samePatternStart),
   );
-  assert.match(samePatternUpdate, /pianoOverlay\.titleAction\.textContent = descriptor\.name/);
   assert.match(samePatternUpdate, /pianoOverlay\.descriptor = descriptor/);
+  assert.match(samePatternUpdate, /synchronizePianoTitle\(pianoOverlay, descriptor\)/);
   assert.match(samePatternUpdate, /dom\.editorHost\.setAttribute\("aria-label", descriptor\.name\)/);
   assert.match(samePatternUpdate, /return false/);
 
@@ -1493,9 +1654,16 @@ test("editor composites, shared playheads, opener routing, and replacement owner
   assert.match(playlist, /routePlaylistContextMenu\(event,[\s\S]*onClip:[\s\S]*onInstrument:[\s\S]*onTrack:/);
   assert.match(playlist, /className: "v2-action-menu-panel v2-playlist-track-context-menu"/);
   assert.match(playlist, /textContent: "Rename Instrument"/);
-  assert.match(playlist, /promptInstrumentName\(track\)/);
-  assert.match(playlist, /projectState\.renameTrack\(trackId, requestedName\)/);
-  assert.match(playlist, /trackAction: "instrument"/);
+  assert.match(playlist, /className: "v2-playlist-track-name-input"/);
+  assert.match(playlist, /maxLength: MAX_TRACK_NAME_LENGTH/);
+  assert.match(playlist, /projectState\.renameTrack\(trackId, edit\.draft\)/);
+  assert.match(playlist, /synchronizePlaylistNames\(\);\s*if \(restoreInputFocus\)/);
+  assert.match(playlist, /if \(\["rename-pattern", "rename-track"\]\.includes\(event\?\.detail\?\.operation\)\) \{\s*synchronizePlaylistNames\(\);\s*return;/);
+  assert.doesNotMatch(playlist, /trackNameRenderHandle|scheduleTrackNameRender|deferRender/);
+  assert.match(playlist, /function requestInstrumentRename\(trackId\)[\s\S]*focusTrackNameInput\(track\.id, \{ select: true \}\)/);
+  assert.match(playlist, /className: "v2-playlist-track-identity"[\s\S]*\[trackNameInput, trackFocus\]/);
+  assert.match(playlist, /onRenamePattern\(pattern\.id, destination\.id\)/);
+  assert.doesNotMatch(playlist, /promptInstrumentName|globalThis\.prompt/);
   assert.match(playlist, /createElement\("span", \{ textContent: track\.name, title: track\.name \}\),\s+createElement\("small", \{ textContent: "Klinto Chip" \}\)/);
   assert.match(playlist, /createPatternForPlaylistTrack\([\s\S]*onOpenPattern,[\s\S]*trackId/);
   assert.doesNotMatch(playlist, /event\.target\.closest\?\.\("button"\)\) return;\s+event\.preventDefault\(\);/);
@@ -1510,8 +1678,11 @@ test("editor composites, shared playheads, opener routing, and replacement owner
   );
   assert.doesNotMatch(piano, /requestAnimationFrame/);
   assert.doesNotMatch(playlist, /requestAnimationFrame/);
+  assert.match(piano, /clamp\(tick, 0, getPatternPlaybackEndTick\(activePattern\(\)\)\)/);
   assert.match(shell, /dispatchEvent\(new CustomEvent\("transportframe"/);
   assert.match(studio, /surfaceHost\.replacePrimary/);
+  assert.match(studio, /const playbackEndTick = getPatternPlaybackEndTick\(pattern\);[\s\S]*?sourceTick % playbackEndTick/);
+  assert.match(studio, /transportState\.status === "paused"[\s\S]*?scheduler\.syncProject\(projectState\.getState\(\)\)/);
   assert.match(studio, /onSeek\(tick\)[\s\S]*workspaceState\.setPlaybackMode\("song"\)/);
   assert.match(studio, /markTrackInput\(trackId, event\.releaseEndTime\)/);
   assert.match(
@@ -1519,5 +1690,6 @@ test("editor composites, shared playheads, opener routing, and replacement owner
     /markTrackInput\(trackId, event\.releaseEndTime, inputLifecycle\)/,
   );
   assert.match(studio, /disposeAudioGraph\(\)/);
+  assert.match(scheduler, /endTick: getPatternPlaybackEndTick\(pattern\)/);
   assert.match(scheduler, /releaseVoices\(activeSession, now, \(record\) => !isRecordStillOwned/);
 });

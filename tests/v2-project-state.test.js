@@ -68,26 +68,26 @@ test("note commands are immutable, atomic, canonically ordered and history-backe
   assert.equal(project.getPattern().notes.length, 2);
 });
 
-test("addNotes accepts touching notes at different pitches as one undoable commit", () => {
+test("addNotes accepts chords and same-pitch touching as one undoable commit", () => {
   const project = createV2ProjectState();
   const before = project.getState();
   const changes = [];
   project.addEventListener("change", (event) => changes.push(event.detail));
 
   const noteIds = project.addNotes("pattern-1", [
-    patternNote("note-touch-left", 60, 0, 24),
-    patternNote("note-touch-middle", 64, 24, 24),
-    patternNote("note-touch-right", 60, 48, 12),
+    patternNote("note-chord-low", 60, 0, 24),
+    patternNote("note-chord-high", 64, 0, 36),
+    patternNote("note-touch-low", 60, 24, 24),
   ]);
 
-  assert.deepEqual(noteIds, ["note-touch-left", "note-touch-middle", "note-touch-right"]);
+  assert.deepEqual(noteIds, ["note-chord-low", "note-chord-high", "note-touch-low"]);
   assert.equal(Object.isFrozen(noteIds), true);
   assert.deepEqual(project.getPattern().notes.map(({ id }) => id), [
-    "note-touch-left",
-    "note-touch-middle",
-    "note-touch-right",
+    "note-chord-low",
+    "note-chord-high",
+    "note-touch-low",
   ]);
-  assert.equal(project.getPattern().lengthTicks, 60);
+  assert.equal(project.getPattern().lengthTicks, 48);
   assert.equal(changes.length, 1);
   assert.equal(changes[0].operation, "add-notes");
   assert.deepEqual(changes[0].noteIds, noteIds);
@@ -103,14 +103,14 @@ test("addNotes accepts touching notes at different pitches as one undoable commi
   assert.deepEqual(changes.map(({ operation }) => operation), ["add-notes", "undo", "redo"]);
 });
 
-test("addNote and addNotes reject overlap at different pitches without partial changes", () => {
+test("addNote and addNotes reject same-pitch overlap without partial changes", () => {
   const project = createProjectWithNotes([
     patternNote("note-anchor", 60, 0, 24),
   ]);
 
   assertOverlapRejectedAtomically(
     project,
-    () => project.addNote("pattern-1", patternNote("note-add-overlap", 67, 23, 12)),
+    () => project.addNote("pattern-1", patternNote("note-add-overlap", 60, 23, 12)),
     { noteIds: ["note-anchor", "note-add-overlap"] },
   );
 
@@ -120,7 +120,7 @@ test("addNote and addNotes reject overlap at different pitches without partial c
     () => emptyProject.addNotes("pattern-1", [
       patternNote("note-valid-prefix", 67, 48, 24),
       patternNote("note-batch-left", 60, 0, 24),
-      patternNote("note-batch-overlap", 72, 12, 12),
+      patternNote("note-batch-overlap", 60, 12, 12),
     ]),
     { noteIds: ["note-batch-left", "note-batch-overlap"] },
   );
@@ -138,15 +138,15 @@ test("note overlap validation wins before linked-clip growth conflicts", () => {
 
   assertOverlapRejectedAtomically(
     project,
-    () => project.addNote("pattern-1", patternNote("note-overlap-and-growth", 67, 12, 48)),
+    () => project.addNote("pattern-1", patternNote("note-overlap-and-growth", 60, 12, 48)),
     { noteIds: ["note-anchor", "note-overlap-and-growth"] },
   );
 });
 
-test("start and duration updates reject Pattern-wide overlap with deterministic details", () => {
+test("start and duration updates reject same-pitch overlap with deterministic details", () => {
   const project = createProjectWithNotes([
     patternNote("note-left", 60, 0, 24),
-    patternNote("note-middle", 61, 24, 24),
+    patternNote("note-middle", 60, 24, 24),
     patternNote("note-right", 60, 48, 24),
   ]);
 
@@ -165,7 +165,7 @@ test("start and duration updates reject Pattern-wide overlap with deterministic 
 test("generic multi-note updates reject the complete batch when one transformed note overlaps", () => {
   const project = createProjectWithNotes([
     patternNote("note-anchor", 60, 0, 24),
-    patternNote("note-batch-a", 62, 48, 12),
+    patternNote("note-batch-a", 60, 48, 12),
     patternNote("note-batch-b", 64, 72, 12),
   ]);
 
@@ -183,6 +183,23 @@ test("generic multi-note updates reject the complete batch when one transformed 
   );
 });
 
+test("duplicateNotes may place a harmonic copy over the source timing", () => {
+  const project = createProjectWithNotes([
+    patternNote("note-source", 60, 0, 24),
+  ]);
+
+  const [copyId] = project.duplicateNotes(
+    "pattern-1",
+    ["note-source"],
+    { deltaPitch: 7, deltaTicks: 12 },
+  );
+
+  assert.deepEqual(project.getPattern().notes.map(({ id, pitch, startTick }) => ({ id, pitch, startTick })), [
+    { id: "note-source", pitch: 60, startTick: 0 },
+    { id: copyId, pitch: 67, startTick: 12 },
+  ]);
+});
+
 test("duplicateNotes rejects an overlapping copy without consuming history or emitting changes", () => {
   const project = createProjectWithNotes([
     patternNote("note-source", 60, 0, 24),
@@ -190,7 +207,7 @@ test("duplicateNotes rejects an overlapping copy without consuming history or em
 
   assertOverlapRejectedAtomically(
     project,
-    () => project.duplicateNotes("pattern-1", ["note-source"], { deltaPitch: 7, deltaTicks: 12 }),
+    () => project.duplicateNotes("pattern-1", ["note-source"], { deltaPitch: 0, deltaTicks: 12 }),
     { noteIds: ["note-source", "note-1"] },
   );
   assert.deepEqual(project.getPattern().notes.map(({ id }) => id), ["note-source"]);

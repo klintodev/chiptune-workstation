@@ -4,6 +4,7 @@ import {
   MAX_PATTERN_CONTENT_TICKS,
   PPQ,
   getPatternEditorEndTick,
+  getPatternPlaybackEndTick,
 } from "../domain/index.js";
 import { createElement, clearElement, setPressed } from "./dom.js";
 import { formatDurationTicks, formatMidiPitch, formatPercent, formatTickPosition } from "./music-format.js";
@@ -196,9 +197,9 @@ export function createPianoRollSurface({
   confirmPatternDelete = async () => true,
   onAddToPlaylist = () => {},
   onAuditionPitch = () => false,
+  onRequestPatternRename = () => false,
   onTransportToggle = () => {},
   projectState,
-  requestPatternName = (pattern) => globalThis.prompt?.("Pattern name", pattern.name),
   getTransportFrame = () => null,
   transportFrameSource = null,
   workspaceState,
@@ -239,7 +240,7 @@ export function createPianoRollSurface({
   const status = createElement("p", {
     className: "v2-editor-help",
     id: "v2-piano-help",
-    textContent: "Hold Control or Command and drag to select notes. Delete removes the selection; Control or Command+B duplicates it to the right. Arrow keys move the cursor, and Control or Command with arrows edits selected notes. Space toggles playback.",
+    textContent: "Hold Control or Command and drag to select notes. Delete removes the selection; Control or Command+B duplicates it to the right. Arrow keys move the cursor, and Control or Command with arrows edits selected notes. Space toggles playback when you are not typing in a name field.",
   });
   const node = createElement("section", {
     className: "v2-primary-surface v2-piano-roll",
@@ -270,32 +271,13 @@ export function createPianoRollSurface({
       ?? project.patterns[0];
   }
 
-  function restoreRenameFocus(target) {
-    queueMicrotask(() => {
-      if (disposed) return;
-      const next = target?.isConnected ? target : canvas;
-      next.focus?.({ preventScroll: true });
-    });
-  }
-
   function requestPatternRename(returnFocus = canvas) {
-    const pattern = activePattern();
-    let requestedName;
     try {
-      requestedName = requestPatternName(pattern);
+      return onRequestPatternRename(returnFocus) ?? false;
     } catch (error) {
-      announce(error instanceof Error ? error.message : "The Pattern name could not be requested.");
-      restoreRenameFocus(returnFocus);
+      announce(error instanceof Error ? error.message : "The Pattern could not be renamed.");
       return false;
     }
-    const changed = renamePianoPattern({
-      announce,
-      patternId: pattern.id,
-      projectState,
-      requestedName,
-    });
-    restoreRenameFocus(returnFocus);
-    return changed;
   }
 
   function editorEndTick(pattern = activePattern()) {
@@ -1140,7 +1122,7 @@ export function createPianoRollSurface({
     const fallback = workspace().playback?.patternPlayheadTick ?? 0;
     const tick = Number.isFinite(frame?.patternTick) ? frame.patternTick : fallback;
     playheadElement.style.translate = `${
-      clamp(tick, 0, activePattern().lengthTicks) * pixelsPerTick
+      clamp(tick, 0, getPatternPlaybackEndTick(activePattern())) * pixelsPerTick
     }px 0`;
     return true;
   }
@@ -1355,7 +1337,10 @@ export function createPianoRollSurface({
       workspaceState.setActivePattern?.(id);
     });
     const rename = createElement("button", { textContent: "Rename Pattern", type: "button" });
-    rename.addEventListener("click", () => requestPatternRename(rename));
+    rename.addEventListener("click", () => {
+      actions.open = false;
+      requestPatternRename(rename);
+    });
     const remove = createElement("button", {
       className: "v2-danger-button",
       disabled: project.patterns.length === 1,
@@ -1394,6 +1379,29 @@ export function createPianoRollSurface({
     renderEditor();
   }
 
+  function synchronizePianoNames() {
+    if (disposed) return false;
+    const project = snapshot();
+    const pattern = activePattern();
+    title.textContent = `${pattern.name}, Piano Roll`;
+    canvas.setAttribute("aria-label", `${pattern.name}, Piano Roll`);
+    const patternSelect = header.querySelector('select[aria-label="Pattern"]');
+    for (const option of patternSelect?.querySelectorAll?.("option") ?? []) {
+      const candidate = project.patterns.find(({ id }) => id === option.value);
+      if (candidate) option.textContent = candidate.name;
+    }
+    const auditionSelect = header.querySelector('select[aria-label="Audition and destination Track"]');
+    for (const option of auditionSelect?.querySelectorAll?.("option") ?? []) {
+      const track = project.tracks.find(({ id }) => id === option.value);
+      if (track) option.textContent = track.name;
+    }
+    const add = header.querySelector(".v2-primary-action");
+    if (add && !add.disabled) {
+      add.title = `Add ${pattern.name} to ${projectState.getTrack(auditionTrackId()).name}`;
+    }
+    return true;
+  }
+
   canvas.addEventListener("keydown", handleEditorKeyDown, { signal: lifecycle.signal });
   canvas.addEventListener("pointerdown", handlePointerDown, { signal: lifecycle.signal });
   canvas.addEventListener("contextmenu", handleContextMenu, { signal: lifecycle.signal });
@@ -1412,6 +1420,10 @@ export function createPianoRollSurface({
   const replacementOperations = new Set(["open-project", "replace", "create-project-from-template"]);
   const handleProjectChange = (event) => {
     if (localProjectMutationDepth > 0 || replacementOperations.has(event?.detail?.operation)) return;
+    if (["rename-pattern", "rename-track"].includes(event?.detail?.operation)) {
+      synchronizePianoNames();
+      return;
+    }
     render();
   };
   const handleWorkspaceChange = (event) => {
