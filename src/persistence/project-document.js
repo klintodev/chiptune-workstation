@@ -1,4 +1,12 @@
-import { createProjectState } from "../state/project-state.js";
+import {
+  PROJECT_SCHEMA_VERSION as LEGACY_PROJECT_SCHEMA_VERSION,
+  createProjectState,
+} from "../state/project-state.js";
+import {
+  PROJECT_SCHEMA_VERSION as V2_PROJECT_SCHEMA_VERSION,
+  normalizeV2Project,
+  normalizeV2ProjectDocument,
+} from "../v2/domain/schema.js";
 
 export const PROJECT_DOCUMENT_FORMAT = "chiptune-workstation";
 export const PROJECT_DOCUMENT_VERSION = 1;
@@ -16,7 +24,30 @@ function validateTimestamp(value, field) {
 }
 
 function normalizeProject(project) {
+  if (project?.schemaVersion === V2_PROJECT_SCHEMA_VERSION) return normalizeV2Project(project);
   return clone(createProjectState(project).getState());
+}
+
+export function normalizeProjectDocumentToV7(candidate) {
+  return normalizeV2ProjectDocument(candidate);
+}
+
+export function normalizeProjectDocumentForSchema(candidate, schemaVersion) {
+  if (![LEGACY_PROJECT_SCHEMA_VERSION, V2_PROJECT_SCHEMA_VERSION].includes(schemaVersion)) {
+    throw new RangeError(
+      `Unsupported target project schema version: ${schemaVersion}.`,
+    );
+  }
+  if (schemaVersion === V2_PROJECT_SCHEMA_VERSION) {
+    return normalizeProjectDocumentToV7(candidate);
+  }
+  const normalized = normalizeProjectDocument(candidate);
+  if (normalized.project.schemaVersion === V2_PROJECT_SCHEMA_VERSION) {
+    throw new RangeError(
+      "This V7 project is unavailable in the current Studio version and was not modified.",
+    );
+  }
+  return normalized;
 }
 
 export function createProjectIdentifier(randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto)) {
@@ -108,17 +139,77 @@ export function parseProjectDocument(text) {
   return normalizeProjectDocument(candidate);
 }
 
+export function parseProjectDocumentToV7(text) {
+  if (typeof text !== "string") throw new TypeError("Project file contents must be text.");
+  if (new TextEncoder().encode(text).byteLength > MAX_PROJECT_FILE_BYTES) {
+    throw new RangeError("Project file is larger than 2 MB.");
+  }
+  let candidate;
+  try {
+    candidate = JSON.parse(text);
+  } catch {
+    throw new SyntaxError("Project file is not valid JSON.");
+  }
+  return normalizeProjectDocumentToV7(candidate);
+}
+
 export function serializeProjectDocument(document) {
   return `${JSON.stringify(normalizeProjectDocument(document), null, 2)}\n`;
 }
 
-export function summarizeProjectDocument(document) {
-  const normalized = normalizeProjectDocument(document);
+export function serializeProjectDocumentToV7(document) {
+  return `${JSON.stringify(normalizeProjectDocumentToV7(document), null, 2)}\n`;
+}
+
+function summarizeNormalizedProjectDocument(normalized) {
   return Object.freeze({
+    availability: "ready",
     id: normalized.id,
     revision: normalized.revision,
+    schemaVersion: normalized.project.schemaVersion,
     title: normalized.project.metadata.title,
     createdAt: normalized.createdAt,
     updatedAt: normalized.updatedAt,
   });
+}
+
+export function summarizeProjectDocument(document) {
+  return summarizeNormalizedProjectDocument(normalizeProjectDocument(document));
+}
+
+export function summarizeUnavailableProjectDocument(candidate, error) {
+  const id = typeof candidate?.id === "string" && candidate.id.trim()
+    ? candidate.id
+    : null;
+  const title = typeof candidate?.project?.metadata?.title === "string"
+    && candidate.project.metadata.title.trim()
+    ? candidate.project.metadata.title.slice(0, 100)
+    : "Unavailable project";
+  return Object.freeze({
+    availability: "unavailable",
+    id,
+    revision: Number.isInteger(candidate?.revision) && candidate.revision >= 0
+      ? candidate.revision
+      : null,
+    title,
+    createdAt: typeof candidate?.createdAt === "string" ? candidate.createdAt : null,
+    updatedAt: typeof candidate?.updatedAt === "string" ? candidate.updatedAt : null,
+    schemaVersion: Number.isInteger(candidate?.project?.schemaVersion)
+      ? candidate.project.schemaVersion
+      : null,
+    sourceSchemaVersion: Number.isInteger(candidate?.project?.schemaVersion)
+      ? candidate.project.schemaVersion
+      : null,
+    reason: error instanceof Error ? error.message : "This project cannot be opened safely.",
+  });
+}
+
+export function summarizeProjectDocumentForSchema(document, schemaVersion) {
+  try {
+    return summarizeNormalizedProjectDocument(
+      normalizeProjectDocumentForSchema(document, schemaVersion),
+    );
+  } catch (error) {
+    return summarizeUnavailableProjectDocument(document, error);
+  }
 }

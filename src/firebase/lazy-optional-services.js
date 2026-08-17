@@ -104,6 +104,7 @@ export function createLazyCloudProjectService({
       releaseService();
     },
     enableCurrentProject: (...args) => use("enableCurrentProject", ...args),
+    getRawRecoveryText: (...args) => use("getRawRecoveryText", ...args),
     async getProjectStatus(...args) {
       if (accountService.getState().account?.emailVerified !== true) {
         return Object.freeze({ status: "local-only", link: null });

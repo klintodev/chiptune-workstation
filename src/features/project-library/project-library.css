@@ -64,7 +64,7 @@
 #project-library-save-status[data-state="unsaved"], #project-library-save-status[data-state="saving"] { border-color: var(--selection); color: var(--selection); }
 #project-library-save-status[data-state="error"], #project-library-save-status[data-state="unavailable"] { border-color: var(--danger); color: var(--danger); }
 .project-title-field input { min-height: 36px; padding: 5px 8px; font-size: 1.12rem; }
-.project-dialog-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.project-dialog-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .project-dialog-actions button { display: grid; min-height: 34px; place-items: center; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--ink); background: var(--bg-1); font-family: "Silkscreen", monospace; font-size: 0.52rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .project-dialog-actions .disabled { pointer-events: none; opacity: 0.38; }
 .project-library-heading { display: flex; justify-content: space-between; padding-top: 3px; }
@@ -112,9 +112,15 @@
 }
 
 @media (max-width: 560px) {
-  .project-dialog-actions { grid-template-columns: repeat(2, 1fr); }
   .project-library-current, .project-share-render { grid-template-columns: 1fr; }
   .project-share-render { display: grid; }
   .project-storage-recovery { align-items: stretch; flex-direction: column; }
   #project-share-render-actions { display: grid; grid-template-columns: 1fr 1fr; }
 }
+
+.project-list-row.unavailable { border-color: color-mix(in srgb, var(--danger) 48%, var(--line)); }
+.project-list-row.unavailable::before { background: var(--danger); box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 65%, transparent); }
+.project-list-unavailable-summary { cursor: default; }
+.project-list-row.unavailable .project-list-open strong { color: var(--danger); }
+.project-list-recover { width: 32px; min-width: 32px; height: 32px; padding: 0; color: var(--danger); background: var(--surface-strong); font-family: sans-serif; font-size: 1rem; }
+.project-list-recover:hover:not(:disabled) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--surface-strong)); }

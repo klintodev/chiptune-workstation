@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { createCloudProjectRecord } from "../src/firebase/cloud-project.js";
 import { createFirebaseClient } from "../src/firebase/firebase-client.js";
+import { createProjectDocument } from "../src/persistence/project-document.js";
+import { createDefaultProject } from "../src/state/project-state.js";
 
 function createSdkDouble() {
   const calls = {
@@ -154,4 +157,78 @@ test("App Check initialises before Auth while Firestore remains lazy", async () 
   assert.deepEqual(order, ["app-check", "auth"]);
   await client.getProject("user-one", "project-one");
   assert.deepEqual(order, ["app-check", "auth", "firestore"]);
+});
+
+test("cloud listing retains every raw Firestore document and raw reads do not normalize", async () => {
+  const document = createProjectDocument(createDefaultProject(), {
+    id: "project-one",
+    now: "2026-08-04T12:00:00.000Z",
+  });
+  const ready = createCloudProjectRecord("user-one", document, 1);
+  const future = structuredClone(ready);
+  future.document.id = "future-payload-id";
+  future.projectId = "future-payload-id";
+  future.document.project.schemaVersion = 99;
+  future.title = "Future cloud tune";
+  delete future.updatedAt;
+  const malformed = {
+    cloudFormat: "broken",
+    title: "Malformed cloud tune",
+    nested: { exact: ["raw", 17] },
+  };
+  const records = new Map([
+    ["ready-key", ready],
+    ["future-key", future],
+    ["malformed-key", malformed],
+  ]);
+  const database = { name: "database" };
+  let listedCollection = null;
+  const client = await createFirebaseClient({
+    config: {
+      apiKey: "public-key",
+      appId: "web-app",
+      authDomain: "example.firebaseapp.com",
+      projectId: "example",
+    },
+    loadSdk: async () => ({
+      app: {
+        getApps: () => [],
+        initializeApp: () => ({ name: "[DEFAULT]" }),
+      },
+      auth: {
+        getAuth: () => ({ currentUser: null }),
+      },
+      firestore: {
+        collection: (_database, ...segments) => segments.join("/"),
+        doc: (_database, ...segments) => segments.join("/"),
+        getFirestore: () => database,
+        async getDocs(reference) {
+          listedCollection = reference;
+          return {
+            docs: [...records].map(([id, value]) => ({
+              data: () => structuredClone(value),
+              id,
+            })),
+          };
+        },
+        async getDoc(reference) {
+          const key = reference.split("/").at(-1);
+          return {
+            data: () => structuredClone(records.get(key)),
+            exists: () => records.has(key),
+          };
+        },
+      },
+    }),
+  });
+
+  const summaries = await client.listProjects("user-one");
+
+  assert.equal(listedCollection, "users/user-one/projects");
+  assert.equal(summaries.length, 3);
+  assert.equal(summaries.find(({ recoveryKey }) => recoveryKey === "ready-key").availability, "ready");
+  assert.equal(summaries.find(({ recoveryKey }) => recoveryKey === "future-key").availability, "unavailable");
+  assert.equal(summaries.find(({ recoveryKey }) => recoveryKey === "malformed-key").availability, "unavailable");
+  assert.deepEqual(await client.getRawProject("user-one", "malformed-key"), malformed);
+  assert.equal(records.get("malformed-key").nested.exact[0], "raw");
 });

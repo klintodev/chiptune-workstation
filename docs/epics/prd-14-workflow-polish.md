@@ -12,12 +12,13 @@ Common composition, playback, sharing, and export actions are easy to understand
 
 #### US51.1 - Keep project actions focused
 
-As a user, I want the technical JSON export action removed so that the project library only presents actions I am expected to use.
+As a user, I want the technical JSON import and export actions removed so that the project library only presents actions I am expected to use.
 
 Requirements:
 
-- The visible JSON export action is removed from the project library.
-- Local autosave and JSON import remain available.
+- The visible JSON import and export actions are removed from the project library.
+- The primary project actions are New and Duplicate; recovery download remains separate and only appears when storage needs attention.
+- Local autosave and the persistence-layer JSON format remain unchanged.
 - Removing the action does not change the persisted project format or cloud storage boundary.
 
 #### US51.2 - Export a playable WAV

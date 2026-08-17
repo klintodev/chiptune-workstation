@@ -13,7 +13,7 @@ This release fixes reliability invariants rather than redesigning the editor. Th
 - PRDs 7 and 8 provide the local repository, project-document, cloud-link, and cloud-project boundaries hardened here.
 - PRD 9 provides the offline arrangement renderer that must share the playable-pitch policy.
 - PRDs 13 and 19 provide verified ownership, validation limits, and cloud security invariants that conflict recovery must preserve.
-- This PRD establishes the initial Playwright and Firebase-emulator harness used and expanded by PRDs 21 and 23.
+- This PRD establishes the deterministic test seams and Firebase-emulator harness used and expanded by PRDs 21 and 23.
 
 ## Implementation epics
 
@@ -83,7 +83,7 @@ This release fixes reliability invariants rather than redesigning the editor. Th
 - Signing out must clear the account-session opt-in marker and stop cloud work while retaining local projects.
 - Local audio, editing, project download, project import, and WAV export must continue while Firebase is offline or blocked.
 - The UI must not imply that a guest project is remotely backed up or that sign-in is required to recover it.
-- Focused browser tests must assert a network-silent guest startup, local startup with IndexedDB disabled, recovery with Firebase requests blocked, and lazy account startup after explicit user intent.
+- Deterministic service-boundary tests must assert a network-silent guest startup, local startup with IndexedDB disabled, recovery with Firebase requests blocked, and lazy account startup after explicit user intent.
 
 ## Out of scope
 

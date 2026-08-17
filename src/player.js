@@ -13,6 +13,7 @@ import {
   getVisualiserPalette,
   getVisualiserTrackColour,
 } from "./visualiser/visualiser-palette.js";
+import { createV2PublicPlayerController } from "./v2/public-player-controller.js";
 
 const elements = {
   canvas: document.querySelector("#player-canvas"),
@@ -40,6 +41,7 @@ let scheduler = null;
 let visualFrame = 0;
 let visitorVolume = 1;
 let remixUrl = null;
+let v2Controller = null;
 let context = null;
 try {
   context = elements.canvas.getContext?.("2d") ?? null;
@@ -125,6 +127,10 @@ async function ensureAudio() {
 
 async function play() {
   try {
+    if (v2Controller) {
+      await v2Controller.play();
+      return;
+    }
     await ensureAudio();
     scheduler.play();
     renderTransport();
@@ -138,22 +144,45 @@ async function play() {
 }
 
 function createPlayer(record) {
-  projectState = createProjectState(record.document.project);
-  audioEngine = createAudioEngine();
-  runtimes = createTrackRuntimeRegistry({ audioEngine, projectState });
-  const project = projectState.getState();
-  scheduler = createArrangementScheduler({
-    bpm: project.transport.bpm,
-    getAudioTime: audioEngine.getCurrentTime,
-    getProjectState: projectState.getState,
-    getSelectedPatternId: () => project.patterns[0].id,
-    getSelectedTrackId: () => project.tracks[0].id,
-    getVoiceEngine: runtimes.getVoiceEngine,
-  });
-  scheduler.addEventListener("statechange", () => {
-    renderTransport();
-    scheduleVisuals();
-  });
+  let hasArrangement = false;
+  if (record.document.project.schemaVersion === 7) {
+    v2Controller = createV2PublicPlayerController({
+      canvas: elements.canvas,
+      controls: {
+        pause: elements.pause,
+        play: elements.play,
+        position: elements.position,
+        restart: elements.restart,
+        status: elements.status,
+        volume: elements.volume,
+      },
+      onError: (error) => showError(publicErrorMessage(error, {
+        context: "Shared playback failed.",
+        fallback: "Playback stopped because the published snapshot could not be played safely.",
+      })),
+      project: record.document.project,
+      reducedMotion,
+    });
+    hasArrangement = v2Controller.hasPlayableArrangement();
+  } else {
+    projectState = createProjectState(record.document.project);
+    audioEngine = createAudioEngine();
+    runtimes = createTrackRuntimeRegistry({ audioEngine, projectState });
+    const project = projectState.getState();
+    scheduler = createArrangementScheduler({
+      bpm: project.transport.bpm,
+      getAudioTime: audioEngine.getCurrentTime,
+      getProjectState: projectState.getState,
+      getSelectedPatternId: () => project.patterns[0].id,
+      getSelectedTrackId: () => project.tracks[0].id,
+      getVoiceEngine: runtimes.getVoiceEngine,
+    });
+    scheduler.addEventListener("statechange", () => {
+      renderTransport();
+      scheduleVisuals();
+    });
+    hasArrangement = getArrangementEnd(project) > 0;
+  }
   elements.title.textContent = record.title;
   elements.creator.textContent = record.creatorName;
   elements.revision.textContent = `Revision ${record.publicationRevision}`;
@@ -163,16 +192,21 @@ function createPlayer(record) {
   }
   document.title = `${record.title} - Klinto Studio`;
   document.querySelector('meta[name="description"]').content = `Listen to ${record.title} by ${record.creatorName}.`;
-  if (getArrangementEnd(project) === 0) showError("This published snapshot does not contain an arranged pattern yet.");
+  if (!hasArrangement) showError("This published snapshot does not contain an arranged pattern yet.");
   else {
     setTextIfChanged(elements.status, "Ready to play");
     elements.play.disabled = false;
   }
-  scheduleVisuals();
+  if (v2Controller) v2Controller.refresh();
+  else scheduleVisuals();
 }
 
 elements.play.addEventListener("click", () => void play());
 elements.pause.addEventListener("click", () => {
+  if (v2Controller) {
+    v2Controller.pause();
+    return;
+  }
   scheduler?.pause();
   cancelAnimationFrame(visualFrame);
   visualFrame = 0;
@@ -180,12 +214,25 @@ elements.pause.addEventListener("click", () => {
   scheduleVisuals();
 });
 elements.restart.addEventListener("click", () => {
+  if (v2Controller) {
+    void v2Controller.restart().catch((error) => {
+      showError(publicErrorMessage(error, {
+        context: "Shared playback failed to restart.",
+        fallback: "Playback could not restart. Try reloading the page.",
+      }));
+    });
+    return;
+  }
   scheduler?.stop();
   scheduler?.setStartStep(0);
   void play();
 });
 elements.volume.addEventListener("input", () => {
   visitorVolume = Number(elements.volume.value) / 100;
+  if (v2Controller) {
+    v2Controller.setVisitorVolume(visitorVolume);
+    return;
+  }
   if (audioEngine?.isReady()) {
     audioEngine.setMasterVolume(projectState.getState().transport.masterVolume * visitorVolume);
   }
@@ -202,13 +249,24 @@ elements.remixConfirm.addEventListener("click", () => {
   location.assign(remixUrl);
 });
 document.addEventListener("visibilitychange", () => {
+  if (v2Controller) {
+    v2Controller.setVisible(!document.hidden);
+    return;
+  }
   if (document.hidden) {
     cancelAnimationFrame(visualFrame);
     visualFrame = 0;
   } else scheduleVisuals();
 });
-reducedMotion.addEventListener("change", scheduleVisuals);
+reducedMotion.addEventListener("change", () => {
+  if (v2Controller) v2Controller.refresh();
+  else scheduleVisuals();
+});
 window.addEventListener("pagehide", () => {
+  if (v2Controller) {
+    void v2Controller.dispose();
+    return;
+  }
   scheduler?.stop();
   runtimes?.dispose();
   void audioEngine?.dispose();

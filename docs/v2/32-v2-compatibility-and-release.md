@@ -26,7 +26,7 @@ Existing safety limits remain unless a preceding PRD explicitly tightens them:
 
 The first public V2 Project is `schemaVersion: 7` inside the unchanged outer `documentVersion: 1` envelope. [The V2 Project schema contract](./v2-project-schema-contract.md) is the single normative shape; feature-PRD excerpts are non-normative. Version 7 lands atomically containing all of:
 
-- 96 PPQ Pattern `lengthTicks` and note events;
+- 96 PPQ note events and canonical content-derived Pattern `lengthTicks`;
 - tick-based clip `startTick` and loop `{ enabled, mode, startTick, endTick }`, retaining `custom | arrangement`;
 - Track `instrument` records for Klinto Chip;
 - Track `mixer` objects with empty-or-populated effect chains;
@@ -43,17 +43,20 @@ After activation:
 - an unshipped internal version may be consolidated before Beta only if it never entered ordinary user storage;
 - a version number is never reused for a different shape.
 
+V7 has not been activated or written to ordinary user storage, so its final Pattern overlap invariant is consolidated before Beta without a schema bump: note spans are half-open, notes on the same pitch may touch end-to-start but may not overlap, and notes at different pitches may overlap to form chords within one Pattern. Once V7 activates, this meaning is frozen and any later change follows the schema-increment rule above.
+
 ## V1 â†’ V2 migration
 
 Migration is a pure trust-boundary operation: clone/parse â†’ validate source envelope â†’ migrate â†’ deeply validate V7 â†’ activate. It never mutates or overwrites the original before successful V7 validation.
 
 ### Musical time
 
-- Pattern step count Ã— 24 â†’ `lengthTicks`; Â¼/Â¾ gates become exact 6/18-tick durations and remain editable without implicit quantization.
+- Populated steps become notes first, then `lengthTicks` is derived from the greatest note end; unused trailing V1 steps no longer impose a fixed Pattern size. Â¼/Â¾ gates become exact 6/18-tick durations and remain editable without implicit quantization.
 - Each populated step â†’ one deterministic note ID and `{ pitch, startTick, durationTicks, velocity }` per PRD 28.
 - Clip `startStep * 24` â†’ `startTick`.
 - Loop step bounds Ã— 24 â†’ exclusive tick bounds; preserve `transport.loop.mode` exactly and retain arrangement-mode auto-follow behaviour.
 - Pattern/Song playback mode is not migrated or persisted; a new/opened session starts in Pattern mode.
+- Pattern mode derives a non-persisted whole-bar performance end from final V7 `lengthTicks`: `ceil(lengthTicks / 384) * 384`. Empty Patterns therefore perform one silent bar, and content already ending on a bar boundary adds no further bar. This derivation does not change migrated Pattern data, linked clip width or Song timing.
 - Note/clip ordering becomes canonical and deterministic.
 - `rootOctave` is removed from musical data; initial view derives from first note or C4 and is not part of audio parity.
 
@@ -90,26 +93,27 @@ Normalized V1-versus-V7 comparisons require exact equality for:
 
 For audio fixtures:
 
-- WAV parity renders at the production 44.1 kHz export rate; live/public reference parity also runs at 48 kHz in the pinned CI Chromium build. At each pinned rate, maximum absolute sample difference is â‰¤ 1e-5 and RMS difference is â‰¤ 1e-6 after identical normalization;
+- WAV parity renders at the production 44.1 kHz export rate. Deterministic offline fixtures use a maximum absolute sample difference of â‰¤ 1e-5 and RMS difference of â‰¤ 1e-6 after identical normalization;
 - a deliberately changed test environment must re-baseline through reviewed evidence, never silently widen tolerances;
 - unseeded noise is not sample-identical: compare occurrence schedule, graph/configuration, envelope, gain, duration and bounded spectral/RMS characteristics;
-- release tails may cross a Pattern boundary exactly as in V1 and are compared separately from gate duration.
+- release and Effect tails may ring through Pattern performance padding and cross a Pattern/clip boundary exactly as in V1; they are compared separately from stored gate duration.
 
 ## Fixture matrix
 
 Fixtures cover V1 Project schemas 1 through 6 through the production migration chain, plus documented legacy aliases, including:
 
 - empty/default Project;
-- every Pattern length and boundary step;
+- every content-derived Pattern span and note boundary, plus empty, partial-final-bar and exact-bar Pattern performance boundaries;
+- valid end-to-start touching, valid cross-pitch overlaps including chords, and malformed same-pitch interval overlap;
 - every waveform, octave and parameter boundary;
-- chords produced after migration only through distinct steps/Tracks, zero-velocity notes and maximum voice/count cases;
+- sequential notes produced from distinct migration steps, chords within one Pattern, zero-velocity notes and maximum voice/count cases;
 - multiple linked clips, touching clips, maximum song boundary and loop bounds;
 - multi-Track mute/solo/pan/volume/master combinations;
 - local JSON, cloud and public envelopes;
 - near-2 MB and near-hosted-size documents;
 - malformed numbers, duplicate IDs, missing references, oversized arrays and unknown types/versions.
 
-Each fixture asserts source immutability, canonical V7 result, repeated-normalization equality and expected audio occurrence projection.
+Each fixture asserts source immutability, canonical V7 result, repeated-normalization equality and expected audio occurrence projection. Any same-pitch overlapping Pattern-note intervals are rejected at import and every local/cloud/public normalization boundary as complete proposals: no note, selection, history entry or linked clip is partially changed. Cross-pitch overlaps remain valid.
 
 ## Unsupported or malformed Project recovery
 
@@ -154,7 +158,7 @@ Rules must not claim to deeply validate arbitrary nested arrays when that is not
 
 - Studio, public player and offline export consume PRD 28's occurrence projection and PRDs 29â€“30's closed device/graph definitions.
 - No route keeps an independent switch statement for waveform/effect semantics.
-- Pattern and Song timing, clip links, tempo, Instrument parameters, Track/master mix and insert order agree.
+- Pattern and Song timing, clip links, tempo, Instrument parameters, Track/master mix and insert order agree. Pattern one-shot and loop playback share the same bar-rounded performance boundary, while Song clips retain exact content-derived duration.
 - WAV renders the arrangement once and ignores transport-loop repetition.
 - Compute bounded Instrument plus serial Track/master tails, then enforce the existing ten-minute absolute limit before creating offline buffers.
 - Public visitor volume is a transient post-master output gain, not persisted and not applied to WAV.
@@ -194,9 +198,9 @@ Only after these are live and verified may any user-facing build enable V7 autos
 - Superseded V1 step/stacked UI and dead adapters are removed after evidence, not in foundational slices.
 - The badge is removed or deliberately renamed; `V2 Beta` does not remain.
 
-## Focused release E2E suites
+## Focused release verification journeys
 
-Use clean-storage fixtures and fail each test on uncaught page error, unhandled rejection or unexpected console error. Do not create one brittle end-to-end mega-test.
+Run these journeys manually against a clean-storage production build. Check page errors, unhandled rejections and unexpected console errors throughout, and record the result in the release ticket.
 
 ### 1. Compose, save and reload
 
@@ -223,9 +227,9 @@ At approximately 390Ã—844: switch surfaces, create/select/delete one note thr
 - Schema/range/count/unique-ID/property tests pass.
 - Scheduler/graph/history/lifecycle tests pass with fake-clock determinism where applicable.
 
-### Browser/audio
+### Runtime/audio
 
-- Required Playwright suites pass in the supported Chromium profile at desktop and mobile viewports.
+- Required desktop and mobile release journeys pass manual review in the supported verification browser.
 - No new page/console errors, stuck voices, duplicate AudioNodes, leaked timers/listeners/animation frames or hidden-surface work.
 - Live/public 48 kHz reference parity and production WAV 44.1 kHz parity/tolerances pass.
 - Browser without Web Audio fails safely.
@@ -255,7 +259,7 @@ Severity labels prioritize repair; they do not narrow conformance scope.
 
 - All required PRDs accepted with their scope exclusions intact.
 - V7 schema/rules/normalizers/player deployed in the safe order and dual-version telemetry is healthy.
-- Migration fixture matrix and all four focused E2E suites pass.
+- Migration fixture matrix and all required release journeys pass.
 - Local, file, cloud, publish, public play, remix and WAV routes preserve V7.
 - 1366Ã—768 visual review confirms one dominant surface and no page scroll.
 - Accessibility Stable gate passes.
@@ -291,7 +295,7 @@ Severity labels prioritize repair; they do not narrow conformance scope.
 - Default V2 authoring waits for all exposed persistence/output routes.
 - Public/live/offline playback share occurrence and device definitions.
 - The existing ten-minute WAV allocation boundary remains after bounded tails.
-- Release automation is four focused E2E suites, not one mega-test.
+- Release journeys are verified by the release owner and recorded with the release evidence.
 - Exactly one `V2 Beta` badge is shown during Beta.
 
 

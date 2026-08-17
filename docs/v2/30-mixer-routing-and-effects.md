@@ -61,6 +61,8 @@ This PRD owns these Mixer rules:
 - The default values and canonical serialization order in the schema contract are binding.
 - A persisted schema version never changes shape or meaning in place.
 
+Playlist's per-Instrument Mute and Solo switches are alternate views of the owning Track Mixer fields. They call the same Track Mixer command and reflect the same persisted state as the Mixer surface; they never add device-local mute/solo keys or a second audio path. Changes apply to the live graph without restarting transport, multiple solo selections remain valid and mute continues to override solo.
+
 ## Closed Effect registry
 
 The internal registry mirrors the Instrument contract: stable type/version, exact defaults/bounds, validation/migration, shared live/offline/public processor factory, UI factory and idempotent disposal. Lookup is side-effect free and never loads remote/project code.
@@ -180,14 +182,14 @@ Stable type: `klinto-delay`, version 1. Tempo-synchronized delay only.
 - The ten-minute guard runs after tails and before 44,100 Hz allocation; WAV ignores loop repetition; public visitor volume remains transient.
 - 1366Ã—768 has no page scroll; narrow/200% channel detail remains complete; 390Ã—844 parameter edit/Back smoke passes.
 
-## Automated coverage
+## Verification coverage
 
 - Schema/registry tests for exact keys/enums/ranges, unique IDs, chain caps and unknown state
 - Pure V1 Mixer/master migration fixtures and no-Effect parity
 - Graph topology tests for mute/solo, order, Trackâ†’master composition and idempotent disposal, including a two-Track proof that each Master Effect is constructed and processed once
 - Offline Filter/Delay parameter, equal-power mix, pure tail-formula/cap and 44,100 Hz ten-minute-allocation tests
 - Undo/redo and focus tests for every insert mutation
-- Playwright keyboard Mixer/effect journey, 1366Ã—768 layout, 200% channel-detail and 390Ã—844 smoke
+- Manual keyboard Mixer/effect journey, 1366Ã—768 layout, 200% channel-detail and 390Ã—844 smoke review
 - Live/offline/public shared-definition and output-route tests
 
 ## Delivery slices

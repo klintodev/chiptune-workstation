@@ -57,7 +57,7 @@ As an arranger, I want Whole arrangement to follow later clip edits so playback 
 - A fake clock that advances between reads cannot make a default voice start time appear to be in the past.
 - Unit tests exercise the full base-note and octave-offset boundary matrix.
 - Scheduler tests cover dynamic-end changes while stopped and playing, shortening behind the current position, and a project becoming empty.
-- Browser tests use a real `AudioContext` after a user gesture and a real `OfflineAudioContext` to verify sample rate, boundary-note setup, rendering completion, and cleanup.
+- Manual release verification uses a real `AudioContext` after a user gesture and a real `OfflineAudioContext` to confirm sample rate, boundary-note setup, rendering completion, and cleanup.
 
 ## Epic 71 - Serialize cloud work and resolve fresh conflicts
 
@@ -135,7 +135,7 @@ As a returning user, I want that downloaded file to restore the same musical pro
 - Importing the download in a fresh store preserves project ID, notes, instruments, mixer state, clips, visualiser settings, and supported metadata.
 - The file contains no cloud-link record or account metadata.
 - Unit tests cover suffix growth into double digits, all-whitespace input, Unicode, duplicate sibling names, and filename-reserved characters.
-- A browser test disables IndexedDB, edits a note, downloads the project, and verifies the captured file can be imported.
+- Deterministic repository tests cover IndexedDB fallback and export/import preservation; manual release verification confirms the download interaction.
 
 ## Epic 73 - Make Firebase contact explicitly optional
 
@@ -172,7 +172,7 @@ As a composer with blocked storage or network access, I want the workstation and
 - Disabling IndexedDB selects the in-memory repository, displays the recovery warning, and leaves the account control non-fatal.
 - Selecting the account control performs the first Firebase load; a stored opt-in marker may perform lazy Auth restoration on reload.
 - Firestore is not loaded merely to render a signed-out account panel.
-- Playwright coverage records requests for clean guest, returning opt-in, blocked-network, and disabled-IndexedDB scenarios.
+- Deterministic optional-service tests record attempted requests for clean guest, returning opt-in, blocked-network, and disabled-IndexedDB scenarios.
 - Unit tests cover capability selection, optional-service state transitions, sign-out disposal, and marker cleanup.
 
 ## Out of scope
@@ -191,11 +191,11 @@ As a composer with blocked storage or network access, I want the workstation and
 4. Complete Epic 72's recovery download before Epic 73 relies on it in storage-failure paths.
 5. Epic 73 makes optional account and cloud loading genuinely lazy.
 
-PRD 21 extends the Playwright harness and adds axe journeys. PRD 23 consolidates these suites and promotes the complete browser, accessibility, audio, and emulator set into blocking CI gates.
+PRD 21 extends the interaction requirements. PRD 23 consolidates deterministic tests and emulator coverage into CI while keeping browser, accessibility and audio interaction checks in the manual release gate.
 
 ## Open questions
 
 - Should the account opt-in marker expire after a long period of inactivity?
 - Should a cloud conflict copy be placed in a dedicated recovery group once the project library supports folders?
 - Should download success include a checksum that a later support tool can verify?
-- Real-time and offline browser audio coverage starts in Chromium; additional engines can be added after the initial reliability gate is stable.
+- The manual release matrix begins with Chromium; additional engines can be added after the initial reliability gate is stable.

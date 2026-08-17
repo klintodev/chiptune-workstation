@@ -1,4 +1,5 @@
 import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js";
+import { renderV2ArrangementOffline } from "../../v2/audio/offline-renderer.js";
 import { encodePcm16Wave } from "../../audio/wav-encoder.js";
 import { setTextIfChanged } from "../../shared/status-announcer.js";
 
@@ -10,11 +11,19 @@ function safeFilename(title) {
   return `${base || "untitled-chiptune"}.wav`;
 }
 
+export async function renderProjectArrangementOffline(project, options) {
+  if (project?.schemaVersion === 7) {
+    const rendered = await renderV2ArrangementOffline(project, options);
+    return rendered.audioBuffer;
+  }
+  return renderArrangementOffline(project, options);
+}
+
 export function createAudioExportFeature({
   encodeWave = encodePcm16Wave,
   persistence,
   projectState,
-  renderAudio = renderArrangementOffline,
+  renderAudio = renderProjectArrangementOffline,
   root = document,
   urlApi = URL,
 } = {}) {

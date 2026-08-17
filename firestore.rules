@@ -26,7 +26,7 @@ service cloud.firestore {
       ];
     }
 
-    function validProject(project) {
+    function validV1Project(project) {
       return project is map
         && project.keys().hasOnly([
           "schemaVersion", "metadata", "scaleGuide", "visualiser", "transport", "patterns", "tracks"
@@ -70,6 +70,56 @@ service cloud.firestore {
         && project.tracks is list
         && project.tracks.size() >= 1
         && project.tracks.size() <= 8;
+    }
+
+    function validV2Project(project) {
+      return project is map
+        && project.keys().hasOnly([
+          "schemaVersion", "metadata", "transport", "patterns", "tracks", "mixer"
+        ])
+        && project.schemaVersion == 7
+        && project.metadata is map
+        && project.metadata.keys().hasOnly(["title"])
+        && validText(project.metadata.title, 1, 100)
+        && project.transport is map
+        && project.transport.keys().hasOnly(["bpm", "loop"])
+        && project.transport.bpm is number
+        && project.transport.bpm >= 40
+        && project.transport.bpm <= 240
+        && project.transport.loop is map
+        && project.transport.loop.keys().hasOnly(["enabled", "mode", "startTick", "endTick"])
+        && project.transport.loop.enabled is bool
+        && project.transport.loop.mode in ["custom", "arrangement"]
+        && project.transport.loop.startTick is int
+        && project.transport.loop.startTick >= 0
+        && project.transport.loop.startTick < 6144
+        && project.transport.loop.endTick is int
+        && project.transport.loop.endTick > project.transport.loop.startTick
+        && project.transport.loop.endTick <= 6144
+        && project.patterns is list
+        && project.patterns.size() >= 1
+        && project.patterns.size() <= 64
+        && project.tracks is list
+        && project.tracks.size() >= 1
+        && project.tracks.size() <= 8
+        && project.mixer is map
+        && project.mixer.keys().hasOnly(["master"])
+        && project.mixer.master is map
+        && project.mixer.master.keys().hasOnly(["volume", "effects"])
+        && project.mixer.master.volume is number
+        && project.mixer.master.volume >= 0
+        && project.mixer.master.volume <= 1
+        && project.mixer.master.effects is list
+        && project.mixer.master.effects.size() <= 4;
+    }
+
+    function validProject(project) {
+      return project is map
+        && project.schemaVersion in [6, 7]
+        && (
+          (project.schemaVersion == 6 && validV1Project(project))
+          || (project.schemaVersion == 7 && validV2Project(project))
+        );
     }
 
     function validProjectDocument(document, projectId) {

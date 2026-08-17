@@ -2,7 +2,10 @@ import {
   copyProjectDocument,
   createProjectIdentifier,
 } from "../persistence/project-document.js";
-import { normalizePublicationRecord } from "./publication.js";
+import {
+  normalizePublicationRecord,
+  normalizePublicationRecordToV7,
+} from "./publication.js";
 
 const MAX_PROJECT_TITLE_LENGTH = 100;
 
@@ -38,9 +41,15 @@ export function createRemixImport(publication, {
   return Object.freeze({ document, provenance });
 }
 
+export function createV2RemixImport(publication, options = {}) {
+  const normalized = normalizePublicationRecordToV7(publication);
+  return createRemixImport(normalized, options);
+}
+
 export function createRemixService({
   createId = createProjectIdentifier,
   loadPublication,
+  migrateToV7 = false,
   now = () => new Date().toISOString(),
   projectRepository,
   provenanceRepository,
@@ -52,7 +61,7 @@ export function createRemixService({
   async function importPublication(publicationId, expectedRevision) {
     const publication = await loadPublication(publicationId);
     if (!publication) throw new RangeError("This public project is no longer available.");
-    const created = createRemixImport(publication, {
+    const created = (migrateToV7 ? createV2RemixImport : createRemixImport)(publication, {
       createId,
       expectedRevision,
       now: now(),

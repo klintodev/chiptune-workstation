@@ -695,19 +695,18 @@ test("final clip removal recovers focus before arrangement-only controls disappe
   });
 });
 
-test("workstation starts selection repair before project-backed feature listeners", async () => {
-  const source = await readFile(new URL("../src/workstation-app.js", import.meta.url), "utf8");
-  const synchronization = source.indexOf("synchronizeWorkspaceSelection({");
+test("workstation creates and repairs transient workspace state before hosted V2 surfaces", async () => {
+  const source = await readFile(new URL("../src/v2/studio-app.js", import.meta.url), "utf8");
+  const workspaceCreation = source.indexOf("const workspaceState = createWorkspaceState(");
+  const hostCreation = source.indexOf("surfaceHost = createSurfaceHost(");
+  const projectListener = source.indexOf("projectState.addEventListener(\"change\", handleProjectChange)");
 
-  assert.notEqual(synchronization, -1);
-  for (const featureStart of [
-    "const workspaceTabs = createWorkspaceTabs(",
-    "const instrumentState = createInstrumentState(",
-    "const patternState = createPatternState(",
-    "arrangerFeature = createArrangerFeature(",
-  ]) {
-    assert.equal(synchronization < source.indexOf(featureStart), true, featureStart);
-  }
+  assert.notEqual(workspaceCreation, -1);
+  assert.notEqual(hostCreation, -1);
+  assert.notEqual(projectListener, -1);
+  assert.equal(workspaceCreation < hostCreation, true);
+  assert.equal(hostCreation < projectListener, true);
+  assert.match(source, /workspaceState\.repairProject\(projectState/);
 });
 
 test("workspace selection repairs before Pattern-only transport synchronization", async (t) => {

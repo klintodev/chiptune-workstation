@@ -2,15 +2,19 @@ import {
   copyProjectDocument,
   createProjectIdentifier,
   normalizeProjectDocument,
+  normalizeProjectDocumentForSchema,
+  normalizeProjectDocumentToV7,
   parseProjectDocument,
 } from "../persistence/project-document.js";
 import { createBoundedUniqueName } from "../shared/bounded-name.js";
 import { MAX_PROJECT_TITLE_LENGTH } from "../state/project-state.js";
+import { serializeRawCloudProjectRecord } from "./cloud-project.js";
 
 const RETRY_DELAYS = Object.freeze([5_000, 15_000, 30_000, 60_000]);
 
 function sameDocument(left, right) {
-  return JSON.stringify(normalizeProjectDocument(left)) === JSON.stringify(normalizeProjectDocument(right));
+  return JSON.stringify(normalizeProjectDocumentToV7(left))
+    === JSON.stringify(normalizeProjectDocumentToV7(right));
 }
 
 function isNetworkFailure(error, onlineTarget) {
@@ -33,6 +37,7 @@ export function createCloudProjectService({
   localRepository,
   now = () => new Date().toISOString(),
   onlineTarget = globalThis,
+  onProjectUpgrade = () => {},
   persistence = null,
   preferences,
   reload = () => globalThis.location?.reload(),
@@ -67,6 +72,13 @@ export function createCloudProjectService({
     if (!account) throw new Error("Sign in before using cloud projects.");
     if (account.emailVerified !== true) throw new Error("Verify your email before using cloud projects.");
     return account;
+  }
+
+  function normalizeForRuntime(document) {
+    const schemaVersion = persistence?.getActiveDocument?.()?.project?.schemaVersion;
+    return Number.isInteger(schemaVersion)
+      ? normalizeProjectDocumentForSchema(document, schemaVersion)
+      : normalizeProjectDocument(document);
   }
 
   function emit(link = null, type = "status") {
@@ -366,6 +378,16 @@ export function createCloudProjectService({
       const link = await linkRepository.get(account.uid, projectId);
       return Object.freeze({ status: link?.status ?? "local-only", link });
     },
+    async getRawRecoveryText(recoveryKey) {
+      const account = requireAccount();
+      const client = await accountService.getClient();
+      if (typeof client.getRawProject !== "function") {
+        throw new Error("Raw cloud recovery is unavailable in this client.");
+      }
+      const raw = await client.getRawProject(account.uid, recoveryKey);
+      if (!raw) throw new RangeError("That cloud recovery record no longer exists.");
+      return serializeRawCloudProjectRecord(raw);
+    },
     async listProjects() {
       const account = requireAccount();
       const client = await accountService.getClient();
@@ -380,7 +402,8 @@ export function createCloudProjectService({
         const client = await accountService.getClient();
         const record = await client.getProject(account.uid, projectId);
         if (!record) throw new Error("That cloud project no longer exists.");
-        const remote = normalizeProjectDocument(record.document);
+        const sourceSchemaVersion = record.document?.project?.schemaVersion;
+        const remote = normalizeForRuntime(record.document);
         if (activeDocument && activeDocument.id !== projectId) {
           const storedActive = await localRepository.get(activeDocument.id);
           if (!storedActive || !sameDocument(storedActive, activeDocument)) {
@@ -401,6 +424,19 @@ export function createCloudProjectService({
           error: "",
           conflictProjectId: "",
         }, "opened");
+        if (remote.project.schemaVersion === 7
+          && Number.isInteger(sourceSchemaVersion)
+          && sourceSchemaVersion >= 1
+          && sourceSchemaVersion < 7) {
+          try {
+            onProjectUpgrade(Object.freeze({
+              fromSchemaVersion: sourceSchemaVersion,
+              projectId: remote.id,
+            }));
+          } catch {
+            // Disclosure storage cannot invalidate a successful cloud recovery/open.
+          }
+        }
         preferences.setLastProjectId(projectId);
         reload();
         return remote;

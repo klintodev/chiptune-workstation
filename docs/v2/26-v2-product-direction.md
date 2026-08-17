@@ -20,29 +20,32 @@ The answer is not to add every familiar DAW feature. V2 must change the centre o
 
 Klinto Studio V2 feels like a small instrument studio:
 
-- compose one reusable Pattern in a full-height Piano Roll;
+- compose one reusable Pattern in a draggable modeless Piano Roll above the persistent Playlist;
 - audition it through an explicit track and Klinto-built instrument;
-- place linked Pattern clips in a dedicated Playlist when ready;
+- place linked Pattern clips directly into the Playlist beneath it;
 - shape sound in a focused Instrument window;
 - mix and add a short, curated chain of Klinto effects;
 - keep transport available without keeping every editor visible.
 
-It adopts FL Studio's separation of Patterns, Playlist, Mixer and devices. It does not copy FL Studio's visual density, freeform desktop or native plug-in hosting.
+On desktop it adopts FL Studio's separation of Patterns, Playlist, Mixer and devices. It does not copy FL Studio's visual density, unbounded window desktop or native plug-in hosting.
 
 ## Product principles
 
 ### Music before chrome
 
-- A new project opens with one dominant Piano Roll.
+- A new project opens with Playlist as the base, its inline Pattern-library `<details>` expanded, and one dominant Piano Roll above it.
 - At 1366Ã—768 there is no page-level vertical scroll.
 - Primary musical content receives substantially more area than navigation or transport.
 - The visualiser does not return.
 
 ### Windows without window chaos
 
-- Piano Roll, Playlist and Mixer are primary surfaces; exactly one is active.
-- At most one Instrument or Effect device window is visible above it.
-- Device windows open, focus and close. V2 does not add moving, pinning, minimizing, maximizing or saved layouts.
+- On desktop, Playlist is the persistent base beneath one draggable modeless Piano Roll and at most one draggable modeless Instrument or Effect window.
+- Mixer remains the exclusive primary surface: while it is active, Playlist and all modeless composition/device windows are hidden from layout, focus and the accessibility tree.
+- The Piano Roll and device windows have approved fixed sizes and bounded drag movement. They are not user-resizable, and their geometry is never persisted.
+- Pattern library is an inline collapsible part of Playlist with one compact all-Pattern dropdown and one draggable selected-Pattern card; it has no independent geometry and does not grow into a card grid.
+- Windows open, focus and close. V2 does not add pinning, minimizing, maximizing or saved layouts.
+- At narrow widths, exactly one fullscreen surface is mounted and exposed at a time.
 - Blocking confirmations are true modals; musical work surfaces are not.
 
 ### First-party sound system
@@ -72,7 +75,7 @@ The primary user wants to create a musical idea quickly, hear it immediately, tu
 
 Core jobs:
 
-- write chords, melodies and bass lines with note lengths and velocity;
+- write melodies, bass lines and chords with note lengths and velocity, including simultaneous notes at different pitches within one Pattern;
 - reuse a Pattern across tracks and song positions;
 - change the sound assigned to a track without rewriting notes;
 - hear a clear mix with a small number of useful effects;
@@ -94,26 +97,28 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 - **Clip:** linked placement of a Pattern on one Track at a tick position; editing the Pattern updates all linked clips.
 - **Instrument:** first-party sound generator owned by a Track.
 - **Effect:** first-party processor instance in a Track or master serial insert chain.
-- **Piano Roll:** Pattern composition surface with a transient audition/destination Track.
-- **Playlist:** song arrangement surface.
-- **Mixer:** Track/master level, pan, mute, solo, metering and insert management surface.
-- **Device window:** the one visible Instrument or Effect editor above the active primary surface.
+- **Piano Roll:** draggable modeless Pattern-composition window with a transient audition/destination Track on desktop; fullscreen surface at narrow widths.
+- **Playlist:** persistent desktop song-arrangement base and fullscreen narrow-width surface.
+- **Mixer:** exclusive Track/master level, pan, mute, solo, metering and insert-management primary surface.
+- **Device window:** the one visible draggable modeless Instrument or Effect editor on desktop; fullscreen surface at narrow widths.
 
 ## V2 minimum product
 
 ### Global shell
 
-- One row, fixed maximum height, containing compact project identity/save state, transport, Pattern/Song mode, tempo/master access and Piano Roll/Playlist/Mixer switching.
+- One row, fixed maximum height, containing compact project identity/save state, V1-style transport with direct `↻` Song-loop toggle, Pattern/Song mode, tempo, the inline Master slider/readout and workspace controls.
+- Space starts or pauses transport from every Studio surface and non-text control, without scrolling the page or activating the focused control; text fields retain Space for typing.
 - Audio enable/state remains visible.
-- Project management, help, sharing, theme and account actions live in one secondary menu.
+- The recognisable V1 Klinto visual identity and working direct dark/light theme toggle are retained; the visualiser remains removed.
+- Project management, help, sharing and account actions live in one secondary menu.
 - Exactly one `V2 Beta` badge during Beta.
 
 ### Composition
 
 - 96 PPQ shared musical time.
-- Polyphonic note events with start, duration, MIDI pitch and velocity.
+- Note events within each Pattern have start, duration, MIDI pitch and velocity. Notes at different pitches may overlap for chords and simultaneous polyphony; same-pitch half-open spans may touch end-to-start but may not overlap.
 - Launch snap values: 1/8, 1/16 and 1/32; default 1/16.
-- Pointer and desktop-keyboard creation, selection, movement, resize, velocity, delete, copy/paste, undo and redo.
+- Pointer and desktop-keyboard creation, modifier-marquee multi-selection, group movement/resize/delete, exact-span duplicate-right, copy/paste, undo and redo.
 - Explicit audition Track, compact New/Duplicate/Rename/Delete Pattern actions and one-click Add to Playlist.
 
 ### Sound
@@ -132,10 +137,11 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 
 ### Arrangement
 
-- Dedicated Playlist with up to eight Track lanes and the existing bounded song length.
+- Persistent desktop Playlist with up to eight Track lanes and the existing bounded song length; Mixer alone replaces it as an exclusive primary.
 - Linked, fixed-duration Pattern clips.
 - Add at the first valid snapped position at or after the session-local Playlist insertion cursor; advance the cursor to the new clip end and fail atomically only when no position fits.
-- Song mode, loop and single-clip select, duplicate, move and delete.
+- Select a Pattern from the Playlist library dropdown and click an empty Track position to place it exactly on the snapped click; occupied positions reject without scanning forward.
+- Song mode and loop, plus desktop marquee multi-selection, group move and duplicate-right Playlist editing.
 
 ### Persistence and output
 
@@ -146,13 +152,13 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 
 ## Experience requirements
 
-- Switching primary surfaces does not stop audio or lose Pattern selection/viewport.
+- Opening, moving or closing a desktop modeless window does not stop audio or lose Pattern selection/viewport; activating exclusive Mixer preserves restorable composition context.
 - Opening or closing a device does not change musical data or audio ownership.
 - Hidden surfaces are unmounted or otherwise absent from layout, tab order and the accessibility tree.
 - Focus returns to a connected, visible and enabled origin; destructive lifecycle changes use documented fallbacks.
 - Empty states teach the next useful action without adding a second dashboard.
 - At 200% zoom, required controls remain reachable without two-dimensional page scrolling.
-- Narrow screens support surface switching, transport, viewing Piano Roll/Playlist, single-note create/select/delete via explicit controls, device parameter editing, save/reload and safe Back/focus behaviour.
+- Narrow screens expose exactly one fullscreen Playlist (including its inline Pattern-library `<details>`), Piano Roll, Mixer or device surface at a time and support switching, transport, single-note create/select/delete via explicit controls, device parameter editing, save/reload and safe Back/focus behaviour.
 - Full touch composition, multi-note gestures and mobile clip rearrangement are post-V2.
 
 ## Success measures
@@ -161,34 +167,34 @@ The core compose-to-song journey must not depend on precise pointer gestures, ca
 
 - A first-time user can create two Patterns, add both to Playlist in sequence and hear Song playback without opening help.
 - A user can open Klinto Chip, change a parameter, close it and return to the unchanged Piano Roll context.
-- At 1366Ã—768, the default composition journey has no page-level vertical scroll and no more than one device above one primary surface.
-- Qualitative review finds the Piano Roll visually dominant, not another strip in a stacked dashboard.
+- At 1366Ã—768, the default composition journey has no page-level vertical scroll and shows Playlist beneath one Piano Roll plus no more than one device window; Mixer is never co-displayed with them.
+- Qualitative review finds the Piano Roll visually dominant above the useful Playlist base, not another strip in a stacked dashboard.
 
 ### Correctness
 
 - Migrated event timing, pitch, duration, velocity, IDs, parameters, routing and mix values match normalized V1 fixtures exactly.
 - Deterministic oscillator renders meet the reference-browser tolerance; noise compares scheduling, envelope, gain, duration and spectral bounds unless deliberately seeded.
 - Save/reload, export and public playback preserve V2 device/effect state.
-- Required E2E journeys fail on uncaught page or console errors.
+- Required release journeys include a manual page and console error check.
 
 ### Quality
 
 - No known keyboard-only or screen-reader blocker in a required V2 journey at Stable.
 - No automatically detectable WCAG 2.2 A/AA violation on required surfaces except a documented false positive with manual evidence.
-- Existing V1 unit/integration/E2E checks remain green or are deliberately replaced by stronger V2 coverage.
+- Existing V1 unit and integration checks remain green or are deliberately replaced by stronger V2 coverage.
 
 ## V1 capabilities retained
 
 - Project create, rename, switch, delete and local autosave
 - JSON download/import and project validation
-- Pattern and Song playback, constant tempo and transport controls
+- Pattern and Song playback, constant tempo and a direct contextual V1 `↻` control that loops the active Pattern's whole-bar performance span or the whole Song; Pattern performance padding does not change its exact content-derived clip span
 - Up to 64 Patterns, eight Tracks and the existing bounded arrangement duration
 - Existing waveform and envelope behaviour
-- Track volume, pan, mute and solo; master volume
+- Track volume, pan, mute and solo; the V1 inline Master slider/readout
 - Undo/redo for musical edits
 - Cloud projects, sharing, publication, remix and public playback
 - WAV export and the existing allocation guard
-- Theme, help and account capabilities without redesign
+- Recognisable V1 visual identity, a working direct dark/light toggle, help and account capabilities without redesign
 
 ## Cross-cutting constraints
 
@@ -209,7 +215,7 @@ V2 Stable requires all PRD 32 gates, removal of superseded V1 composition UI, do
 
 - Native or third-party plug-in hosting; plug-in SDK or marketplace
 - Additional instruments/effects and factory/user presets
-- A Rack, separate Keyboard window or freeform desktop/window manager
+- A Rack, separate Keyboard window, unbounded freeform desktop/window manager, user-resizable windows or saved window geometry
 - Automation, modulation routing, buses, sends, sidechains or groups
 - Audio recording/clips, sample import, MIDI import/export or external MIDI devices
 - Tempo maps, time-signature changes, swing, triplets or off-grid editing
@@ -219,7 +225,7 @@ V2 Stable requires all PRD 32 gates, removal of superseded V1 composition UI, do
 
 ## Principal risks and controls
 
-- **Scope recreates clutter:** enforce the chrome budget, one-primary/one-device rule and visual gate before implementation acceptance.
+- **Scope recreates clutter:** enforce the chrome budget, persistent-Playlist/one-Piano/one-device desktop bound, exclusive Mixer and visual gate before implementation acceptance.
 - **Timing migration breaks songs:** migrate every time-bearing field atomically, pin fixtures and share one scheduler projection.
 - **Audio paths diverge:** expose first-party processors as shared definitions with live/offline/public adapters.
 - **Rollback hides data:** deploy dual-schema validation and V2-read recovery before enabling V2 writes.
@@ -231,12 +237,14 @@ V2 Stable requires all PRD 32 gates, removal of superseded V1 composition UI, do
 - Patterns are project-level and instrument-independent.
 - A Piano Roll has a transient `auditionTrackId`; it is repaired when Tracks change and is never persisted.
 - Tracks own Instrument, Mixer and Playlist-lane state.
-- Clips are linked and fixed to Pattern duration.
+- Clips are linked and automatically follow the Pattern span derived from its notes.
 - Pattern/Song playback mode and the Playlist insertion cursor are session state, not Project data.
 - A Project always contains at least one Pattern and one Track; final-object deletion is unavailable.
 - V2 launch timing is snapped to 1/8, 1/16 or 1/32 at 96 PPQ; off-grid timing and triplets are deferred.
-- Desktop exposes one primary surface and at most one fixed-size modeless device window.
-- Window state is session-local UI state. Reload restores one safe Piano Roll; project data never stores window state.
+- Desktop exposes persistent Playlist beneath one draggable modeless Piano Roll and at most one draggable modeless device; Mixer remains exclusive.
+- Piano Roll and device sizes are fixed. Their bounded drag positions are session-only and never persisted.
+- Reload restores the approved Playlist with its Pattern-library `<details>` expanded and the Piano Roll at its default position.
+- Narrow widths expose one fullscreen surface at a time.
 - Klinto builds its own web instruments and effects; no native or arbitrary plug-in hosting.
 - V2 ships one instrument, two effects and no presets.
 - One final V2 schema shape is activated atomically; any later persisted change receives a new version.

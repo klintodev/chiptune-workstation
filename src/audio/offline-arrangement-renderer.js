@@ -126,7 +126,9 @@ export async function renderArrangementOffline(project, {
       getOutputNode: () => channel,
     });
     voiceEngine.setVolume(track.instrumentVolume);
-    for (const note of track.notes) voiceEngine.trigger(note);
+    for (const note of track.notes) {
+      voiceEngine.trigger({ ...note, duration: note.durationSeconds });
+    }
   }
 
   try {

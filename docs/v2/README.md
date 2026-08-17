@@ -31,12 +31,13 @@ The direction borrows FL Studio's object separation and workflow, not its densit
 | [PRD 30](./30-mixer-routing-and-effects.md) | Mixer, bounded routing, Klinto Filter and Klinto Delay | PRDs 27â€“29 |
 | [PRD 32](./32-v2-compatibility-and-release.md) | Schema activation, migration, hosted compatibility and release gates | PRDs 26â€“31 |
 | [V2 schema contract](./v2-project-schema-contract.md) | Normative Project/document shape, defaults, bounds and V1 field map | Finalized PRDs 28â€“30; required before PRD 32 activation |
+| [Release and rollback runbook](./release-and-rollback-runbook.md) | Exact PRD 32 artifacts, cutover order, recovery evidence and emergency rollback | PRD 32 compatibility implementation |
 
 The numbering follows the existing product-document sequence. Delivery order is intentionally not numerical: Playlist is part of the core compose-to-song journey and does not wait for effects.
 
 ## Delivery order
 
-1. Finish the V1 stabilization and E2E baseline already in progress.
+1. Finish the V1 stabilization and deterministic test baseline already in progress.
 2. Build PRD 27's generic primary-surface and single-device hosts behind a V2 flag, with approved 1366Ã—768 and 390Ã—844 wireframes.
 3. Build PRD 28's complete in-memory musical-time foundation and Piano Roll: pattern events, clip starts, loop bounds and shared scheduling all use ticks together.
 4. Build Klinto Chip and its first-party instrument runtime under PRD 29.
@@ -52,7 +53,7 @@ No intermediate persisted V2 shape may escape into a normal user repository. If 
 V2 is complete only when a user can:
 
 1. Open or create a project into a clean Piano Roll-first workspace.
-2. Create and edit polyphonic, variable-duration notes with desktop pointer and keyboard access.
+2. Create and edit variable-duration Pattern notes with desktop pointer and keyboard access, including chords formed by overlapping notes at different pitches.
 3. Audition the Pattern through an explicit track and Klinto Chip.
 4. Add that Pattern at the first valid snapped position at or after the Playlist insertion cursor, arrange linked clips and play Song mode.
 5. Mix tracks and master, insert Filter or Delay, and hear the same graph in live playback, WAV export and public playback.

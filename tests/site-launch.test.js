@@ -50,13 +50,15 @@ test("light-theme accent and muted text colours meet normal-text contrast", asyn
   assert.ok(contrast(token("muted"), token("panel")) >= 4.5);
 });
 
-test("the light theme removes scanlines and the project library exposes recovery downloads", async () => {
+test("the light theme removes scanlines and the project library keeps recovery separate from project actions", async () => {
   const [baseCss, html] = await Promise.all([
     readFile(new URL("src/styles/base.css", root), "utf8"),
     readFile(new URL("index.html", root), "utf8"),
   ]);
   assert.match(baseCss, /:root\[data-theme="light"\]\s+body::before\s*{\s*display:\s*none;/);
-  assert.match(html, /id="project-export"/);
+  assert.doesNotMatch(html, /id="project-import"/);
+  assert.doesNotMatch(html, /id="project-export"/);
+  assert.match(html, /class="project-dialog-actions"[\s\S]*id="project-new"[\s\S]*id="project-duplicate"/);
   assert.match(html, /id="project-storage-recovery"[\s\S]*id="project-recovery-download"/);
   assert.match(html, /class="global-transport"[\s\S]*id="playback-mode"[\s\S]*class="global-status"/);
 });
