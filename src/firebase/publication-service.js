@@ -34,7 +34,7 @@ export function createPublicationService({
 
   async function publish(creatorName) {
     const account = requireAccount();
-    const document = await persistence.saveNow();
+    const document = await persistence.saveNow({ commitUpgrade: true });
     const existing = await linkRepository.get(account.uid, document.id);
     const publicationId = existing?.publicationId ?? createId().replace(/^project-/, "publication-");
     const timestamp = now();

@@ -9,6 +9,11 @@ import {
   V2_PIANO_PREVIEW_SECONDS,
 } from "../src/v2/audio/keyboard-audition.js";
 import { VOICE_RETIRE_RAMP_SECONDS } from "../src/v2/audio/klinto-chip-synth.js";
+import { createDefaultInstrumentInstance } from "../src/v2/domain/index.js";
+
+function assertClose(actual, expected) {
+  assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} is not close to ${expected}`);
+}
 
 function keyEvent(type, code, values = {}) {
   const event = new Event(type, { cancelable: true });
@@ -552,7 +557,7 @@ test("V2 Piano previews use the explicit Track's complete finite audition event"
   assert.equal(preview.velocity, 0.35);
   assert.equal(preview.durationSeconds, V2_PIANO_PREVIEW_SECONDS);
   assert.equal(preview.startTime, 6);
-  assert.equal(preview.releaseEndTime, 6 + V2_PIANO_PREVIEW_SECONDS + 0.3 + 0.01);
+  assertClose(preview.releaseEndTime, 6 + V2_PIANO_PREVIEW_SECONDS + 0.3 + 0.01);
   assert.match(preview.ownership.occurrenceId, /^piano-preview:/);
   assert.deepEqual(preview.ownership, {
     clipId: null,
@@ -779,16 +784,16 @@ test("V2 Piano preview Track removal retires a release tail before graph synchro
   assert.equal(audition.reconcileProject(project), true);
   assert.deepEqual(previewRuntime.operations, [{ kind: "retire", time: 4.2 }]);
   assert.equal(audition.getActiveVoiceCount(), 0);
-  assert.deepEqual(inputEvents, [
-    {
-      releaseEndTime: 4 + V2_PIANO_PREVIEW_SECONDS + 1 + 0.01,
-      trackId: "track-preview",
-    },
-    {
-      releaseEndTime: 4.2 + VOICE_RETIRE_RAMP_SECONDS,
-      trackId: "track-preview",
-    },
-  ]);
+  assert.equal(inputEvents.length, 2);
+  assertClose(
+    inputEvents[0].releaseEndTime,
+    4 + V2_PIANO_PREVIEW_SECONDS + 1 + 0.01,
+  );
+  assert.equal(inputEvents[0].trackId, "track-preview");
+  assert.deepEqual(inputEvents[1], {
+    releaseEndTime: 4.2 + VOICE_RETIRE_RAMP_SECONDS,
+    trackId: "track-preview",
+  });
   assert.deepEqual(inputLifecycles, [
     { inputId, phase: "start", trackId: "track-preview" },
     { inputId, phase: "end", trackId: "track-preview" },
@@ -799,4 +804,93 @@ test("V2 Piano preview Track removal retires a release tail before graph synchro
   assert.equal(previewRuntime.finishNaturally(), false, "a retired preview cannot emit a later stale end");
   assert.equal(inputLifecycles.length, 2);
   audition.dispose();
+});
+
+test("Drums audition owns mapped one-shots but leaves unmapped keys and previews unowned", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  const renderEvents = [];
+  const inputLifecycles = [];
+  let finishVoice;
+  const project = {
+    id: "project-drums-audition",
+    tracks: [{
+      id: "track-drums",
+      instrument: structuredClone(createDefaultInstrumentInstance(
+        "instrument-drums",
+        "klinto-drums",
+      )),
+    }],
+  };
+  const audition = createV2KeyboardAudition({
+    audioEngine: { getCurrentTime: () => 3, isReady: () => true },
+    documentLike,
+    getProject: () => project,
+    getSynthRuntime: () => ({
+      trigger(event) {
+        renderEvents.push(event);
+        const listeners = new Set();
+        let ended = false;
+        finishVoice = () => {
+          if (ended) return false;
+          ended = true;
+          for (const listener of listeners) listener();
+          return true;
+        };
+        return {
+          addEndedListener(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+          get ended() { return ended; },
+          retire: finishVoice,
+          stop: finishVoice,
+        };
+      },
+    }),
+    getTrackId: () => "track-drums",
+    keyupTarget: documentLike,
+    onTrackInput(trackId, event, lifecycle) {
+      inputLifecycles.push({ ...event, ...lifecycle, trackId });
+    },
+  });
+
+  const unmappedDown = keyEvent("keydown", "KeyQ");
+  documentLike.dispatchEvent(unmappedDown);
+  assert.equal(unmappedDown.defaultPrevented, true, "the musical key remains browser-safe");
+  assert.equal(renderEvents.length, 0);
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  const unmappedUp = keyEvent("keyup", "KeyQ");
+  documentLike.dispatchEvent(unmappedUp);
+  assert.equal(unmappedUp.defaultPrevented, false, "an unmapped key owns no keyup");
+  assert.deepEqual(inputLifecycles, []);
+  assert.equal(audition.previewNote({ pitch: 72, trackId: "track-drums" }), false);
+
+  const mappedDown = keyEvent("keydown", "KeyZ");
+  documentLike.dispatchEvent(mappedDown);
+  assert.equal(renderEvents.length, 1);
+  assert.equal(renderEvents[0].pitch, 60);
+  assert.equal(renderEvents[0].instrumentType, "klinto-drums");
+  assert.equal(renderEvents[0].instrumentVersion, 1);
+  assert.equal(renderEvents[0].drumPiece, "kick");
+  assert.equal(renderEvents[0].oneShot, true);
+  assert.equal(renderEvents[0].durationSeconds, 0.45);
+  assert.equal(audition.getActiveVoiceCount(), 1);
+  assert.deepEqual(inputLifecycles, [{
+    inputId: "keyboard-audition:1",
+    phase: "start",
+    releaseEndTime: 3.465,
+    trackId: "track-drums",
+  }]);
+
+  const mappedUp = keyEvent("keyup", "KeyZ");
+  documentLike.dispatchEvent(mappedUp);
+  assert.equal(mappedUp.defaultPrevented, true);
+  assert.equal(audition.getActiveVoiceCount(), 1, "keyup does not truncate a drum one-shot");
+  finishVoice();
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  assert.deepEqual(inputLifecycles.at(-1), {
+    inputId: "keyboard-audition:1",
+    phase: "end",
+    releaseEndTime: 3.465,
+    trackId: "track-drums",
+  });
+  assert.equal(audition.dispose(), true);
 });

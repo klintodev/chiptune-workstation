@@ -10,6 +10,10 @@ import {
 } from "../src/firebase/publication.js";
 import { createMemoryPublicationLinkRepository } from "../src/firebase/publication-link-repository.js";
 import { createPublicationService } from "../src/firebase/publication-service.js";
+import { createDefaultV2Project } from "../src/v2/domain/schema.js";
+import { createV2ProjectState } from "../src/v2/domain/project-state.js";
+import { createV2ProjectPersistence } from "../src/v2/persistence/project-persistence.js";
+import { createV2MemoryProjectRepository } from "../src/v2/persistence/project-repository.js";
 
 function createDocument({ palette = "arcade" } = {}) {
   const project = createProjectState();
@@ -90,6 +94,7 @@ test("republishing preserves one stable URL and advances snapshot revision", asy
     getState() { return { account: { uid: "user-1", emailVerified: true } }; },
   };
   const document = createDocument();
+  const saveOptions = [];
   const service = createPublicationService({
     accountService,
     createId: () => "project-public",
@@ -100,7 +105,10 @@ test("republishing preserves one stable URL and advances snapshot revision", asy
     })(),
     persistence: {
       getActiveDocument: () => document,
-      saveNow: async () => document,
+      saveNow: async (options) => {
+        saveOptions.push(options);
+        return document;
+      },
     },
     shareBaseUrl: "https://studio.example/app/",
   });
@@ -111,9 +119,83 @@ test("republishing preserves one stable URL and advances snapshot revision", asy
   assert.equal(second.url, "https://studio.example/app/player.html?id=publication-public");
   assert.equal(second.publicationRevision, 2);
   assert.equal(second.publishedAt, first.publishedAt);
+  assert.deepEqual(saveOptions, [
+    { commitUpgrade: true },
+    { commitUpgrade: true },
+  ]);
   assert.equal(await service.unpublish(), true);
   assert.deepEqual(deleted, { uid: "user-1", id: "publication-public" });
   assert.equal(await service.getCurrentPublication(), null);
+});
+
+test("publishing a clean migrated V7 project commits and discloses its V8 upgrade once", async () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.schemaVersion = 7;
+  project.metadata.title = "Publish migrated tune";
+  const source = createProjectDocument(project, {
+    id: "project-v7-publish",
+    now: "2026-07-20T12:00:00.000Z",
+  });
+  const repository = createV2MemoryProjectRepository([source]);
+  const activated = await repository.get(source.id);
+  const projectState = createV2ProjectState(activated.project);
+  const upgrades = [];
+  const persistence = createV2ProjectPersistence({
+    clearTimer() {},
+    initialDocument: activated,
+    initialSourceSchemaVersion: 7,
+    now: () => "2026-07-20T12:01:00.000Z",
+    onProjectUpgrade: (detail) => upgrades.push(detail),
+    projectState,
+    repository,
+    setTimer: () => 1,
+  });
+  let remote = null;
+  const accountService = {
+    async getClient() {
+      return {
+        async savePublication(values) {
+          remote = createPublicationRecord({
+            ...values,
+            ownerSlot: "01",
+            publicationRevision: (remote?.publicationRevision ?? 0) + 1,
+            publishedAt: remote?.publishedAt ?? values.publishedAt,
+          });
+          return remote;
+        },
+      };
+    },
+    getState: () => ({ account: { uid: "user-v7", emailVerified: true } }),
+  };
+  const service = createPublicationService({
+    accountService,
+    createId: () => "project-v7-publication",
+    linkRepository: createMemoryPublicationLinkRepository(),
+    now: () => "2026-07-20T12:02:00.000Z",
+    persistence,
+  });
+
+  await persistence.saveNow();
+  assert.equal((await repository.getRaw(source.id)).project.schemaVersion, 7);
+  assert.equal(persistence.getPendingUpgradeSourceSchemaVersion(), 7);
+
+  await service.publish("Chip Artist");
+  const committedRaw = await repository.getRaw(source.id);
+  assert.equal(committedRaw.project.schemaVersion, 8);
+  assert.equal(committedRaw.revision, source.revision + 1);
+  assert.equal(remote.document.project.schemaVersion, 8);
+  assert.equal(remote.document.revision, source.revision + 1);
+  assert.deepEqual(upgrades, [{
+    fromSchemaVersion: 7,
+    projectId: source.id,
+  }]);
+  assert.equal(persistence.getPendingUpgradeSourceSchemaVersion(), null);
+
+  const afterFirstPublish = structuredClone(committedRaw);
+  await service.publish("Chip Artist");
+  assert.deepEqual(await repository.getRaw(source.id), afterFirstPublish);
+  assert.equal(upgrades.length, 1);
+  await persistence.dispose();
 });
 
 test("publishing rejects an unverified account before requesting Firebase", async () => {

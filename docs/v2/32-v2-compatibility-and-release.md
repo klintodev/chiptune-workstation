@@ -4,6 +4,8 @@ Status: Draft
 Release: Klinto Studio V2 Beta â†’ V2 Stable  
 Depends on: PRDs 26â€“31
 
+> Post-launch compatibility extension: schema 8 preserves V7 and adds the `klinto-drums` Instrument contract. Native V7 validates against its frozen Chip-only meaning before a pure V7→V8 migration. See [PRD 33](./33-klinto-drums.md) and the schema-8 amendment in the [schema contract](./v2-project-schema-contract.md).
+
 ## Description
 
 Activate V2 without losing V1 projects, splitting audio behaviour across runtimes or creating a rollback that hides user data. This PRD owns the final schema gate, trust boundaries, local/hosted cutover, recovery, release tests and exit criteria.

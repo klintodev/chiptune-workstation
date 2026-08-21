@@ -26,6 +26,7 @@ export function isGlobalTransportShortcut(event) {
   if (event.code !== "Space" && event.key !== " " && event.key !== "Spacebar") return false;
 
   const target = event.target;
+  if (target?.closest?.('[data-transport-space="native"]')) return false;
   if (target?.isContentEditable || target?.closest?.("textarea, [contenteditable]")) return false;
   const input = target?.closest?.("input");
   if (!input) return true;

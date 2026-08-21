@@ -4,11 +4,13 @@ import test from "node:test";
 import {
   KLINTO_CHIP_DEFINITION,
   KLINTO_DELAY_DEFINITION,
+  KLINTO_DRUMS_DEFINITION,
   KLINTO_FILTER_DEFINITION,
 } from "../src/v2/audio/device-registry.js";
 
 const DEFINITIONS = Object.freeze([
   KLINTO_CHIP_DEFINITION,
+  KLINTO_DRUMS_DEFINITION,
   KLINTO_FILTER_DEFINITION,
   KLINTO_DELAY_DEFINITION,
 ]);
@@ -61,4 +63,15 @@ test("definition-owned UI factories and runtime/UI disposal are explicit and ide
   assert.equal(KLINTO_DELAY_DEFINITION.disposeRuntime(runtime), true);
   assert.equal(KLINTO_DELAY_DEFINITION.disposeRuntime(runtime), false);
   assert.throws(() => KLINTO_FILTER_DEFINITION.disposeRuntime({}), /runtime.*disposal/);
+});
+
+test("each first-party Instrument definition has one shared synth lifecycle for every surface", () => {
+  for (const definition of [KLINTO_CHIP_DEFINITION, KLINTO_DRUMS_DEFINITION]) {
+    assert.equal(typeof definition.adaptVoice, "function");
+    assert.equal(typeof definition.getTailSeconds, "function");
+    assert.equal(definition.synthAdapters.live, definition.createSynthRuntime);
+    assert.equal(definition.synthAdapters.offline, definition.createSynthRuntime);
+    assert.equal(definition.synthAdapters.public, definition.createSynthRuntime);
+    assert.equal(Object.isFrozen(definition.synthAdapters), true);
+  }
 });

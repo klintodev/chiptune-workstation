@@ -210,7 +210,7 @@ function normalizeMasterMixer(candidate, usedInstanceIds) {
 }
 
 export function canonicalizeV2Project(candidate) {
-  assertExactKeys(candidate, ["schemaVersion", "metadata", "transport", "patterns", "tracks", "mixer"], "V7 Project");
+  assertExactKeys(candidate, ["schemaVersion", "metadata", "transport", "patterns", "tracks", "mixer"], "V8 Project");
   if (candidate.schemaVersion !== PROJECT_SCHEMA_VERSION) {
     throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
   }

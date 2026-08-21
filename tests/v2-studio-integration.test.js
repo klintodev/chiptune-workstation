@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { createV2ProjectState } from "../src/v2/domain/index.js";
+import {
+  KLINTO_DRUMS_CONTRACT,
+  createV2ProjectState,
+} from "../src/v2/domain/index.js";
 import { createWorkspaceState } from "../src/v2/state/workspace-state.js";
 
 import {
+  createPianoRollSurface,
   getBoundedPianoMove,
   getExpandedPianoEditorEndTick,
   getPianoDuplicateDeltaTicks,
@@ -30,6 +34,7 @@ import {
   resolvePlaylistFocusTarget,
   routePlaylistContextMenu,
 } from "../src/v2/ui/playlist.js";
+import { createMixerSurface } from "../src/v2/ui/mixer.js";
 import {
   createStudioShell,
   getGlobalHistoryAction,
@@ -51,6 +56,10 @@ class FakeClassList {
   remove(value) {
     this.values.delete(value);
   }
+
+  contains(value) {
+    return this.values.has(value);
+  }
 }
 
 class FakeNode extends EventTarget {
@@ -65,16 +74,25 @@ class FakeNode extends EventTarget {
     this.hidden = false;
     this.id = "";
     this.isConnected = true;
+    this.max = "";
+    this.min = "";
     this.nodeType = nodeType;
+    this.open = false;
     this.ownerDocument = ownerDocument;
     this.parentNode = null;
+    this.step = "";
     this.style = {
       removeProperty(name) {
         delete this[name];
       },
+      setProperty(name, value) {
+        this[name] = String(value);
+      },
     };
     this.tagName = tagName.toUpperCase();
     this.textContent = "";
+    this.title = "";
+    this.type = "";
     this.value = "";
   }
 
@@ -87,6 +105,36 @@ class FakeNode extends EventTarget {
 
   click() {
     if (!this.disabled) this.dispatchEvent(new Event("click"));
+  }
+
+  contains(candidate) {
+    for (let current = candidate; current; current = current.parentNode) {
+      if (current === this) return true;
+    }
+    return false;
+  }
+
+  closest(selector) {
+    const selectors = selector.split(",").map((candidate) => candidate.trim());
+    const matches = (node, candidate) => {
+      const tagName = candidate.match(/^[a-z][a-z0-9-]*/i)?.[0]?.toUpperCase() ?? null;
+      const classNames = [...candidate.matchAll(/\.([a-z0-9_-]+)/gi)]
+        .map(([, className]) => className);
+      const dataAttributes = [...candidate.matchAll(/\[data-([a-z0-9-]+)(?:="([^"]*)")?\]/gi)]
+        .map(([, name, value]) => ({
+          name: name.replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase()),
+          value,
+        }));
+      return (!tagName || node.tagName === tagName)
+        && classNames.every((className) => String(node.className).split(/\s+/).includes(className))
+        && dataAttributes.every(({ name, value }) => (
+          value === undefined ? Object.hasOwn(node.dataset ?? {}, name) : node.dataset?.[name] === value
+        ));
+    };
+    for (let current = this; current; current = current.parentNode) {
+      if (selectors.some((candidate) => matches(current, candidate))) return current;
+    }
+    return null;
   }
 
   focus() {
@@ -175,6 +223,12 @@ class FakeNode extends EventTarget {
   }
 
   replaceChildren(...children) {
+    for (const child of this.children) {
+      if (child && typeof child === "object") {
+        child.isConnected = false;
+        child.parentNode = null;
+      }
+    }
     this.children = [];
     this.append(...children);
   }
@@ -599,6 +653,7 @@ test("global transport shortcut owns plain Space outside text entry", () => {
   assert.equal(isGlobalTransportShortcut({ ...base, target: target("input", { closestMatch: { type: "number" } }) }), true);
   assert.equal(isGlobalTransportShortcut({ ...base, target: target("input", { closestMatch: { type: "text" } }) }), false);
   assert.equal(isGlobalTransportShortcut({ ...base, target: target("textarea") }), false);
+  assert.equal(isGlobalTransportShortcut({ ...base, target: target("data-transport-space") }), false);
   assert.equal(isGlobalTransportShortcut({ ...base, target: { isContentEditable: true } }), false);
   assert.equal(isGlobalTransportShortcut({ ...base, ctrlKey: true }), false);
   assert.equal(isGlobalTransportShortcut({ ...base, defaultPrevented: true }), false);
@@ -844,9 +899,221 @@ test("Playlist Track names are always-visible inputs with commit and restore sem
   surface.dispose();
 });
 
+test("Playlist adds the selected registered Instrument and retains chooser state and focus", () => {
+  const projectState = createV2ProjectState();
+  const workspaceState = createWorkspaceState(projectState);
+  workspaceState.activatePlaylist();
+  const announcements = [];
+  const surface = createPlaylistSurface({
+    announce: (message) => announcements.push(message),
+    projectState,
+    workspaceState,
+  });
+  const findChooser = () => surface.node.find(({ dataset }) => (
+    dataset.playlistAddInstrument === "type"
+  ));
+  const findAdd = () => surface.node.find(({ dataset }) => (
+    dataset.playlistAddInstrument === "add"
+  ));
+  const findInstrument = (trackId) => surface.node.find(({ dataset }) => (
+    dataset.trackId === trackId && dataset.playlistTrackAction === "instrument"
+  ));
+
+  let chooser = findChooser();
+  assert.equal(chooser.value, "klinto-chip");
+  assert.equal(chooser.dataset.transportSpace, "native");
+  assert.equal(findAdd().dataset.transportSpace, "native");
+  assert.deepEqual(
+    chooser.querySelectorAll("option").map(({ textContent, value }) => ({ textContent, value })),
+    [
+      { textContent: "Klinto Chip", value: "klinto-chip" },
+      { textContent: "Klinto Drums", value: "klinto-drums" },
+    ],
+  );
+  assert.equal(findInstrument("track-1").find(({ tagName }) => tagName === "SMALL").textContent, "Klinto Chip");
+
+  chooser.value = KLINTO_DRUMS_CONTRACT.type;
+  chooser.dispatchEvent(new Event("change"));
+  chooser.focus();
+  surface.render();
+  chooser = findChooser();
+  assert.equal(chooser.value, KLINTO_DRUMS_CONTRACT.type);
+  assert.equal(globalThis.document.activeElement, chooser);
+  assert.equal(findAdd().getAttribute("aria-label"), "Add Klinto Drums to Playlist");
+
+  findAdd().click();
+  const drumsTrack = projectState.getState().tracks.at(-1);
+  assert.equal(drumsTrack.instrument.type, KLINTO_DRUMS_CONTRACT.type);
+  assert.deepEqual(drumsTrack.instrument.params, KLINTO_DRUMS_CONTRACT.defaults);
+  assert.equal(workspaceState.getState().playlist.destinationTrackId, drumsTrack.id);
+  assert.equal(announcements.at(-1), `Klinto Drums added as ${drumsTrack.name}.`);
+  assert.equal(globalThis.document.activeElement.dataset.trackId, drumsTrack.id);
+  assert.equal(globalThis.document.activeElement.dataset.playlistTrackAction, "instrument");
+  assert.equal(
+    findInstrument(drumsTrack.id).find(({ tagName }) => tagName === "SMALL").textContent,
+    "Klinto Drums",
+  );
+  assert.equal(
+    findInstrument(drumsTrack.id).getAttribute("aria-label"),
+    `Open ${drumsTrack.name}, Klinto Drums Instrument`,
+  );
+
+  while (projectState.getState().tracks.length < 8) projectState.addTrack();
+  assert.equal(findChooser().value, KLINTO_DRUMS_CONTRACT.type);
+  assert.equal(findChooser().disabled, true);
+  assert.equal(findAdd().disabled, true);
+  surface.dispose();
+});
+
+test("Mixer adds the selected registered Instrument and selects its channel", () => {
+  const projectState = createV2ProjectState();
+  const workspaceState = createWorkspaceState(projectState);
+  workspaceState.activateMixer();
+  const announcements = [];
+  const surface = createMixerSurface({
+    announce: (message) => announcements.push(message),
+    cancelAnimationFrameFn: () => {},
+    projectState,
+    requestAnimationFrameFn: () => null,
+    workspaceState,
+  });
+  const findChooser = () => surface.node.find(({ dataset }) => (
+    dataset.mixerControl === "add-track-type"
+  ));
+  const findAdd = () => surface.node.find(({ dataset }) => dataset.mixerControl === "add-track");
+  const findInstrument = (trackId) => surface.node.find(({ dataset }) => (
+    dataset.channelId === trackId && dataset.mixerControl === "instrument"
+  ));
+
+  let chooser = findChooser();
+  assert.equal(chooser.value, "klinto-chip");
+  assert.equal(chooser.dataset.transportSpace, "native");
+  assert.equal(findAdd().dataset.transportSpace, "native");
+  assert.deepEqual(
+    chooser.querySelectorAll("option").map(({ textContent, value }) => ({ textContent, value })),
+    [
+      { textContent: "Klinto Chip", value: "klinto-chip" },
+      { textContent: "Klinto Drums", value: "klinto-drums" },
+    ],
+  );
+  assert.equal(findInstrument("track-1").textContent, "Klinto Chip");
+
+  chooser.value = KLINTO_DRUMS_CONTRACT.type;
+  chooser.dispatchEvent(new Event("change"));
+  chooser.focus();
+  projectState.renameTrack("track-1", "Lead");
+  chooser = findChooser();
+  assert.equal(chooser.value, KLINTO_DRUMS_CONTRACT.type);
+  assert.equal(globalThis.document.activeElement, chooser);
+  assert.equal(findAdd().getAttribute("aria-label"), "Add Klinto Drums to Mixer");
+
+  findAdd().click();
+  const drumsTrack = projectState.getState().tracks.at(-1);
+  assert.equal(drumsTrack.instrument.type, KLINTO_DRUMS_CONTRACT.type);
+  assert.deepEqual(drumsTrack.instrument.params, KLINTO_DRUMS_CONTRACT.defaults);
+  assert.equal(workspaceState.getState().mixer.channelId, drumsTrack.id);
+  assert.equal(announcements.at(-1), `Klinto Drums added as ${drumsTrack.name}.`);
+  assert.equal(globalThis.document.activeElement.dataset.channelId, drumsTrack.id);
+  assert.equal(globalThis.document.activeElement.dataset.mixerControl, "heading");
+  assert.equal(findInstrument(drumsTrack.id).textContent, "Klinto Drums");
+  assert.equal(
+    findInstrument(drumsTrack.id).getAttribute("aria-label"),
+    `Open ${drumsTrack.name}, Klinto Drums Instrument`,
+  );
+
+  while (projectState.getState().tracks.length < 8) projectState.addTrack();
+  assert.equal(findChooser().value, KLINTO_DRUMS_CONTRACT.type);
+  assert.equal(findChooser().disabled, true);
+  assert.equal(findAdd().disabled, true);
+  surface.dispose();
+});
+
+test("Piano Roll presents the selected drum map without changing Pattern history", () => {
+  const expectedPitchLabels = [
+    [60, "C4", "Kick"],
+    [61, "C♯4", "Short Kick"],
+    [62, "D4", "Snare"],
+    [63, "D♯4", "Tight Snare"],
+    [64, "E4", "Closed Hat"],
+    [65, "F4", "Pedal Hat"],
+    [66, "F♯4", "Open Hat"],
+    [67, "G4", "Low Tom"],
+    [68, "G♯4", "Low-mid Tom"],
+    [69, "A4", "Mid Tom"],
+    [70, "A♯4", "High-mid Tom"],
+    [71, "B4", "High Tom"],
+  ];
+  const projectState = createV2ProjectState();
+  const drumsTrackId = projectState.addTrack("Drums", KLINTO_DRUMS_CONTRACT.type);
+  const noteId = projectState.addNote("pattern-1", {
+    durationTicks: 24,
+    pitch: 60,
+    startTick: 0,
+    velocity: 0.75,
+  });
+  const workspaceState = createWorkspaceState(projectState, { auditionTrackId: drumsTrackId });
+  const announcements = [];
+  const surface = createPianoRollSurface({
+    announce: (message) => announcements.push(message),
+    projectState,
+    workspaceState,
+  });
+  const findPitchLabel = (pitch) => surface.node.find(({ className, dataset }) => (
+    Number(dataset.pitch) === pitch
+      && String(className).split(/\s+/).includes("v2-pitch-label")
+  ));
+  const findNote = () => surface.node.find(({ dataset }) => dataset.noteId === noteId);
+  const findCursor = () => surface.node.find(({ className }) => (
+    String(className).split(/\s+/).includes("v2-piano-cursor")
+  ));
+  const auditionSelect = surface.node.find((node) => (
+    node.tagName === "SELECT"
+      && node.getAttribute("aria-label") === "Audition and destination Track"
+  ));
+
+  assert.deepEqual(
+    expectedPitchLabels.map(([pitch]) => findPitchLabel(pitch).textContent),
+    expectedPitchLabels.map(([, note, drum]) => `${note} · ${drum}`),
+  );
+  for (const [pitch] of expectedPitchLabels) {
+    assert.match(findPitchLabel(pitch).className, /\bhas-drum-name\b/);
+  }
+  assert.equal(findPitchLabel(72).textContent, "C5");
+  assert.doesNotMatch(findPitchLabel(72).className, /\bhas-drum-name\b/);
+  assert.match(findNote().getAttribute("aria-label"), /^C4, Kick, bar 1, beat 1,/);
+  assert.equal(findCursor().getAttribute("aria-label"), "bar 1, beat 1, C4, Kick");
+
+  const projectBeforeSwitch = structuredClone(projectState.getState());
+  const historyBeforeSwitch = structuredClone(projectState.getHistoryState());
+  auditionSelect.value = "track-1";
+  auditionSelect.dispatchEvent(new Event("change"));
+  assert.equal(findPitchLabel(60).textContent, "C4");
+  assert.doesNotMatch(findPitchLabel(60).className, /\bhas-drum-name\b/);
+  assert.match(findNote().getAttribute("aria-label"), /^C4, bar 1, beat 1,/);
+  assert.equal(findCursor().getAttribute("aria-label"), "bar 1, beat 1, C4");
+  assert.equal(
+    announcements.at(-1),
+    "Pattern 1 will audition through Pulse 1 using Klinto Chip.",
+  );
+
+  auditionSelect.value = drumsTrackId;
+  auditionSelect.dispatchEvent(new Event("change"));
+  assert.equal(findPitchLabel(60).textContent, "C4 · Kick");
+  assert.match(findNote().getAttribute("aria-label"), /^C4, Kick, bar 1, beat 1,/);
+  assert.equal(findCursor().getAttribute("aria-label"), "bar 1, beat 1, C4, Kick");
+  assert.equal(
+    announcements.at(-1),
+    "Pattern 1 will audition through Drums using Klinto Drums.",
+  );
+  assert.deepEqual(projectState.getState(), projectBeforeSwitch);
+  assert.deepEqual(projectState.getHistoryState(), historyBeforeSwitch);
+  surface.dispose();
+});
+
 test("Playlist Track action rail wires labelled, ordered, focus-stable Mixer switches", async () => {
   const playlist = await readFile(new URL("../src/v2/ui/playlist.js", import.meta.url), "utf8");
 
+  assert.match(playlist, /add\.addEventListener\("keydown", \(event\) => event\.stopPropagation\(\)\)/);
   assert.match(playlist, /const TRACK_ACTION_ORDER = Object\.freeze\(\[\s*"select",\s*"instrument",\s*"mute",\s*"solo",\s*"move-up",\s*"move-down",\s*"remove",?\s*\]\)/);
   assert.match(playlist, /"aria-label": `Mute \$\{track\.name\} Instrument`,\s*"aria-pressed": String\(track\.mixer\.muted\),\s*dataset: \{ playlistTrackAction: "mute", trackId: track\.id \}/);
   assert.match(playlist, /"aria-label": `Solo \$\{track\.name\} Instrument`,\s*"aria-pressed": String\(track\.mixer\.solo\),\s*dataset: \{ playlistTrackAction: "solo", trackId: track\.id \}/);
@@ -1075,6 +1342,128 @@ test("an open Instrument updates owner labels through rename, undo, and redo wit
   } finally {
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;
+  }
+});
+
+test("Klinto Drums exposes contextual controls, its note map, Reset history, and mobile Back", () => {
+  const previousDocument = globalThis.document;
+  const document = createFakeDocument();
+  globalThis.document = document;
+  try {
+    const projectState = createV2ProjectState();
+    const trackId = projectState.addTrack("Drums", KLINTO_DRUMS_CONTRACT.type);
+    const track = projectState.getTrack(trackId);
+    let closeCount = 0;
+    const deviceWindow = createDeviceWindow({
+      device: {
+        instanceId: track.instrument.instanceId,
+        kind: "instrument",
+        trackId,
+      },
+      mobile: true,
+      onClose: () => { closeCount += 1; },
+      projectState,
+    });
+    const title = deviceWindow.node.find(({ tagName }) => tagName === "H2");
+    const reset = deviceWindow.node.find(({ dataset }) => dataset.deviceAction === "reset");
+    const tone = deviceWindow.node.find(({ dataset }) => dataset.deviceParam === "tone");
+    const decay = deviceWindow.node.find(({ dataset }) => dataset.deviceParam === "decaySeconds");
+    const output = deviceWindow.node.find(({ dataset }) => dataset.deviceParam === "level");
+    const valueText = (input) => input.parentNode.find(({ tagName }) => tagName === "OUTPUT").textContent;
+
+    assert.equal(title.textContent, "Drums, Klinto Drums");
+    assert.deepEqual(
+      deviceWindow.node.querySelectorAll("h3").map(({ textContent }) => textContent),
+      ["Character", "Envelope", "Output"],
+    );
+    assert.deepEqual(
+      [tone, decay, output].map(({ type }) => type),
+      ["range", "range", "range"],
+    );
+    assert.deepEqual(
+      [tone.getAttribute("aria-label"), decay.getAttribute("aria-label"), output.getAttribute("aria-label")],
+      [
+        "Drums, Klinto Drums, Tone",
+        "Drums, Klinto Drums, Decay",
+        "Drums, Klinto Drums, Instrument output",
+      ],
+    );
+    assert.deepEqual(
+      [
+        [Number(tone.min), Number(tone.max), Number(tone.step), Number(tone.value), tone.getAttribute("aria-valuetext")],
+        [Number(decay.min), Number(decay.max), Number(decay.step), Number(decay.value), decay.getAttribute("aria-valuetext")],
+        [Number(output.min), Number(output.max), Number(output.step), Number(output.value), output.getAttribute("aria-valuetext")],
+      ],
+      [
+        [0, 1, 0.01, 0.5, "50%"],
+        [0.05, 2, 0.01, 0.45, "450 milliseconds"],
+        [0, 1, 0.01, 0.5, "50%"],
+      ],
+    );
+    assert.deepEqual([valueText(tone), valueText(decay), valueText(output)], [
+      "50%",
+      "450 milliseconds",
+      "50%",
+    ]);
+
+    const noteMap = deviceWindow.node.find(({ tagName }) => tagName === "DETAILS");
+    assert.equal(noteMap.open, false);
+    assert.equal(noteMap.find(({ tagName }) => tagName === "SUMMARY").textContent, "Drum note map");
+    assert.deepEqual(
+      noteMap.querySelectorAll("dt").map(({ textContent }) => textContent),
+      ["C4", "C♯4", "D4", "D♯4", "E4", "F4", "F♯4", "G4", "G♯4", "A4", "A♯4", "B4"],
+    );
+    assert.deepEqual(
+      noteMap.querySelectorAll("dd").map(({ textContent }) => textContent),
+      [
+        "Kick",
+        "Short Kick",
+        "Snare",
+        "Tight Snare",
+        "Closed Hat",
+        "Pedal Hat",
+        "Open Hat",
+        "Low Tom",
+        "Low-mid Tom",
+        "Mid Tom",
+        "High-mid Tom",
+        "High Tom",
+      ],
+    );
+
+    projectState.setInstrumentParam(trackId, "tone", 0.8);
+    projectState.setInstrumentParam(trackId, "decaySeconds", 1.25);
+    projectState.setInstrumentParam(trackId, "level", 0.7);
+    const editedParams = structuredClone(projectState.getTrack(trackId).instrument.params);
+    reset.click();
+    assert.deepEqual(projectState.getTrack(trackId).instrument.params, KLINTO_DRUMS_CONTRACT.defaults);
+    assert.deepEqual([valueText(tone), valueText(decay), valueText(output)], [
+      "50%",
+      "450 milliseconds",
+      "50%",
+    ]);
+    projectState.undo();
+    assert.deepEqual(projectState.getTrack(trackId).instrument.params, editedParams);
+    assert.deepEqual([valueText(tone), valueText(decay), valueText(output)], ["80%", "1.25 seconds", "70%"]);
+
+    const originalTone = tone;
+    projectState.renameTrack(trackId, "Beat Box");
+    assert.equal(deviceWindow.node.find(({ dataset }) => dataset.deviceParam === "tone"), originalTone);
+    assert.equal(title.textContent, "Beat Box, Klinto Drums");
+    assert.equal(tone.getAttribute("aria-label"), "Beat Box, Klinto Drums, Tone");
+    assert.equal(reset.getAttribute("aria-label"), "Reset Beat Box, Klinto Drums");
+
+    const back = deviceWindow.node.find(({ tagName, textContent }) => (
+      tagName === "BUTTON" && textContent === "Back"
+    ));
+    assert.equal(back.disabled, false);
+    back.focus();
+    assert.equal(document.activeElement, back);
+    back.click();
+    assert.equal(closeCount, 1);
+    deviceWindow.dispose();
+  } finally {
+    globalThis.document = previousDocument;
   }
 });
 
@@ -1464,7 +1853,7 @@ test("Piano pointer audition stays isolated from editing gestures and keeps its 
   assert.match(piano, /onAuditionPitch\s*=\s*\(\)\s*=>\s*false/);
   assert.match(
     piano,
-    /className:\s*"v2-pitch-label"[\s\S]*?dataset:\s*\{\s*pitch\s*\}/,
+    /className:\s*`v2-pitch-label\$\{instrumentName \? " has-drum-name" : ""\}`[\s\S]*?dataset:\s*\{\s*pitch\s*\}/,
   );
 
   const audition = sourceBlock(piano, "function auditionPitch", "function updatePatternSession");
@@ -1614,9 +2003,10 @@ test("Piano overlap paths batch paste and preserve pointer/session atomicity", a
 });
 
 test("editor composites, shared playheads, opener routing, and replacement ownership are wired", async () => {
-  const [piano, playlist, shell, studio, scheduler] = await Promise.all([
+  const [piano, playlist, mixer, shell, studio, scheduler] = await Promise.all([
     readFile(new URL("../src/v2/ui/piano-roll.js", import.meta.url), "utf8"),
     readFile(new URL("../src/v2/ui/playlist.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/v2/ui/mixer.js", import.meta.url), "utf8"),
     readFile(new URL("../src/v2/ui/studio-shell.js", import.meta.url), "utf8"),
     readFile(new URL("../src/v2/studio-app.js", import.meta.url), "utf8"),
     readFile(new URL("../src/v2/audio/occurrence-scheduler.js", import.meta.url), "utf8"),
@@ -1636,6 +2026,8 @@ test("editor composites, shared playheads, opener routing, and replacement owner
   assert.match(piano, /"pointercancel"/);
   assert.match(piano, /role: "listbox"/);
   assert.match(piano, /"aria-multiselectable": "true"/);
+  assert.match(piano, /const pitchText = formatEditorPitch\(pitch, \{ visual: true \}\)/);
+  assert.match(piano, /className: `v2-pitch-label\$\{instrumentName \? " has-drum-name" : ""\}`/);
   assert.match(piano, /role: "option",\s+tabIndex: -1/);
   assert.match(piano, /"aria-keyshortcuts": "Delete Backspace Control\+B Meta\+B"/);
   assert.match(piano, /if \(isMod\(event\) && !note\) \{\s+startMarquee\(event\)/);
@@ -1664,11 +2056,18 @@ test("editor composites, shared playheads, opener routing, and replacement owner
   assert.match(playlist, /className: "v2-playlist-track-identity"[\s\S]*\[trackNameInput, trackFocus\]/);
   assert.match(playlist, /onRenamePattern\(pattern\.id, destination\.id\)/);
   assert.doesNotMatch(playlist, /promptInstrumentName|globalThis\.prompt/);
-  assert.match(playlist, /createElement\("span", \{ textContent: track\.name, title: track\.name \}\),\s+createElement\("small", \{ textContent: "Klinto Chip" \}\)/);
+  assert.match(
+    playlist,
+    /const instrumentName = getInstrumentName\(track\.instrument\);\s+const instrument = createElement\("button", \{[\s\S]*?className: "v2-device-launcher v2-playlist-instrument"[\s\S]*?\}, \[\s+createElement\("span", \{ textContent: track\.name, title: track\.name \}\),\s+createElement\("small", \{ textContent: instrumentName \}\),?\s+\]\)/,
+  );
   assert.match(playlist, /createPatternForPlaylistTrack\([\s\S]*onOpenPattern,[\s\S]*trackId/);
   assert.doesNotMatch(playlist, /event\.target\.closest\?\.\("button"\)\) return;\s+event\.preventDefault\(\);/);
   assert.match(playlist, /const ADD_INSTRUMENT_ROW_HEIGHT = 44/);
   assert.match(playlist, /className: "v2-playlist-add-instrument-row"/);
+  assert.match(playlist, /createElement\("div", \{ className: "v2-add-instrument-controls" \}, \[picker, add\]\)/);
+  assert.match(playlist, /projectState\.addTrack\(undefined, definition\.type\)/);
+  assert.match(mixer, /createElement\("div", \{ className: "v2-add-instrument-controls" \}, \[typePicker, addTrack\]\)/);
+  assert.match(mixer, /projectState\.addTrack\(undefined, definition\.type\)/);
   assert.match(playlist, /timeline\.append\(addInstrumentRow\)/);
   assert.doesNotMatch(playlist, /v2-playlist-header-leading/);
   assert.ok(

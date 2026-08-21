@@ -8,8 +8,8 @@ import {
   ticksToSeconds,
 } from "../domain/index.js";
 import { calculateProjectExportTailSeconds, calculateSerialRouteTailSeconds } from "./effect-tail.js";
+import { DEVICE_REGISTRY, getInstrumentTailSeconds } from "./device-registry.js";
 import { describeProjectAudioRoute } from "./route-descriptor.js";
-import { toWebAudioWaveform } from "./web-audio-runtime.js";
 
 export const VOICE_DISCONNECT_GRACE_SECONDS = 0.01;
 export const PLAYBACK_MODES = Object.freeze(["pattern", "song"]);
@@ -53,23 +53,34 @@ function getTrack(project, trackId) {
 export function adaptOccurrenceToRenderEvent(project, occurrence, bpm = project.transport.bpm) {
   const track = getTrack(project, occurrence.trackId);
   const params = track.instrument.params;
-  const effectivePitch = getEffectiveInstrumentPitch(occurrence.pitch, params.octave);
+  const definition = DEVICE_REGISTRY.instruments.require(
+    track.instrument.type,
+    track.instrument.version,
+  );
   const playbackDurationTicks = occurrence.playbackDurationTicks ?? occurrence.durationTicks;
   const transportTick = occurrence.transportTick ?? occurrence.startTick;
   const startSeconds = ticksToSeconds(transportTick, bpm);
-  const durationSeconds = ticksToSeconds(playbackDurationTicks, bpm);
+  const noteDurationSeconds = ticksToSeconds(playbackDurationTicks, bpm);
+  const voice = definition.adaptVoice?.({
+    noteDurationSeconds,
+    params,
+    pitch: occurrence.pitch,
+  });
+  if (voice === null) return null;
+  if (!voice || !Number.isFinite(voice.voiceEndOffsetSeconds) || voice.voiceEndOffsetSeconds < 0) {
+    throw new TypeError(`${definition.name} did not produce valid voice timing.`);
+  }
   const releaseEndSeconds = startSeconds
-    + durationSeconds
-    + params.releaseSeconds
+    + voice.voiceEndOffsetSeconds
     + VOICE_DISCONNECT_GRACE_SECONDS;
   return Object.freeze({
     ...occurrence,
-    attackSeconds: params.attackSeconds,
-    durationSeconds,
-    effectivePitch,
-    frequencyHz: midiPitchToFrequency(effectivePitch),
+    ...voice,
     instrumentInstanceId: track.instrument.instanceId,
     instrumentLevel: params.level,
+    instrumentType: track.instrument.type,
+    instrumentVersion: track.instrument.version,
+    noteDurationSeconds,
     ownership: Object.freeze({
       clipId: occurrence.clipId,
       mode: occurrence.mode,
@@ -81,11 +92,8 @@ export function adaptOccurrenceToRenderEvent(project, occurrence, bpm = project.
     }),
     playbackDurationTicks,
     releaseEndSeconds,
-    releaseSeconds: params.releaseSeconds,
     startSeconds,
     transportTick,
-    waveform: params.waveform,
-    webAudioWaveform: toWebAudioWaveform(params.waveform),
   });
 }
 
@@ -100,7 +108,7 @@ export function applyTrackVoiceLimit(events, maxVoices = MAX_TRACK_VOICES) {
     throw new RangeError("Voice limit must be a positive integer.");
   }
   const activeByTrack = new Map();
-  return Object.freeze(events.map((event) => {
+  return Object.freeze(events.filter((event) => event !== null).map((event) => {
     let active = activeByTrack.get(event.trackId) ?? [];
     active = active.filter((candidate) => candidate.releaseEndSeconds > event.startSeconds);
     const retireOccurrenceIds = [];
@@ -158,10 +166,10 @@ export function createRenderPlan(projectCandidate, {
     adaptOccurrenceToRenderEvent(project, occurrence, bpm)
   )));
   const tailSeconds = mode === "song"
-    ? calculateProjectExportTailSeconds(project)
+    ? calculateProjectExportTailSeconds(project, { getInstrumentTailSeconds })
     : calculateSerialRouteTailSeconds({
         bpm,
-        instrumentReleaseSeconds: selectedTrack.instrument.params.releaseSeconds,
+        instrumentTailSeconds: getInstrumentTailSeconds(selectedTrack.instrument),
         masterEffects: project.mixer.master.effects,
         trackEffects: selectedTrack.mixer.effects,
       });

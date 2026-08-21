@@ -1,4 +1,9 @@
 import { clearElement, createElement, createLabeledRange, setPressed } from "./dom.js";
+import {
+  getDefaultInstrumentType,
+  getInstrumentDefinitions,
+  getInstrumentName,
+} from "./device-presentation.js";
 import { formatPercent } from "./music-format.js";
 
 const RANGE_EDIT_KEYS = new Set([
@@ -47,6 +52,7 @@ function structureIdentity(project) {
       effects: track.mixer.effects.map(({ instanceId, type }) => [instanceId, type]),
       id: track.id,
       instrumentInstanceId: track.instrument.instanceId,
+      instrumentType: [track.instrument.type, track.instrument.version],
       name: track.name,
     })),
   });
@@ -70,7 +76,9 @@ export function createMixerSurface({
   const lifecycle = new AbortController();
   const meterElements = new Map();
   const channelControls = new Map();
+  let addInstrumentType = getDefaultInstrumentType();
   let addTrackControl = null;
+  let addTrackTypeControl = null;
   let channelSelector = null;
   let disposed = false;
   let frame = null;
@@ -327,11 +335,13 @@ export function createMixerSurface({
     controls.heading = heading;
     channel.append(heading);
     if (!isMaster) {
+      const instrumentName = getInstrumentName(track.instrument);
       const instrument = createElement("button", {
-        "aria-label": `Open ${track.name} Klinto Chip instrument`,
+        "aria-label": `Open ${track.name}, ${instrumentName} Instrument`,
         className: "v2-instrument-slot",
         dataset: { channelId, mixerControl: "instrument" },
-        textContent: "Klinto Chip",
+        textContent: instrumentName,
+        title: `Open ${track.name}, ${instrumentName} Instrument`,
         type: "button",
         onClick: (event) => onOpenInstrument(track.id, event.currentTarget),
       });
@@ -419,24 +429,62 @@ export function createMixerSurface({
       selectChannel(selector.value);
       focusDescriptor({ channelId: selector.value, control: "heading", kind: "channel" });
     }, { signal: lifecycle.signal });
-    const addTrack = createElement("button", {
-      className: "v2-primary-action v2-mixer-add-instrument",
-      dataset: { mixerControl: "add-track" },
-      disabled: project().tracks.length >= 8,
-      textContent: "+ Add Instrument",
-      title: project().tracks.length >= 8
+    const definitions = getInstrumentDefinitions();
+    if (!definitions.some(({ type }) => type === addInstrumentType)) {
+      addInstrumentType = definitions[0]?.type ?? getDefaultInstrumentType();
+    }
+    const unavailable = project().tracks.length >= 8;
+    const typePicker = createElement("select", {
+      "aria-label": "New Mixer Instrument type",
+      dataset: { mixerControl: "add-track-type", transportSpace: "native" },
+      disabled: unavailable,
+      title: unavailable
         ? "A Project supports at most eight Instruments"
-        : "Create a Track with a Klinto Chip instrument",
+        : "Choose an Instrument for the new Mixer Track",
+    });
+    for (const definition of definitions) {
+      typePicker.append(createElement("option", {
+        textContent: definition.name,
+        value: definition.type,
+      }));
+    }
+    typePicker.value = addInstrumentType;
+    const selectedDefinition = () => (
+      definitions.find(({ type }) => type === typePicker.value) ?? definitions[0]
+    );
+    const addTrack = createElement("button", {
+      "aria-label": `Add ${selectedDefinition().name} to Mixer`,
+      className: "v2-primary-action v2-mixer-add-instrument",
+      dataset: { mixerControl: "add-track", transportSpace: "native" },
+      disabled: unavailable,
+      textContent: "+ Add Instrument",
+      title: unavailable
+        ? "A Project supports at most eight Instruments"
+        : `Create a Mixer Track with ${selectedDefinition().name}`,
       type: "button",
       onClick: () => {
-        const id = projectState.addTrack();
+        const definition = selectedDefinition();
+        addInstrumentType = definition.type;
+        const id = projectState.addTrack(undefined, definition.type);
+        const track = projectState.getTrack(id);
         selectChannel(id);
         focusDescriptor({ channelId: id, control: "heading", kind: "channel" });
+        announce(`${definition.name} added as ${track.name}.`);
       },
     });
+    typePicker.addEventListener("change", () => {
+      addInstrumentType = typePicker.value;
+      const definition = selectedDefinition();
+      addTrack.setAttribute("aria-label", `Add ${definition.name} to Mixer`);
+      addTrack.title = `Create a Mixer Track with ${definition.name}`;
+    }, { signal: lifecycle.signal });
     channelSelector = selector;
+    addTrackTypeControl = typePicker;
     addTrackControl = addTrack;
-    header.append(createElement("label", { className: "v2-mixer-channel-selector" }, ["Channel", selector]), addTrack);
+    header.append(
+      createElement("label", { className: "v2-mixer-channel-selector" }, ["Channel", selector]),
+      createElement("div", { className: "v2-add-instrument-controls" }, [typePicker, addTrack]),
+    );
   }
 
   function captureFocus() {
@@ -487,6 +535,9 @@ export function createMixerSurface({
     if (descriptor.kind === "control") {
       if (descriptor.control === "title") return title;
       if (descriptor.control === "channel-selector") return channelSelector;
+      if (descriptor.control === "add-track-type") {
+        return addTrackTypeControl?.disabled ? title : addTrackTypeControl;
+      }
       if (descriptor.control === "add-track") return addTrackControl?.disabled ? title : addTrackControl;
     }
     if (descriptor.kind === "channel") {

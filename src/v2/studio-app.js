@@ -8,10 +8,10 @@ import { createProjectLibraryFeature } from "../features/project-library/project
 import { createLocalRemixProvenanceRepository } from "../persistence/remix-provenance-repository.js";
 import { createSessionState } from "../state/session-state.js";
 import { createDeviceRuntimeRegistry } from "./audio/runtime-registry.js";
-import { createKlintoChipSynthRuntime } from "./audio/klinto-chip-synth.js";
+import { createInstrumentSynthRouter } from "./audio/instrument-synth-router.js";
 import { createV2KeyboardAudition } from "./audio/keyboard-audition.js";
 import { createV2Scheduler } from "./audio/occurrence-scheduler.js";
-import { MAX_PATTERN_NAME_LENGTH } from "./domain/constants.js";
+import { MAX_PATTERN_NAME_LENGTH, PROJECT_SCHEMA_VERSION } from "./domain/constants.js";
 import { getPatternPlaybackEndTick } from "./domain/pattern-span.js";
 import { createV2ProjectState } from "./domain/project-state.js";
 import { normalizeV2Project } from "./domain/schema.js";
@@ -32,6 +32,7 @@ import { createWorkspaceState } from "./state/workspace-state.js";
 import { createDeviceWindow } from "./ui/device-window.js";
 import { createDraggableWindow } from "./ui/draggable-window.js";
 import { createV2HelpDialog } from "./ui/help-dialog.js";
+import { getInstrumentName } from "./ui/device-presentation.js";
 import { createMixerSurface } from "./ui/mixer.js";
 import { createPianoRollSurface } from "./ui/piano-roll.js";
 import { createPlaylistSurface } from "./ui/playlist.js";
@@ -54,7 +55,7 @@ function prepareDocument(documentLike) {
 
   const root = documentLike.createElement("div");
   root.className = "v2-workspace";
-  root.dataset.schemaVersion = "7";
+  root.dataset.schemaVersion = String(PROJECT_SCHEMA_VERSION);
   const shellContainer = documentLike.createElement("div");
   shellContainer.className = "v2-workspace-shell";
   const content = documentLike.createElement("main");
@@ -152,7 +153,9 @@ function deviceDescriptor(device, project) {
     const track = project.tracks.find(({ instrument }) => instrument.instanceId === device.instanceId);
     return {
       ...device,
-      name: `${track?.name ?? "Track"}, Klinto Chip`,
+      name: track
+        ? `${track.name}, ${getInstrumentName(track.instrument)}`
+        : "Instrument",
     };
   }
   const record = findEffect(project, device.instanceId);
@@ -247,13 +250,14 @@ export async function createV2StudioApp({ document: documentLike = document } = 
       const context = destination.context;
       audioEngine.setMasterVolume(1);
       runtimeRegistry = createDeviceRuntimeRegistry({ context, destination });
-      synthRuntime = createKlintoChipSynthRuntime({
+      synthRuntime = createInstrumentSynthRouter({
         context,
         getOutputNode(trackId) {
           const output = runtimeRegistry.getTrackInputNode(trackId);
           if (!output) throw new RangeError(`Unknown audio Track: ${trackId}.`);
           return output;
         },
+        mode: "live",
       });
     }
     runtimeRegistry.sync(projectState.getState());

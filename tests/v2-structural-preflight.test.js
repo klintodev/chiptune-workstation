@@ -7,7 +7,7 @@ import {
   MAX_PROJECT_STRUCTURE_NODES,
 } from "../src/v2/domain/constants.js";
 import { assertBoundedV2Structure } from "../src/v2/domain/domain-utils.js";
-import { migrateProjectToV7 } from "../src/v2/domain/migration.js";
+import { migrateProjectToV8 } from "../src/v2/domain/migration.js";
 import { createDefaultV2Project } from "../src/v2/domain/project-schema.js";
 import { createV2ProjectState } from "../src/v2/domain/project-state.js";
 import {
@@ -78,24 +78,24 @@ test("portable V2 parsing rejects deeply nested and node-heavy JSON below the by
   );
 });
 
-test("direct migration activation applies the same bounds before legacy or V7 validation", () => {
+test("direct migration activation applies the same bounds before legacy, V7, or V8 validation", () => {
   const deepProject = structuredClone(createDefaultV2Project());
   deepProject.padding = createNestedObject(MAX_PROJECT_STRUCTURE_DEPTH + 1);
   assert.throws(
-    () => migrateProjectToV7(deepProject),
+    () => migrateProjectToV8(deepProject),
     new RegExp(`maximum structural depth of ${MAX_PROJECT_STRUCTURE_DEPTH}`),
   );
 
   const wideProject = structuredClone(createDefaultV2Project());
   wideProject.padding = Array(MAX_PROJECT_STRUCTURE_NODES).fill(null);
   assert.throws(
-    () => migrateProjectToV7(wideProject),
+    () => migrateProjectToV8(wideProject),
     new RegExp(`structural node limit of ${MAX_PROJECT_STRUCTURE_NODES}`),
   );
 
   const cyclicProject = structuredClone(createDefaultV2Project());
   cyclicProject.padding = cyclicProject;
-  assert.throws(() => migrateProjectToV7(cyclicProject), /acyclic JSON structure/);
+  assert.throws(() => migrateProjectToV8(cyclicProject), /acyclic JSON structure/);
 });
 
 test("a structural import failure cannot save or activate a partial Project", async () => {

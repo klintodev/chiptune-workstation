@@ -20,6 +20,7 @@ import {
 } from "./constants.js";
 import {
   KLINTO_CHIP_CONTRACT,
+  KLINTO_DRUMS_CONTRACT,
 } from "./device-contracts.js";
 import {
   allocateMigratedId,
@@ -309,22 +310,52 @@ function migrateSchemaTwoThroughSix(candidate) {
   };
 }
 
-export function migrateProjectToV7(candidate) {
+function canonicalizeSchemaSevenAsV8(candidate) {
+  for (const track of Array.isArray(candidate.tracks) ? candidate.tracks : []) {
+    const instrumentType = track?.instrument?.type;
+    if (instrumentType === KLINTO_DRUMS_CONTRACT.type) {
+      throw new RangeError(
+        `Project schema 7 does not support Instrument type: ${KLINTO_DRUMS_CONTRACT.type}.`,
+      );
+    }
+    if (typeof instrumentType === "string" && instrumentType !== KLINTO_CHIP_CONTRACT.type) {
+      throw new RangeError(`Unknown Instrument type: ${instrumentType}.`);
+    }
+  }
+  return canonicalizeV2Project({ ...candidate, schemaVersion: PROJECT_SCHEMA_VERSION });
+}
+
+export function normalizeV7Project(candidate) {
+  assertBoundedV2Structure(candidate, { label: "Project" });
+  assertRecord(candidate, "Project");
+  if (candidate.schemaVersion !== 7) {
+    throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
+  }
+  const current = canonicalizeSchemaSevenAsV8(candidate);
+  return deepFreeze({ ...current, schemaVersion: 7 });
+}
+
+export function migrateProjectToV8(candidate) {
   assertBoundedV2Structure(candidate, { label: "Project" });
   assertRecord(candidate, "Project");
   if (candidate.schemaVersion === PROJECT_SCHEMA_VERSION) return canonicalizeV2Project(candidate);
+  if (candidate.schemaVersion === 7) return canonicalizeSchemaSevenAsV8(candidate);
   if (!Number.isInteger(candidate.schemaVersion) || candidate.schemaVersion < 1 || candidate.schemaVersion > 6) {
     throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
   }
-  // Keep the shipped schema 1 -> 6 path authoritative. The V7 boundary only
+  // Keep the shipped schema 1 -> 6 path authoritative. The V8 boundary only
   // converts the resulting V6 musical model; it does not reinterpret history.
   const legacyV6 = migrateLegacyProject(candidate);
   const migrated = migrateSchemaTwoThroughSix(legacyV6);
   return canonicalizeV2Project(migrated);
 }
 
+// Transitional aliases keep existing callers on the current-schema migration
+// while V8-specific names are adopted across the application.
+export const migrateProjectToV7 = migrateProjectToV8;
+
 export function normalizeV2Project(candidate) {
-  return migrateProjectToV7(candidate);
+  return migrateProjectToV8(candidate);
 }
 
 function validateTimestamp(value, field) {
@@ -362,7 +393,8 @@ export function normalizeV2ProjectDocument(candidate) {
   });
 }
 
-export const migrateProjectDocumentToV7 = normalizeV2ProjectDocument;
+export const migrateProjectDocumentToV8 = normalizeV2ProjectDocument;
+export const migrateProjectDocumentToV7 = migrateProjectDocumentToV8;
 
 export function parseV2ProjectDocument(text) {
   if (typeof text !== "string") throw new TypeError("Project file contents must be text.");

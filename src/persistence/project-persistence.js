@@ -29,6 +29,12 @@ function uniqueTitle(base, summaries, { fallback = "Untitled chiptune", suffix =
   );
 }
 
+function canMigrateToSchema(sourceSchemaVersion, targetSchemaVersion) {
+  return Number.isInteger(sourceSchemaVersion)
+    && sourceSchemaVersion >= 1
+    && sourceSchemaVersion <= targetSchemaVersion;
+}
+
 export async function loadInitialProjectDocument({
   createId = createProjectIdentifier,
   now = () => new Date().toISOString(),
@@ -51,7 +57,7 @@ export async function loadInitialProjectDocument({
   for (const summary of projects) {
     if (
       summary.availability === "unavailable"
-      && summary.schemaVersion !== targetSchemaVersion
+      && !canMigrateToSchema(summary.schemaVersion, targetSchemaVersion)
     ) continue;
     try {
       const recent = await repository.get(summary.id);
@@ -271,7 +277,7 @@ export function createProjectPersistence({
     for (const summary of remaining) {
       if (
         summary.availability === "unavailable"
-        && summary.schemaVersion !== runtimeSchemaVersion
+        && !canMigrateToSchema(summary.schemaVersion, runtimeSchemaVersion)
       ) continue;
       try {
         const next = await repository.get(summary.id);

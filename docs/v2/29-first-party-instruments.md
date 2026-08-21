@@ -4,6 +4,8 @@ Status: Draft
 Release: Klinto Studio V2  
 Depends on: PRDs 27â€“28
 
+> Post-launch extension: [PRD 33](./33-klinto-drums.md) adds Klinto Drums under schema 8. The Klinto Chip and frozen schema-7 decisions in this document remain unchanged.
+
 ## Description
 
 Introduce a closed, first-party Instrument contract and move each Track's V1 sound properties into one stable Klinto Chip instance with its own focused device window.

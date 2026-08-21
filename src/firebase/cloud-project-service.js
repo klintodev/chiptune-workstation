@@ -3,18 +3,28 @@ import {
   createProjectIdentifier,
   normalizeProjectDocument,
   normalizeProjectDocumentForSchema,
-  normalizeProjectDocumentToV7,
+  normalizeProjectDocumentToV8,
   parseProjectDocument,
 } from "../persistence/project-document.js";
 import { createBoundedUniqueName } from "../shared/bounded-name.js";
 import { MAX_PROJECT_TITLE_LENGTH } from "../state/project-state.js";
+import { PROJECT_SCHEMA_VERSION } from "../v2/domain/constants.js";
 import { serializeRawCloudProjectRecord } from "./cloud-project.js";
 
 const RETRY_DELAYS = Object.freeze([5_000, 15_000, 30_000, 60_000]);
 
 function sameDocument(left, right) {
-  return JSON.stringify(normalizeProjectDocumentToV7(left))
-    === JSON.stringify(normalizeProjectDocumentToV7(right));
+  const comparable = (candidate) => {
+    const normalized = normalizeProjectDocumentToV8(candidate);
+    return {
+      format: normalized.format,
+      documentVersion: normalized.documentVersion,
+      id: normalized.id,
+      createdAt: normalized.createdAt,
+      project: normalized.project,
+    };
+  };
+  return JSON.stringify(comparable(left)) === JSON.stringify(comparable(right));
 }
 
 function isNetworkFailure(error, onlineTarget) {
@@ -75,10 +85,15 @@ export function createCloudProjectService({
   }
 
   function normalizeForRuntime(document) {
-    const schemaVersion = persistence?.getActiveDocument?.()?.project?.schemaVersion;
+    const schemaVersion = getRuntimeSchemaVersion();
     return Number.isInteger(schemaVersion)
       ? normalizeProjectDocumentForSchema(document, schemaVersion)
       : normalizeProjectDocument(document);
+  }
+
+  function getRuntimeSchemaVersion() {
+    const schemaVersion = persistence?.getActiveDocument?.()?.project?.schemaVersion;
+    return Number.isInteger(schemaVersion) ? schemaVersion : undefined;
   }
 
   function emit(link = null, type = "status") {
@@ -94,9 +109,11 @@ export function createCloudProjectService({
   async function captureActiveDocument(projectId = null) {
     const activeDocument = persistence?.getActiveDocument?.();
     if (!activeDocument || (projectId !== null && activeDocument.id !== projectId)) return null;
+    const pendingUpgradeSource = persistence?.getPendingUpgradeSourceSchemaVersion?.();
     try {
-      await persistence.saveNow();
-    } catch {
+      await persistence.saveNow({ commitUpgrade: true });
+    } catch (error) {
+      if (Number.isInteger(pendingUpgradeSource)) throw error;
       // The in-memory snapshot remains authoritative when durable local saving fails.
     }
     return parseProjectDocument(persistence.getExportText());
@@ -391,7 +408,9 @@ export function createCloudProjectService({
     async listProjects() {
       const account = requireAccount();
       const client = await accountService.getClient();
-      return client.listProjects(account.uid);
+      return client.listProjects(account.uid, {
+        targetSchemaVersion: getRuntimeSchemaVersion(),
+      });
     },
     async openProject(projectId) {
       const account = requireAccount();
@@ -413,8 +432,25 @@ export function createCloudProjectService({
         const local = activeDocument?.id === projectId
           ? activeDocument
           : await localRepository.get(projectId);
-        if (local && !sameDocument(local, remote)) await preserveCopy(local, "local before cloud open");
-        await localRepository.save(remote);
+        const matchesRemote = local ? sameDocument(local, remote) : false;
+        if (local && !matchesRemote) await preserveCopy(local, "local before cloud open");
+        const openedDocument = matchesRemote && activeDocument?.id === projectId
+          ? activeDocument
+          : remote;
+        await localRepository.save(openedDocument);
+        if (openedDocument.project.schemaVersion === PROJECT_SCHEMA_VERSION
+          && Number.isInteger(sourceSchemaVersion)
+          && sourceSchemaVersion >= 1
+          && sourceSchemaVersion < PROJECT_SCHEMA_VERSION) {
+          try {
+            onProjectUpgrade(Object.freeze({
+              fromSchemaVersion: sourceSchemaVersion,
+              projectId: openedDocument.id,
+            }));
+          } catch {
+            // Disclosure storage cannot invalidate a successful cloud recovery/open.
+          }
+        }
         await saveLink({
           uid: account.uid,
           projectId,
@@ -424,22 +460,9 @@ export function createCloudProjectService({
           error: "",
           conflictProjectId: "",
         }, "opened");
-        if (remote.project.schemaVersion === 7
-          && Number.isInteger(sourceSchemaVersion)
-          && sourceSchemaVersion >= 1
-          && sourceSchemaVersion < 7) {
-          try {
-            onProjectUpgrade(Object.freeze({
-              fromSchemaVersion: sourceSchemaVersion,
-              projectId: remote.id,
-            }));
-          } catch {
-            // Disclosure storage cannot invalidate a successful cloud recovery/open.
-          }
-        }
         preferences.setLastProjectId(projectId);
         reload();
-        return remote;
+        return openedDocument;
       });
     },
     overwriteConflictWithLocal,

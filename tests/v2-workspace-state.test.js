@@ -11,7 +11,7 @@ import {
 function createProject({ id = "project-a" } = {}) {
   return {
     id,
-    schemaVersion: 7,
+    schemaVersion: 8,
     patterns: [
       {
         id: "pattern-1",

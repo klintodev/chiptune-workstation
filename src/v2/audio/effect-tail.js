@@ -94,12 +94,14 @@ export function sumSerialEffectTails(effects, bpm) {
 
 export function calculateSerialRouteTailSeconds({
   bpm,
+  instrumentTailSeconds,
   instrumentReleaseSeconds,
   masterEffects = [],
   trackEffects = [],
 }) {
-  assertFiniteRange(instrumentReleaseSeconds, 0, 3, "Instrument release");
-  return instrumentReleaseSeconds
+  const resolvedInstrumentTail = instrumentTailSeconds ?? instrumentReleaseSeconds;
+  assertFiniteRange(resolvedInstrumentTail, 0, 10, "Instrument tail");
+  return resolvedInstrumentTail
     + sumSerialEffectTails(trackEffects, bpm)
     + sumSerialEffectTails(masterEffects, bpm);
 }
@@ -109,7 +111,10 @@ export function calculateSerialRouteTailSeconds({
  * Master route. Master effects are deliberately added once after the maximum,
  * rather than once for every Track.
  */
-export function calculateProjectExportTailSeconds(project, { trackIds } = {}) {
+export function calculateProjectExportTailSeconds(project, {
+  getInstrumentTailSeconds = (instrument) => instrument?.params?.releaseSeconds,
+  trackIds,
+} = {}) {
   if (!project || typeof project !== "object" || !Array.isArray(project.tracks)) {
     throw new TypeError("A Project with Tracks is required.");
   }
@@ -119,9 +124,9 @@ export function calculateProjectExportTailSeconds(project, { trackIds } = {}) {
     ? project.tracks
     : project.tracks.filter((track) => includedIds.has(track.id));
   const longestTrackTail = includedTracks.reduce((longest, track) => {
-    const release = track.instrument?.params?.releaseSeconds;
-    assertFiniteRange(release, 0.01, 3, `Instrument release for Track ${track.id}`);
-    const trackTail = release + sumSerialEffectTails(track.mixer?.effects ?? [], bpm);
+    const instrumentTail = getInstrumentTailSeconds(track.instrument, track);
+    assertFiniteRange(instrumentTail, 0, 10, `Instrument tail for Track ${track.id}`);
+    const trackTail = instrumentTail + sumSerialEffectTails(track.mixer?.effects ?? [], bpm);
     return Math.max(longest, trackTail);
   }, 0);
   return longestTrackTail

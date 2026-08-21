@@ -4,6 +4,7 @@ import {
 } from "../state/project-state.js";
 import {
   PROJECT_SCHEMA_VERSION as V2_PROJECT_SCHEMA_VERSION,
+  normalizeV7Project,
   normalizeV2Project,
   normalizeV2ProjectDocument,
 } from "../v2/domain/schema.js";
@@ -25,12 +26,17 @@ function validateTimestamp(value, field) {
 
 function normalizeProject(project) {
   if (project?.schemaVersion === V2_PROJECT_SCHEMA_VERSION) return normalizeV2Project(project);
+  if (project?.schemaVersion === 7) return normalizeV7Project(project);
   return clone(createProjectState(project).getState());
 }
 
-export function normalizeProjectDocumentToV7(candidate) {
+export function normalizeProjectDocumentToV8(candidate) {
   return normalizeV2ProjectDocument(candidate);
 }
+
+// Transitional aliases keep existing V2 callers on the current schema while
+// V8-specific adapter names are adopted across the application.
+export const normalizeProjectDocumentToV7 = normalizeProjectDocumentToV8;
 
 export function normalizeProjectDocumentForSchema(candidate, schemaVersion) {
   if (![LEGACY_PROJECT_SCHEMA_VERSION, V2_PROJECT_SCHEMA_VERSION].includes(schemaVersion)) {
@@ -39,12 +45,12 @@ export function normalizeProjectDocumentForSchema(candidate, schemaVersion) {
     );
   }
   if (schemaVersion === V2_PROJECT_SCHEMA_VERSION) {
-    return normalizeProjectDocumentToV7(candidate);
+    return normalizeProjectDocumentToV8(candidate);
   }
   const normalized = normalizeProjectDocument(candidate);
-  if (normalized.project.schemaVersion === V2_PROJECT_SCHEMA_VERSION) {
+  if (normalized.project.schemaVersion !== LEGACY_PROJECT_SCHEMA_VERSION) {
     throw new RangeError(
-      "This V7 project is unavailable in the current Studio version and was not modified.",
+      `This V${normalized.project.schemaVersion} project is unavailable in the current Studio version and was not modified.`,
     );
   }
   return normalized;
@@ -139,7 +145,7 @@ export function parseProjectDocument(text) {
   return normalizeProjectDocument(candidate);
 }
 
-export function parseProjectDocumentToV7(text) {
+export function parseProjectDocumentToV8(text) {
   if (typeof text !== "string") throw new TypeError("Project file contents must be text.");
   if (new TextEncoder().encode(text).byteLength > MAX_PROJECT_FILE_BYTES) {
     throw new RangeError("Project file is larger than 2 MB.");
@@ -150,16 +156,20 @@ export function parseProjectDocumentToV7(text) {
   } catch {
     throw new SyntaxError("Project file is not valid JSON.");
   }
-  return normalizeProjectDocumentToV7(candidate);
+  return normalizeProjectDocumentToV8(candidate);
 }
+
+export const parseProjectDocumentToV7 = parseProjectDocumentToV8;
 
 export function serializeProjectDocument(document) {
   return `${JSON.stringify(normalizeProjectDocument(document), null, 2)}\n`;
 }
 
-export function serializeProjectDocumentToV7(document) {
-  return `${JSON.stringify(normalizeProjectDocumentToV7(document), null, 2)}\n`;
+export function serializeProjectDocumentToV8(document) {
+  return `${JSON.stringify(normalizeProjectDocumentToV8(document), null, 2)}\n`;
 }
+
+export const serializeProjectDocumentToV7 = serializeProjectDocumentToV8;
 
 function summarizeNormalizedProjectDocument(normalized) {
   return Object.freeze({

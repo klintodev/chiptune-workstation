@@ -4,6 +4,8 @@ export * from "./route-descriptor.js";
 export * from "./runtime-registry.js";
 export * from "./web-audio-runtime.js";
 export * from "./klinto-chip-synth.js";
+export * from "./klinto-drums-synth.js";
+export * from "./instrument-synth-router.js";
 export * from "./offline-renderer.js";
 export * from "./render-plan.js";
 export * from "./synth-adapter.js";

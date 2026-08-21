@@ -1,5 +1,10 @@
 import { MAX_TRACK_NAME_LENGTH } from "../domain/constants.js";
 import { clearElement, createElement } from "./dom.js";
+import {
+  getDefaultInstrumentType,
+  getInstrumentDefinitions,
+  getInstrumentName,
+} from "./device-presentation.js";
 import { formatDurationTicks, formatTickPosition } from "./music-format.js";
 
 const MAX_SONG_TICKS = 6144;
@@ -333,6 +338,7 @@ export function createPlaylistSurface({
   const lifecycle = new AbortController();
   const notePreviewPrefix = `v2-playlist-note-preview-${playlistSurfaceSequence += 1}`;
   let disposed = false;
+  let addInstrumentType = getDefaultInstrumentType();
   let localProjectMutationDepth = 0;
   let localWorkspaceMutationDepth = 0;
   let pendingFocus = null;
@@ -432,10 +438,17 @@ export function createPlaylistSurface({
   function captureFocusPreference() {
     const active = node.ownerDocument?.activeElement;
     if (!active || !node.contains?.(active)) return;
+    const addInstrumentControl = active.closest?.("[data-playlist-add-instrument]");
     const clip = active.closest?.("[data-clip-id]");
     const action = active.closest?.("[data-playlist-track-action]");
     const track = active.closest?.("[data-track-id]");
-    if (clip?.dataset.clipId) {
+    if (addInstrumentControl?.dataset.playlistAddInstrument) {
+      rememberFocus({
+        addInstrumentControl: addInstrumentControl.dataset.playlistAddInstrument,
+        clipId: null,
+        trackAction: null,
+      });
+    } else if (clip?.dataset.clipId) {
       rememberFocus({ clipId: clip.dataset.clipId, trackAction: null });
     } else if (action?.dataset.playlistTrackAction && track?.dataset.trackId) {
       rememberFocus({
@@ -452,6 +465,13 @@ export function createPlaylistSurface({
     if (!pendingFocus) return false;
     const preference = pendingFocus;
     pendingFocus = null;
+    const addInstrumentTarget = preference.addInstrumentControl
+      ? node.querySelector(`[data-playlist-add-instrument="${selectorId(preference.addInstrumentControl)}"]`)
+      : null;
+    if (addInstrumentTarget && !addInstrumentTarget.disabled) {
+      addInstrumentTarget.focus({ preventScroll: true });
+      return true;
+    }
     const target = resolvePlaylistFocusTarget(project(), preference);
     const actionTarget = preference.trackAction && target.trackId
       ? node.querySelector(`[data-track-id="${selectorId(target.trackId)}"][data-playlist-track-action="${selectorId(preference.trackAction)}"]`)
@@ -1334,23 +1354,68 @@ export function createPlaylistSurface({
     return true;
   }
 
-  function createAddInstrumentButton() {
+  function createAddInstrumentControls() {
     const trackCount = project().tracks.length;
-    return createElement("button", {
-      className: "v2-primary-action v2-playlist-add-instrument",
-      disabled: trackCount >= 8,
-      textContent: "+ Add Instrument",
-      title: trackCount >= 8
+    const definitions = getInstrumentDefinitions();
+    if (!definitions.some(({ type }) => type === addInstrumentType)) {
+      addInstrumentType = definitions[0]?.type ?? getDefaultInstrumentType();
+    }
+    const unavailable = trackCount >= 8;
+    const picker = createElement("select", {
+      "aria-label": "New Playlist Instrument type",
+      dataset: { playlistAddInstrument: "type", transportSpace: "native" },
+      disabled: unavailable,
+      title: unavailable
         ? "A Project supports at most eight Instruments"
-        : "Create a Track with a Klinto Chip instrument",
+        : "Choose an Instrument for the new Track",
+    });
+    for (const definition of definitions) {
+      picker.append(createElement("option", {
+        textContent: definition.name,
+        value: definition.type,
+      }));
+    }
+    picker.value = addInstrumentType;
+    picker.addEventListener("keydown", (event) => event.stopPropagation());
+    const selectedDefinition = () => (
+      definitions.find(({ type }) => type === picker.value) ?? definitions[0]
+    );
+
+    const add = createElement("button", {
+      "aria-label": `Add ${selectedDefinition().name} to Playlist`,
+      className: "v2-primary-action v2-playlist-add-instrument",
+      dataset: { playlistAddInstrument: "add", transportSpace: "native" },
+      disabled: unavailable,
+      textContent: "+ Add Instrument",
+      title: unavailable
+        ? "A Project supports at most eight Instruments"
+        : `Create a Track with ${selectedDefinition().name}`,
       type: "button",
       onClick: () => {
-        const id = mutateProject(() => projectState.addTrack());
-        rememberFocus({ trackId: id, trackIndex: project().tracks.length - 1 });
+        const definition = selectedDefinition();
+        addInstrumentType = definition.type;
+        const id = mutateProject(() => projectState.addTrack(undefined, definition.type));
+        const track = projectState.getTrack(id);
+        pendingFocus = {
+          addInstrumentControl: null,
+          clipId: null,
+          trackAction: "instrument",
+          trackId: id,
+          trackIndex: project().tracks.length - 1,
+        };
         setSession({ destinationTrackId: id, selectedClipId: null });
-        render();
+        announce(`${definition.name} added as ${track.name}.`);
+        render({ captureFocus: false });
       },
     });
+    picker.addEventListener("change", () => {
+      addInstrumentType = picker.value;
+      const definition = selectedDefinition();
+      add.setAttribute("aria-label", `Add ${definition.name} to Playlist`);
+      add.title = `Create a Track with ${definition.name}`;
+    });
+    add.addEventListener("keydown", (event) => event.stopPropagation());
+    return createElement("div", { className: "v2-add-instrument-controls" }, [picker, add]);
   }
 
   function renderHeader() {
@@ -1654,13 +1719,16 @@ export function createPlaylistSurface({
       }
       const instrument = lane.querySelector(".v2-playlist-instrument");
       if (instrument) {
-        instrument.setAttribute("aria-label", `Open ${track.name} Klinto Chip instrument`);
-        instrument.title = `Open ${track.name} Klinto Chip instrument`;
+        const instrumentName = getInstrumentName(track.instrument);
+        instrument.setAttribute("aria-label", `Open ${track.name}, ${instrumentName} Instrument`);
+        instrument.title = `Open ${track.name}, ${instrumentName} Instrument`;
         const ownerLabel = instrument.querySelector("span");
         if (ownerLabel) {
           ownerLabel.textContent = track.name;
           ownerLabel.title = track.name;
         }
+        const productLabel = instrument.querySelector("small");
+        if (productLabel) productLabel.textContent = instrumentName;
       }
       const mute = lane.querySelector('[data-playlist-track-action="mute"]');
       if (mute) {
@@ -2023,17 +2091,18 @@ export function createPlaylistSurface({
       const trackIdentity = createElement("div", {
         className: "v2-playlist-track-identity",
       }, [trackNameInput, trackFocus]);
+      const instrumentName = getInstrumentName(track.instrument);
       const instrument = createElement("button", {
-        "aria-label": `Open ${track.name} Klinto Chip instrument`,
+        "aria-label": `Open ${track.name}, ${instrumentName} Instrument`,
         className: "v2-device-launcher v2-playlist-instrument",
         dataset: { playlistTrackAction: "instrument", trackId: track.id },
         tabIndex: -1,
-        title: `Open ${track.name} Klinto Chip instrument`,
+        title: `Open ${track.name}, ${instrumentName} Instrument`,
         type: "button",
         onClick: (event) => onOpenInstrument(track.id, event.currentTarget),
       }, [
         createElement("span", { textContent: track.name, title: track.name }),
-        createElement("small", { textContent: "Klinto Chip" }),
+        createElement("small", { textContent: instrumentName }),
       ]);
       const toggleTrackSwitch = (field, trackAction) => {
         const current = projectState.getTrack(track.id);
@@ -2217,7 +2286,7 @@ export function createPlaylistSurface({
       createElement("div", {
         className: "v2-playlist-add-instrument-cell",
         role: "gridcell",
-      }, [createAddInstrumentButton()]),
+      }, [createAddInstrumentControls()]),
     ]);
     timeline.append(addInstrumentRow);
 
@@ -2264,7 +2333,7 @@ export function createPlaylistSurface({
     }
   }
 
-  function render() {
+  function render({ captureFocus = true } = {}) {
     if (trackContextMenu?.menu.contains(node.ownerDocument?.activeElement) && trackContextTrackId) {
       rememberFocus({
         clipId: null,
@@ -2272,7 +2341,7 @@ export function createPlaylistSurface({
         trackId: trackContextTrackId,
       });
     }
-    captureFocusPreference();
+    if (captureFocus) captureFocusPreference();
     renderHeader();
     renderPatternLibrary();
     renderTimeline();

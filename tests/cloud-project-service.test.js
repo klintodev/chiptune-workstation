@@ -10,6 +10,7 @@ import { createCloudProjectService } from "../src/firebase/cloud-project-service
 import {
   createProjectDocument,
   normalizeProjectDocumentToV7,
+  normalizeProjectDocumentToV8,
   reviseProjectDocument,
   serializeProjectDocument,
 } from "../src/persistence/project-document.js";
@@ -18,6 +19,10 @@ import {
   createProjectPreferences,
 } from "../src/persistence/project-repository.js";
 import { createDefaultProject } from "../src/state/project-state.js";
+import {
+  createDefaultInstrumentInstance,
+  createDefaultV2Project,
+} from "../src/v2/domain/schema.js";
 
 const FIRST_TIME = "2026-07-20T12:00:00.000Z";
 const SECOND_TIME = "2026-07-20T12:01:00.000Z";
@@ -53,6 +58,47 @@ function createDeferred() {
   return { promise, resolve };
 }
 
+function createV8DrumDocument({
+  id = "project-drums",
+  tone = 0.75,
+} = {}) {
+  const project = structuredClone(createDefaultV2Project());
+  project.metadata.title = "Cloud drum tune";
+  project.tracks.push({
+    id: "track-drums",
+    name: "Drums",
+    instrument: structuredClone(createDefaultInstrumentInstance(
+      "instrument-drums",
+      "klinto-drums",
+    )),
+    mixer: { volume: 1, pan: 0, muted: false, solo: false, effects: [] },
+    clips: [],
+  });
+  project.tracks[1].instrument.params.tone = tone;
+  return createProjectDocument(project, { id, now: FIRST_TIME });
+}
+
+function createPendingUpgradePersistence(source, localRepository) {
+  let active = normalizeProjectDocumentToV8(source);
+  let pendingSourceSchemaVersion = source.project.schemaVersion;
+  const saveCalls = [];
+  return {
+    getActiveDocument: () => active,
+    getExportText: () => serializeProjectDocument(active),
+    getPendingUpgradeSourceSchemaVersion: () => pendingSourceSchemaVersion,
+    saveCalls,
+    async saveNow(options) {
+      saveCalls.push(options);
+      if (options?.commitUpgrade === true && pendingSourceSchemaVersion !== null) {
+        active = reviseProjectDocument(active, active.project, { now: SECOND_TIME });
+        await localRepository.save(active);
+        pendingSourceSchemaVersion = null;
+      }
+      return active;
+    },
+  };
+}
+
 test("first cloud backup is explicit and records its remote revision", async () => {
   const document = createProjectDocument(createDefaultProject(), { id: "project-one", now: FIRST_TIME });
   const localRepository = createMemoryProjectRepository([document]);
@@ -81,6 +127,181 @@ test("first cloud backup is explicit and records its remote revision", async () 
   assert.equal(link.status, "synced");
   assert.equal(link.cloudRevision, 1);
   assert.equal(link.pendingDocument, null);
+  service.dispose();
+});
+
+test("cloud linking requires a pending schema upgrade to commit locally before upload", async () => {
+  const source = createProjectDocument(createDefaultProject(), {
+    id: "pending-cloud-upgrade",
+    now: FIRST_TIME,
+  });
+  const active = normalizeProjectDocumentToV8(source);
+  const saveCalls = [];
+  let networkCalls = 0;
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        networkCalls += 1;
+        return null;
+      },
+      async saveProject() {
+        networkCalls += 1;
+        return null;
+      },
+    }),
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository: createMemoryProjectRepository([source]),
+    persistence: {
+      getActiveDocument: () => active,
+      getExportText: () => serializeProjectDocument(active),
+      getPendingUpgradeSourceSchemaVersion: () => 7,
+      async saveNow(options) {
+        saveCalls.push(options);
+        throw new Error("IndexedDB unavailable");
+      },
+    },
+    preferences: createPreferences(active.id),
+  });
+
+  await assert.rejects(service.enableCurrentProject(), /IndexedDB unavailable/);
+
+  assert.deepEqual(saveCalls, [{ commitUpgrade: true }]);
+  assert.equal(networkCalls, 0);
+  service.dispose();
+});
+
+test("native V8 Drums round-trip through cloud linking without a false conflict", async () => {
+  const document = createV8DrumDocument();
+  const remote = createCloudProjectRecord("user-one", document, 6);
+  const localRepository = createMemoryProjectRepository([document]);
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        return remote;
+      },
+      async saveProject() {
+        assert.fail("an identical V8 drum document must not be uploaded as a conflict");
+      },
+    }),
+    createId: () => {
+      assert.fail("an identical V8 drum document must not create a safety copy");
+    },
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository,
+    preferences: createPreferences(document.id),
+  });
+
+  const link = await service.enableCurrentProject();
+
+  assert.equal(link.status, "synced");
+  assert.equal(link.cloudRevision, 6);
+  assert.deepEqual(remote.document.project.tracks[1].instrument.params, {
+    tone: 0.75,
+    decaySeconds: 0.45,
+    level: 0.5,
+  });
+  assert.deepEqual((await localRepository.list()).map(({ id }) => id), [document.id]);
+  service.dispose();
+});
+
+test("a divergent native V8 Drums record preserves its exact state in the cloud conflict copy", async () => {
+  const local = createV8DrumDocument({ tone: 0.2 });
+  const remoteDocument = createV8DrumDocument({ tone: 0.9 });
+  const localRepository = createMemoryProjectRepository([local]);
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        return createCloudProjectRecord("user-one", remoteDocument, 7);
+      },
+    }),
+    createId: () => "drum-conflict-copy",
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository,
+    now: () => SECOND_TIME,
+    preferences: createPreferences(local.id),
+  });
+
+  const link = await service.enableCurrentProject();
+
+  assert.equal(link.status, "conflict");
+  assert.equal(link.conflictProjectId, "drum-conflict-copy");
+  assert.equal((await localRepository.get(local.id)).project.tracks[1].instrument.params.tone, 0.2);
+  const conflict = await localRepository.get("drum-conflict-copy");
+  assert.equal(conflict.project.schemaVersion, 8);
+  assert.deepEqual(conflict.project.tracks[1].instrument.params, {
+    tone: 0.9,
+    decaySeconds: 0.45,
+    level: 0.5,
+  });
+  service.dispose();
+});
+
+test("cloud conflict comparison treats historical V7 and its canonical V8 migration as equal", async () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.schemaVersion = 7;
+  project.metadata.title = "Historical cloud tune";
+  const historical = createProjectDocument(project, { id: "historical-cloud", now: FIRST_TIME });
+  const current = normalizeProjectDocumentToV8(historical);
+  assert.deepEqual(normalizeProjectDocumentToV7(historical), current);
+  const localRepository = createMemoryProjectRepository([current]);
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        return createCloudProjectRecord("user-one", historical, 8);
+      },
+    }),
+    createId: () => {
+      assert.fail("equivalent V7 and V8 documents must not create a conflict copy");
+    },
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository,
+    preferences: createPreferences(current.id),
+  });
+
+  const link = await service.enableCurrentProject();
+
+  assert.equal(link.status, "synced");
+  assert.equal(link.cloudRevision, 8);
+  assert.deepEqual((await localRepository.list()).map(({ id }) => id), [current.id]);
+  service.dispose();
+});
+
+test("linking an identical V7 cloud project ignores the forced upgrade revision envelope", async () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.schemaVersion = 7;
+  const source = createProjectDocument(project, {
+    id: "identical-v7-link",
+    now: FIRST_TIME,
+  });
+  const localRepository = createMemoryProjectRepository([source]);
+  const persistence = createPendingUpgradePersistence(source, localRepository);
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        return createCloudProjectRecord("user-one", source, 8);
+      },
+      async saveProject() {
+        assert.fail("an envelope-only migration must not upload or create a conflict");
+      },
+    }),
+    createId: () => {
+      assert.fail("an envelope-only migration must not create a safety copy");
+    },
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository,
+    persistence,
+    preferences: createPreferences(source.id),
+  });
+
+  const link = await service.enableCurrentProject();
+  const committed = await localRepository.get(source.id);
+
+  assert.equal(link.status, "synced");
+  assert.equal(link.cloudRevision, 8);
+  assert.deepEqual(persistence.saveCalls, [{ commitUpgrade: true }]);
+  assert.equal(committed.project.schemaVersion, 8);
+  assert.equal(committed.revision, source.revision + 1);
+  assert.deepEqual((await localRepository.list()).map(({ id }) => id), [source.id]);
   service.dispose();
 });
 
@@ -298,6 +519,36 @@ test("cloud operations reject an unverified account before network access", asyn
   await assert.rejects(service.listProjects(), /Verify your email/);
   assert.equal(clientRequested, false);
   service.dispose();
+});
+
+test("cloud listing forwards the active Studio schema as its compatibility target", async () => {
+  const activeDocuments = [
+    createProjectDocument(createDefaultProject(), { id: "active-v6", now: FIRST_TIME }),
+    createV8DrumDocument({ id: "active-v8" }),
+  ];
+
+  for (const activeDocument of activeDocuments) {
+    const calls = [];
+    const service = createCloudProjectService({
+      accountService: createAccountServiceDouble({
+        async listProjects(uid, options) {
+          calls.push({ uid, options });
+          return [];
+        },
+      }),
+      linkRepository: createMemoryCloudLinkRepository(),
+      localRepository: createMemoryProjectRepository([activeDocument]),
+      persistence: { getActiveDocument: () => activeDocument },
+      preferences: createPreferences(activeDocument.id),
+    });
+
+    assert.deepEqual(await service.listProjects(), []);
+    assert.deepEqual(calls, [{
+      uid: "user-one",
+      options: { targetSchemaVersion: activeDocument.project.schemaVersion },
+    }]);
+    service.dispose();
+  }
 });
 
 test("startup cloud-link failures are caught and reported as background failures", async () => {
@@ -559,12 +810,12 @@ test("authenticated cloud recovery downloads the untouched raw Firestore object"
   service.dispose();
 });
 
-test("opening a V1 cloud Project into V2 queues the one-time upgrade disclosure", async () => {
+test("opening a V6 cloud Project into V8 queues the one-time upgrade disclosure", async () => {
   const source = createProjectDocument(createDefaultProject(), {
     id: "migrated-cloud",
     now: FIRST_TIME,
   });
-  const activeV7 = normalizeProjectDocumentToV7(source);
+  const activeV8 = normalizeProjectDocumentToV8(source);
   const upgrades = [];
   let reloadCount = 0;
   const localRepository = createMemoryProjectRepository([source]);
@@ -578,8 +829,8 @@ test("opening a V1 cloud Project into V2 queues the one-time upgrade disclosure"
     localRepository,
     onProjectUpgrade: (detail) => upgrades.push(detail),
     persistence: {
-      getActiveDocument: () => activeV7,
-      getExportText: () => serializeProjectDocument(activeV7),
+      getActiveDocument: () => activeV8,
+      getExportText: () => serializeProjectDocument(activeV8),
       async saveNow() {},
     },
     preferences: createPreferences(source.id),
@@ -588,11 +839,100 @@ test("opening a V1 cloud Project into V2 queues the one-time upgrade disclosure"
 
   const opened = await service.openProject(source.id);
 
-  assert.equal(opened.project.schemaVersion, 7);
+  assert.equal(opened.project.schemaVersion, 8);
   assert.deepEqual(upgrades, [{
     fromSchemaVersion: 6,
     projectId: source.id,
   }]);
   assert.equal(reloadCount, 1);
+  service.dispose();
+});
+
+test("opening the same V7 cloud project preserves its forced local V8 commit envelope", async () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.schemaVersion = 7;
+  const source = createProjectDocument(project, {
+    id: "same-v7-cloud-open",
+    now: FIRST_TIME,
+  });
+  const localRepository = createMemoryProjectRepository([source]);
+  const persistence = createPendingUpgradePersistence(source, localRepository);
+  const upgrades = [];
+  let reloadCount = 0;
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        return createCloudProjectRecord("user-one", source, 9);
+      },
+    }),
+    createId: () => {
+      assert.fail("an envelope-only migration must not create a safety copy");
+    },
+    linkRepository: createMemoryCloudLinkRepository(),
+    localRepository,
+    onProjectUpgrade: (detail) => upgrades.push(detail),
+    persistence,
+    preferences: createPreferences(source.id),
+    reload: () => { reloadCount += 1; },
+  });
+
+  const opened = await service.openProject(source.id);
+  const stored = await localRepository.get(source.id);
+
+  assert.equal(opened.project.schemaVersion, 8);
+  assert.equal(opened.revision, source.revision + 1);
+  assert.equal(opened.updatedAt, SECOND_TIME);
+  assert.deepEqual(stored, opened);
+  assert.deepEqual(persistence.saveCalls, [{ commitUpgrade: true }]);
+  assert.deepEqual(upgrades, [{
+    fromSchemaVersion: 7,
+    projectId: source.id,
+  }]);
+  assert.equal(reloadCount, 1);
+  assert.deepEqual((await localRepository.list()).map(({ id }) => id), [source.id]);
+  service.dispose();
+});
+
+test("cloud open discloses a V7 upgrade after the local save even when link storage fails", async () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.schemaVersion = 7;
+  const source = createProjectDocument(project, {
+    id: "link-failure-upgrade",
+    now: FIRST_TIME,
+  });
+  const activeV8 = normalizeProjectDocumentToV8(source);
+  const upgrades = [];
+  let reloadCount = 0;
+  const localRepository = createMemoryProjectRepository([source]);
+  const service = createCloudProjectService({
+    accountService: createAccountServiceDouble({
+      async getProject() {
+        return createCloudProjectRecord("user-one", source, 5);
+      },
+    }),
+    linkRepository: {
+      async save() {
+        throw new Error("Cloud link storage unavailable");
+      },
+    },
+    localRepository,
+    onProjectUpgrade: (detail) => upgrades.push(detail),
+    persistence: {
+      getActiveDocument: () => activeV8,
+      getExportText: () => serializeProjectDocument(activeV8),
+      async saveNow() {},
+    },
+    preferences: createPreferences(source.id),
+    reload: () => { reloadCount += 1; },
+  });
+
+  await assert.rejects(service.openProject(source.id), /Cloud link storage unavailable/);
+
+  assert.equal((await localRepository.get(source.id)).project.schemaVersion, 8);
+  assert.deepEqual(upgrades, [{
+    fromSchemaVersion: 7,
+    projectId: source.id,
+  }]);
+  assert.equal(reloadCount, 0);
   service.dispose();
 });

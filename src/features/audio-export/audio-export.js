@@ -1,5 +1,6 @@
 import { renderArrangementOffline } from "../../audio/offline-arrangement-renderer.js";
 import { renderV2ArrangementOffline } from "../../v2/audio/offline-renderer.js";
+import { PROJECT_SCHEMA_VERSION as CURRENT_PROJECT_SCHEMA_VERSION } from "../../v2/domain/constants.js";
 import { encodePcm16Wave } from "../../audio/wav-encoder.js";
 import { setTextIfChanged } from "../../shared/status-announcer.js";
 
@@ -12,7 +13,7 @@ function safeFilename(title) {
 }
 
 export async function renderProjectArrangementOffline(project, options) {
-  if (project?.schemaVersion === 7) {
+  if ([7, CURRENT_PROJECT_SCHEMA_VERSION].includes(project?.schemaVersion)) {
     const rendered = await renderV2ArrangementOffline(project, options);
     return rendered.audioBuffer;
   }

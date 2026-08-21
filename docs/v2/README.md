@@ -13,7 +13,7 @@ This package defines the smallest coherent route from the current step-sequencer
 - A first-party Instrument or Effect may open above the primary surface; only one device window is visible at a time.
 - Patterns remain project-level, reusable musical objects. Tracks own an instrument, a Mixer channel and a Playlist lane.
 - V2 uses 96 pulses per quarter note (PPQ), with launch editing snapped to 1/8, 1/16 or 1/32 notes.
-- Klinto Chip is the only launch instrument. Klinto Filter and Klinto Delay are the only launch effects.
+- Klinto Chip is the launch instrument. Schema 8 adds the post-launch Klinto Drums first-party instrument; Klinto Filter and Klinto Delay remain the only effects.
 - Instruments and effects are written by Klinto for the Web Audio runtime. V2 does not host native VST, Audio Unit or arbitrary third-party plug-ins.
 - One `V2 Beta` badge is shown during Beta and removed or deliberately renamed at Stable.
 
@@ -30,6 +30,7 @@ The direction borrows FL Studio's object separation and workflow, not its densit
 | [PRD 31](./31-playlist-arrangement.md) | Playlist presentation and arrangement commands | PRDs 27â€“29 |
 | [PRD 30](./30-mixer-routing-and-effects.md) | Mixer, bounded routing, Klinto Filter and Klinto Delay | PRDs 27â€“29 |
 | [PRD 32](./32-v2-compatibility-and-release.md) | Schema activation, migration, hosted compatibility and release gates | PRDs 26â€“31 |
+| [PRD 33](./33-klinto-drums.md) | Schema-8 Klinto Drums instrument, mapped kit and instrument chooser | PRDs 27–32 |
 | [V2 schema contract](./v2-project-schema-contract.md) | Normative Project/document shape, defaults, bounds and V1 field map | Finalized PRDs 28â€“30; required before PRD 32 activation |
 | [Release and rollback runbook](./release-and-rollback-runbook.md) | Exact PRD 32 artifacts, cutover order, recovery evidence and emergency rollback | PRD 32 compatibility implementation |
 
@@ -68,7 +69,7 @@ V2 explicitly excludes:
 
 - Native VST or Audio Unit hosting, arbitrary uploaded code, third-party plug-ins or a plug-in SDK
 - Rack/channel-rack UI, a separate Keyboard window or a generic movable/minimizable window manager
-- Additional instruments, additional effects, factory/user presets or a preset marketplace
+- Additional instruments beyond the PRD 33 Klinto Drums extension, additional effects, user presets or a preset marketplace
 - Automation lanes, MIDI import/export, audio recording, audio clips or sample libraries
 - Sends, return buses, sidechains or arbitrary routing graphs
 - Free/off-grid timing, triplets, swing, tempo automation or time-signature editing

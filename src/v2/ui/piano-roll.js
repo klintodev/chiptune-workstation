@@ -7,6 +7,7 @@ import {
   getPatternPlaybackEndTick,
 } from "../domain/index.js";
 import { createElement, clearElement, setPressed } from "./dom.js";
+import { getInstrumentName, getInstrumentPitchName } from "./device-presentation.js";
 import { formatDurationTicks, formatMidiPitch, formatPercent, formatTickPosition } from "./music-format.js";
 
 const MIN_PITCH = 36;
@@ -87,8 +88,8 @@ export function renamePianoPattern({
   }
 }
 
-function noteLabel(note) {
-  return `${formatMidiPitch(note.pitch)}, ${formatTickPosition(note.startTick)}, ${formatDurationTicks(note.durationTicks)}, velocity ${formatPercent(note.velocity)}`;
+function noteLabel(note, formatPitch = formatMidiPitch) {
+  return `${formatPitch(note.pitch)}, ${formatTickPosition(note.startTick)}, ${formatDurationTicks(note.durationTicks)}, velocity ${formatPercent(note.velocity)}`;
 }
 
 function uniqueSelectedNotes(pattern, ids) {
@@ -327,6 +328,26 @@ export function createPianoRollSurface({
     return trackIds.has(candidate) ? candidate : snapshot().tracks[0].id;
   }
 
+  function auditionTrack() {
+    const project = snapshot();
+    return project.tracks.find(({ id }) => id === auditionTrackId()) ?? project.tracks[0];
+  }
+
+  function instrumentPitchName(pitch) {
+    return getInstrumentPitchName(auditionTrack().instrument, pitch);
+  }
+
+  function formatEditorPitch(pitch, { visual = false } = {}) {
+    const midiPitch = formatMidiPitch(pitch);
+    const instrumentName = instrumentPitchName(pitch);
+    if (!instrumentName) return midiPitch;
+    return `${midiPitch}${visual ? " · " : ", "}${instrumentName}`;
+  }
+
+  function describeNote(note) {
+    return noteLabel(note, (pitch) => formatEditorPitch(pitch));
+  }
+
   function auditionPitch(pitch, {
     noteId = null,
     velocity = PIANO_RAIL_PREVIEW_VELOCITY,
@@ -393,7 +414,7 @@ export function createPianoRollSurface({
     if (announceSelection) {
       const notes = uniqueSelectedNotes(pattern, selectedNoteIds);
       if (notes.length === 0) announce(`${pattern.name}. Selection cleared.`);
-      else if (notes.length === 1) announce(`${pattern.name}. Selected ${noteLabel(notes[0])}.`);
+      else if (notes.length === 1) announce(`${pattern.name}. Selected ${describeNote(notes[0])}.`);
       else announce(`${pattern.name}. ${notes.length} notes selected.`);
     }
     renderEditor();
@@ -423,7 +444,7 @@ export function createPianoRollSurface({
         && cursorTick >= note.startTick
         && cursorTick < note.startTick + note.durationTicks
       ));
-      announce(`${pattern.name}, ${formatTickPosition(cursorTick)}, ${formatMidiPitch(cursorPitch)}, ${atCursor ? noteLabel(atCursor) : "empty"}.`);
+      announce(`${pattern.name}, ${formatTickPosition(cursorTick)}, ${formatEditorPitch(cursorPitch)}, ${atCursor ? describeNote(atCursor) : "empty"}.`);
     }
     renderEditor();
   }
@@ -747,7 +768,7 @@ export function createPianoRollSurface({
       element.style.translate = `${deltaTick * pixelsPerTick}px ${-deltaPitch * ROW_HEIGHT}px`;
       element.setAttribute(
         "aria-label",
-        `${noteLabel(preview)}${selectedNoteIds.has(note.id) ? ", selected" : ""}`,
+        `${describeNote(preview)}${selectedNoteIds.has(note.id) ? ", selected" : ""}`,
       );
       const label = noteLabelElements.get(note.id);
       if (label) label.textContent = formatMidiPitch(preview.pitch);
@@ -761,7 +782,7 @@ export function createPianoRollSurface({
       element.style.translate = "";
       element.setAttribute(
         "aria-label",
-        `${noteLabel(note)}${selectedNoteIds.has(note.id) ? ", selected" : ""}`,
+        `${describeNote(note)}${selectedNoteIds.has(note.id) ? ", selected" : ""}`,
       );
       const label = noteLabelElements.get(note.id);
       if (label) label.textContent = formatMidiPitch(note.pitch);
@@ -1069,14 +1090,14 @@ export function createPianoRollSurface({
     });
     renderEditor();
     renderHeader();
-    announce(`Deleted ${noteLabel(note)} from ${pattern.name}.`);
+    announce(`Deleted ${describeNote(note)} from ${pattern.name}.`);
   }
 
   function renderInspector() {
     clearElement(inspector);
     const notes = uniqueSelectedNotes(activePattern(), selectedNoteIds);
     if (notes.length === 0) {
-      inspector.append(createElement("p", { textContent: `${formatTickPosition(cursorTick)} · ${formatMidiPitch(cursorPitch)} · no note selected` }));
+      inspector.append(createElement("p", { textContent: `${formatTickPosition(cursorTick)} · ${formatEditorPitch(cursorPitch, { visual: true })} · no note selected` }));
       inspector.append(createElement("button", {
         className: "v2-mobile-note-action",
         textContent: "Create note here",
@@ -1093,7 +1114,7 @@ export function createPianoRollSurface({
       }));
       return;
     }
-    inspector.append(createElement("strong", { textContent: notes.length === 1 ? noteLabel(notes[0]) : `${notes.length} notes selected` }));
+    inspector.append(createElement("strong", { textContent: notes.length === 1 ? describeNote(notes[0]) : `${notes.length} notes selected` }));
     const velocity = createElement("input", {
       "aria-label": "Selected note velocity",
       max: 1,
@@ -1144,16 +1165,20 @@ export function createPianoRollSurface({
     clearElement(canvas);
 
     for (let pitch = MAX_PITCH; pitch >= MIN_PITCH; pitch -= 1) {
+      const instrumentName = instrumentPitchName(pitch);
+      const pitchText = formatEditorPitch(pitch, { visual: true });
       const row = createElement("div", {
         "aria-hidden": "true",
         className: `v2-pitch-row ${pitch % 12 === 0 ? "is-c" : ""}`,
         style: { top: `${(MAX_PITCH - pitch) * ROW_HEIGHT}px` },
       });
       row.append(createElement("span", {
-        className: "v2-pitch-label",
+        className: `v2-pitch-label${instrumentName ? " has-drum-name" : ""}`,
         dataset: { pitch },
-        textContent: formatMidiPitch(pitch),
-        title: `Play ${formatMidiPitch(pitch)}`,
+        textContent: pitchText,
+        title: instrumentName
+          ? `Play ${instrumentName} (${formatMidiPitch(pitch)})`
+          : `Play ${formatMidiPitch(pitch)}`,
       }));
       canvas.append(row);
     }
@@ -1163,7 +1188,7 @@ export function createPianoRollSurface({
       id: `v2-piano-cursor-${pattern.id}`,
       role: "option",
       "aria-selected": "false",
-      "aria-label": `${formatTickPosition(cursorTick)}, ${formatMidiPitch(cursorPitch)}`,
+      "aria-label": `${formatTickPosition(cursorTick)}, ${formatEditorPitch(cursorPitch)}`,
       style: {
         height: `${ROW_HEIGHT - 2}px`,
         left: `${LABEL_WIDTH + cursorTick * pixelsPerTick}px`,
@@ -1193,7 +1218,7 @@ export function createPianoRollSurface({
         role: "option",
         tabIndex: -1,
         type: "button",
-        "aria-label": `${noteLabel(note)}${selected ? ", selected" : ""}`,
+        "aria-label": `${describeNote(note)}${selected ? ", selected" : ""}`,
         "aria-selected": String(selected),
         style: {
           height: `${ROW_HEIGHT - 4}px`,
@@ -1281,7 +1306,9 @@ export function createPianoRollSurface({
     auditionSelect.value = auditionTrackId();
     auditionSelect.addEventListener("change", () => {
       updatePatternSession({ auditionTrackId: auditionSelect.value });
-      announce(`${pattern.name} will audition through ${projectState.getTrack(auditionSelect.value).name}.`);
+      const track = projectState.getTrack(auditionSelect.value);
+      renderEditor();
+      announce(`${pattern.name} will audition through ${track.name} using ${getInstrumentName(track.instrument)}.`);
     });
     const toolGroup = createElement("div", { className: "v2-segmented v2-piano-tools", role: "group", "aria-label": "Piano Roll tool" });
     for (const [value, label] of [["draw", "Draw"], ["select", "Select"]]) {

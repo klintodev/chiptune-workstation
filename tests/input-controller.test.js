@@ -28,7 +28,70 @@ test("pattern root octave shifts captured notes before instrument transposition"
   controller.start("test", 60);
 
   assert.deepEqual(captured, [36]);
+  assert.equal(triggers[0].pitch, 36);
   assert.equal(triggers[0].frequency, midiNoteToFrequency(48));
+  controller.dispose();
+});
+
+test("a synth null result creates no keyboard ownership or note callback", () => {
+  const root = new EventTarget();
+  root.querySelectorAll = () => [];
+  const triggerEvents = [];
+  const activeChanges = [];
+  const captured = [];
+  const controller = createInputController({
+    getInstrumentConfig: () => ({
+      attackSeconds: 0.001,
+      octaveOffset: 0,
+      releaseSeconds: 0.01,
+      voiceType: "klinto-drums",
+    }),
+    getVoiceEngine: () => ({
+      trigger(event) {
+        triggerEvents.push(event);
+        return null;
+      },
+    }),
+    onActiveNotesChange: (notes) => activeChanges.push([...notes]),
+    onNoteStart: (pitch) => captured.push(pitch),
+    root,
+  });
+
+  assert.equal(controller.start("keyboard:KeyQ", 72), false);
+  assert.equal(triggerEvents[0].pitch, 72);
+  assert.deepEqual(captured, []);
+  assert.deepEqual(activeChanges, []);
+  assert.equal(controller.stop("keyboard:KeyQ"), false);
+  controller.dispose();
+});
+
+test("refreshing held notes drops ownership when the replacement pitch is unmapped", () => {
+  let mapped = true;
+  let stopCount = 0;
+  const activeChanges = [];
+  const controller = createInputController({
+    getInstrumentConfig: () => ({
+      attackSeconds: 0.001,
+      octaveOffset: 0,
+      releaseSeconds: 0.01,
+      voiceType: "klinto-drums",
+    }),
+    getVoiceEngine: () => ({
+      trigger() {
+        return mapped ? { stop: () => { stopCount += 1; } } : null;
+      },
+    }),
+    onActiveNotesChange: (notes) => activeChanges.push([...notes]),
+    root: new EventTarget(),
+  });
+
+  assert.equal(controller.start("keyboard:KeyQ", 60), true);
+  mapped = false;
+  controller.refreshActiveVoices();
+
+  assert.equal(stopCount, 1);
+  assert.deepEqual(activeChanges, [[60], []]);
+  assert.equal(controller.stop("keyboard:KeyQ"), false);
   controller.dispose();
 });
 

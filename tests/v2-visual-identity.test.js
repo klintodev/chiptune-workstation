@@ -58,10 +58,13 @@ test("Piano Roll grid geometry and Mixer density remain visually bounded", async
   assert.match(css, /--v2-piano-label-width:\s*88px/);
   assert.match(css, /background-position:\s*var\(--v2-piano-label-width\) 0,\s*var\(--v2-piano-label-width\) 0/);
   assert.match(css, /\.v2-pitch-label\s*{[^}]*width:\s*var\(--v2-piano-label-width\)/s);
+  assert.match(css, /\.v2-pitch-label\.has-drum-name\s*{[^}]*line-height:\s*0\.9;[^}]*text-align:\s*right;[^}]*white-space:\s*normal/s);
   assert.match(css, /\.v2-mixer-channels\s*{[^}]*align-items:\s*flex-start/s);
   assert.match(css, /\.v2-insert-chain\s*{[^}]*margin-top:\s*6px/s);
   assert.match(css, /\.v2-playlist-add-instrument-row\s*{[^}]*position:\s*absolute[^}]*height:\s*44px/s);
   assert.match(css, /\.v2-playlist-add-instrument-cell\s*{[^}]*position:\s*sticky[^}]*left:\s*0[^}]*width:\s*310px/s);
+  assert.match(css, /\.v2-add-instrument-controls\s*{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;[^}]*min-width:\s*0/s);
+  assert.match(css, /\.v2-add-instrument-controls select\s*{[^}]*min-width:\s*0/s);
   assert.match(css, /\.v2-playlist-track-header\s*{[^}]*grid-template-columns:\s*minmax\(94px, 1\.15fr\) minmax\(98px, 1fr\) 84px;[^}]*width:\s*310px/s);
   assert.match(css, /\.v2-playlist-track-identity\s*{[^}]*grid-template-rows:\s*32px 20px;[^}]*height:\s*55px/s);
   assert.match(css, /input\.v2-playlist-track-name-input\s*{[^}]*width:\s*100%;[^}]*user-select:\s*text/s);

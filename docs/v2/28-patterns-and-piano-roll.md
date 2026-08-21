@@ -1,8 +1,10 @@
 # PRD 28: Patterns and Piano Roll
 
-Status: Draft  
-Release: Klinto Studio V2  
+Status: Draft
+Release: Klinto Studio V2
 Depends on: PRDs 26â€“27
+
+> Schema-8 extension: when the audition Track uses Klinto Drums, Piano Roll rows 60–71 show the fixed drum names from [PRD 33](./33-klinto-drums.md). Pattern pitch data remains Instrument-independent.
 
 ## Description
 

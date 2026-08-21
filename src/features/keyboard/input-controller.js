@@ -31,9 +31,11 @@ export function createInputController({
     const voice = activeVoiceEngine.trigger({
       type: config.voiceType,
       frequency: midiNoteToFrequency(playedNote),
+      pitch: patternNote,
       attackSeconds: config.attackSeconds,
       releaseSeconds: config.releaseSeconds,
     });
+    if (!voice) return null;
     return {
       activeNote: patternNote - keyboardNoteOffset * 12,
       patternNote,
@@ -50,6 +52,7 @@ export function createInputController({
       if (error?.code === "not-ready") return false;
       throw error;
     }
+    if (!started) return false;
     voicesByOwner.set(owner, {
       activeNote: started.activeNote,
       baseNote,
@@ -84,6 +87,10 @@ export function createInputController({
     for (const [owner, active] of voicesByOwner) {
       active.voice.stop();
       const refreshed = createVoice(active.baseNote);
+      if (!refreshed) {
+        voicesByOwner.delete(owner);
+        continue;
+      }
       voicesByOwner.set(owner, {
         activeNote: refreshed.activeNote,
         baseNote: active.baseNote,

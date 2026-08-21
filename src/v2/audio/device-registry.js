@@ -1,6 +1,7 @@
 import {
   KLINTO_CHIP_CONTRACT,
   KLINTO_DELAY_CONTRACT,
+  KLINTO_DRUMS_CONTRACT,
   KLINTO_FILTER_CONTRACT,
   createDefaultEffectInstance,
   createDefaultInstrumentInstance,
@@ -11,9 +12,18 @@ import {
   adaptKlintoChipVoiceParameters,
   createKlintoChipOutputRuntime,
   createKlintoDelayRuntime,
+  createKlintoDrumsOutputRuntime,
   createKlintoFilterRuntime,
+  toWebAudioWaveform,
 } from "./web-audio-runtime.js";
 import { getDelayTimeSeconds, getEqualPowerGains } from "./effect-tail.js";
+import { createKlintoChipSynthRuntime } from "./klinto-chip-synth.js";
+import {
+  adaptKlintoDrumsVoice,
+  createKlintoDrumsSynthRuntime,
+  getKlintoDrumsTailSeconds,
+  KLINTO_DRUM_PITCH_NAMES,
+} from "./klinto-drums-synth.js";
 
 function deepFreeze(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -23,12 +33,16 @@ function deepFreeze(value) {
 
 function createDefinition({
   adaptParameters = (params) => Object.freeze({ ...params }),
+  adaptVoice = null,
   contract,
   createDefault,
   createRuntime,
+  createSynthRuntime = null,
+  getTailSeconds = null,
   kind,
   name,
   normalize,
+  pitchNames = null,
   sections,
   uiParameters,
 }) {
@@ -37,6 +51,13 @@ function createDefinition({
     offline: createRuntime,
     public: createRuntime,
   });
+  const synthAdapters = createSynthRuntime
+    ? Object.freeze({
+        live: createSynthRuntime,
+        offline: createSynthRuntime,
+        public: createSynthRuntime,
+      })
+    : null;
   const parameterKeys = Object.keys(uiParameters);
   if (
     parameterKeys.length !== contract.paramKeys.length
@@ -44,9 +65,17 @@ function createDefinition({
   ) {
     throw new TypeError(`${name} UI metadata must describe every parameter exactly once.`);
   }
+  if (kind === "instrument" && (
+    typeof adaptVoice !== "function"
+    || typeof createSynthRuntime !== "function"
+    || typeof getTailSeconds !== "function"
+  )) {
+    throw new TypeError(`${name} must define voice adaptation, synthesis and tail policy.`);
+  }
   let definition;
   definition = {
     adaptParameters,
+    adaptVoice,
     contract,
     createDefault,
     createUI(options = {}) {
@@ -60,6 +89,7 @@ function createDefinition({
       return editor;
     },
     createRuntime,
+    createSynthRuntime,
     defaults: contract.defaults,
     disposeRuntime(runtime) {
       if (!runtime || typeof runtime.dispose !== "function") {
@@ -74,6 +104,7 @@ function createDefinition({
       return editor.dispose();
     },
     kind,
+    getTailSeconds,
     migrate(instance, options) {
       return normalize(instance, options);
     },
@@ -82,10 +113,12 @@ function createDefinition({
     parameters: contract.parameters,
     paramKeys: contract.paramKeys,
     runtimeAdapters,
+    synthAdapters,
     type: contract.type,
     ui: {
       name,
       parameters: uiParameters,
+      pitchNames,
       sections,
     },
     version: contract.version,
@@ -93,11 +126,39 @@ function createDefinition({
   return deepFreeze(definition);
 }
 
+function adaptKlintoChipVoice({ noteDurationSeconds, params, pitch } = {}) {
+  if (!Number.isInteger(pitch) || !Number.isInteger(params?.octave)) {
+    throw new TypeError("Klinto Chip pitch and octave must be integers.");
+  }
+  if (!Number.isFinite(noteDurationSeconds) || noteDurationSeconds <= 0) {
+    throw new RangeError("Klinto Chip note duration must be positive.");
+  }
+  const effectivePitch = pitch + params.octave * 12;
+  if (effectivePitch < 12 || effectivePitch > 136) {
+    throw new RangeError("Instrument octave produced an unsupported effective MIDI pitch.");
+  }
+  const frequencyHz = 440 * 2 ** ((effectivePitch - 69) / 12);
+  return Object.freeze({
+    attackSeconds: params.attackSeconds,
+    durationSeconds: noteDurationSeconds,
+    effectivePitch,
+    frequencyHz,
+    oneShot: false,
+    releaseSeconds: params.releaseSeconds,
+    voiceEndOffsetSeconds: noteDurationSeconds + params.releaseSeconds,
+    waveform: params.waveform,
+    webAudioWaveform: toWebAudioWaveform(params.waveform),
+  });
+}
+
 export const KLINTO_CHIP_DEFINITION = createDefinition({
   adaptParameters: adaptKlintoChipVoiceParameters,
+  adaptVoice: adaptKlintoChipVoice,
   contract: KLINTO_CHIP_CONTRACT,
   createDefault: (instanceId) => createDefaultInstrumentInstance(instanceId),
   createRuntime: createKlintoChipOutputRuntime,
+  createSynthRuntime: createKlintoChipSynthRuntime,
+  getTailSeconds: (params) => params.releaseSeconds,
   kind: "instrument",
   name: "Klinto Chip",
   normalize: normalizeInstrumentInstance,
@@ -133,6 +194,46 @@ export const KLINTO_CHIP_DEFINITION = createDefinition({
       label: "Release",
       step: 0.01,
       valueText: (value) => value < 1 ? `${Math.round(value * 1000)} milliseconds` : `${value} seconds`,
+    },
+    level: {
+      label: "Instrument output",
+      step: 0.01,
+      valueText: (value) => `${Math.round(value * 100)}%`,
+    },
+  },
+});
+
+export const KLINTO_DRUMS_DEFINITION = createDefinition({
+  adaptVoice: adaptKlintoDrumsVoice,
+  contract: KLINTO_DRUMS_CONTRACT,
+  createDefault: (instanceId) => createDefaultInstrumentInstance(
+    instanceId,
+    KLINTO_DRUMS_CONTRACT.type,
+  ),
+  createRuntime: createKlintoDrumsOutputRuntime,
+  createSynthRuntime: createKlintoDrumsSynthRuntime,
+  getTailSeconds: getKlintoDrumsTailSeconds,
+  kind: "instrument",
+  name: "Klinto Drums",
+  normalize: normalizeInstrumentInstance,
+  pitchNames: KLINTO_DRUM_PITCH_NAMES,
+  sections: [
+    { id: "character", label: "Character", params: ["tone"] },
+    { id: "envelope", label: "Envelope", params: ["decaySeconds"] },
+    { id: "output", label: "Output", params: ["level"] },
+  ],
+  uiParameters: {
+    tone: {
+      label: "Tone",
+      step: 0.01,
+      valueText: (value) => `${Math.round(value * 100)}%`,
+    },
+    decaySeconds: {
+      label: "Decay",
+      step: 0.01,
+      valueText: (value) => value < 1
+        ? `${Math.round(value * 1000)} milliseconds`
+        : `${Number(value).toFixed(2)} seconds`,
     },
     level: {
       label: "Instrument output",
@@ -251,7 +352,10 @@ function createClosedRegistry(kind, definitions) {
   });
 }
 
-export const INSTRUMENT_DEFINITIONS = Object.freeze([KLINTO_CHIP_DEFINITION]);
+export const INSTRUMENT_DEFINITIONS = Object.freeze([
+  KLINTO_CHIP_DEFINITION,
+  KLINTO_DRUMS_DEFINITION,
+]);
 export const EFFECT_DEFINITIONS = Object.freeze([
   KLINTO_FILTER_DEFINITION,
   KLINTO_DELAY_DEFINITION,
@@ -266,3 +370,15 @@ export const DEVICE_REGISTRY = Object.freeze({
   effects: effectRegistry,
   instruments: instrumentRegistry,
 });
+
+export function getInstrumentTailSeconds(instance) {
+  if (!instance || typeof instance !== "object") {
+    throw new TypeError("Instrument tail policy requires an Instrument instance.");
+  }
+  const definition = instrumentRegistry.require(instance.type, instance.version);
+  const tailSeconds = definition.getTailSeconds(instance.params);
+  if (!Number.isFinite(tailSeconds) || tailSeconds < 0) {
+    throw new RangeError(`${definition.name} produced an invalid tail duration.`);
+  }
+  return tailSeconds;
+}

@@ -3,10 +3,13 @@ import test from "node:test";
 
 import {
   KLINTO_CHIP_CONTRACT,
+  KLINTO_DRUMS_CONTRACT,
   PROJECT_SCHEMA_VERSION,
   canonicalizeV2Project,
+  createDefaultInstrumentInstance,
   createDefaultV2Project,
-  migrateProjectToV7,
+  migrateProjectToV8,
+  normalizeInstrumentInstance,
   normalizeV2Project,
   validateV2Project,
 } from "../src/v2/domain/schema.js";
@@ -49,9 +52,10 @@ function legacyProject(schemaVersion = 6) {
   };
 }
 
-test("the default is the exact, deeply frozen canonical schema-7 Project", () => {
+test("the default is the exact, deeply frozen canonical schema-8 Project", () => {
   const project = createDefaultV2Project();
 
+  assert.equal(PROJECT_SCHEMA_VERSION, 8);
   assert.equal(project.schemaVersion, PROJECT_SCHEMA_VERSION);
   assert.deepEqual(Object.keys(project), ["schemaVersion", "metadata", "transport", "patterns", "tracks", "mixer"]);
   assert.deepEqual(project.transport, {
@@ -63,6 +67,154 @@ test("the default is the exact, deeply frozen canonical schema-7 Project", () =>
   assert.deepEqual(project.mixer, { master: { volume: 0.35, effects: [] } });
   assert.equal(Object.isFrozen(project.tracks[0].instrument.params), true);
   assert.equal(validateV2Project(project), true);
+});
+
+test("Klinto Drums has one exact frozen contract with strict defaults, bounds, keys, and version", () => {
+  assert.deepEqual(KLINTO_DRUMS_CONTRACT, {
+    type: "klinto-drums",
+    version: 1,
+    paramKeys: ["tone", "decaySeconds", "level"],
+    defaults: {
+      tone: 0.5,
+      decaySeconds: 0.45,
+      level: 0.5,
+    },
+    parameters: {
+      tone: { kind: "number", minimum: 0, maximum: 1 },
+      decaySeconds: { kind: "number", minimum: 0.05, maximum: 2 },
+      level: { kind: "number", minimum: 0, maximum: 1 },
+    },
+  });
+  assert.equal(Object.isFrozen(KLINTO_DRUMS_CONTRACT), true);
+  assert.equal(Object.isFrozen(KLINTO_DRUMS_CONTRACT.defaults), true);
+  assert.deepEqual(createDefaultInstrumentInstance("instrument-drums", "klinto-drums"), {
+    instanceId: "instrument-drums",
+    type: "klinto-drums",
+    version: 1,
+    params: {
+      tone: 0.5,
+      decaySeconds: 0.45,
+      level: 0.5,
+    },
+  });
+
+  const boundary = (params) => normalizeInstrumentInstance({
+    instanceId: "instrument-drums",
+    type: "klinto-drums",
+    version: 1,
+    params,
+  });
+  assert.deepEqual(boundary({ tone: 0, decaySeconds: 0.05, level: 0 }).params, {
+    tone: 0,
+    decaySeconds: 0.05,
+    level: 0,
+  });
+  assert.deepEqual(boundary({ tone: 1, decaySeconds: 2, level: 1 }).params, {
+    tone: 1,
+    decaySeconds: 2,
+    level: 1,
+  });
+  assert.throws(() => boundary({ tone: -0.01, decaySeconds: 0.45, level: 0.5 }), /between 0 and 1/);
+  assert.throws(() => boundary({ tone: 1.01, decaySeconds: 0.45, level: 0.5 }), /between 0 and 1/);
+  assert.throws(() => boundary({ tone: 0.5, decaySeconds: 0.049, level: 0.5 }), /between 0.05 and 2/);
+  assert.throws(() => boundary({ tone: 0.5, decaySeconds: 2.01, level: 0.5 }), /between 0.05 and 2/);
+  assert.throws(() => boundary({ tone: 0.5, decaySeconds: 0.45, level: -0.01 }), /between 0 and 1/);
+  assert.throws(() => boundary({ tone: 0.5, decaySeconds: 0.45, level: 1.01 }), /between 0 and 1/);
+  assert.throws(() => normalizeInstrumentInstance({
+    instanceId: "instrument-drums",
+    type: "klinto-drums",
+    version: 1,
+    params: { ...KLINTO_DRUMS_CONTRACT.defaults, hidden: true },
+  }), /unknown hidden/);
+  assert.throws(() => normalizeInstrumentInstance({
+    instanceId: "instrument-drums",
+    type: "klinto-drums",
+    version: 2,
+    params: { ...KLINTO_DRUMS_CONTRACT.defaults },
+  }), /Unsupported klinto-drums version: 2/);
+});
+
+test("canonical schema 8 accepts a native mixed Chip and Drums Project without losing device state", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.metadata.title = "Mixed native V8 tune";
+  project.patterns[0].notes.push({
+    id: "note-kick",
+    pitch: 36,
+    startTick: 0,
+    durationTicks: 24,
+    velocity: 0.9,
+  });
+  project.tracks[0].clips.push({ id: "clip-chip", patternId: "pattern-1", startTick: 0 });
+  project.tracks.push({
+    id: "track-drums",
+    name: "Drums",
+    instrument: {
+      instanceId: "instrument-drums",
+      type: "klinto-drums",
+      version: 1,
+      params: { tone: 0.75, decaySeconds: 0.9, level: 0.6 },
+    },
+    mixer: { volume: 0.8, pan: 0.1, muted: false, solo: false, effects: [] },
+    clips: [{ id: "clip-drums", patternId: "pattern-1", startTick: 384 }],
+  });
+
+  const normalized = canonicalizeV2Project(project);
+
+  assert.equal(normalized.schemaVersion, 8);
+  assert.deepEqual(normalized.tracks.map(({ instrument }) => instrument.type), [
+    "klinto-chip",
+    "klinto-drums",
+  ]);
+  assert.deepEqual(normalized.tracks[1].instrument.params, {
+    tone: 0.75,
+    decaySeconds: 0.9,
+    level: 0.6,
+  });
+  assert.deepEqual(normalizeV2Project(normalized), normalized);
+  assert.equal(validateV2Project(normalized), true);
+});
+
+test("V7 to V8 migration is pure, idempotent, data-preserving, and rejects forged V7 drums", () => {
+  const current = structuredClone(createDefaultV2Project());
+  current.metadata.title = "Historical V7 tune";
+  current.transport.bpm = 173;
+  current.patterns[0].notes.push({
+    id: "note-v7",
+    pitch: 72,
+    startTick: 48,
+    durationTicks: 36,
+    velocity: 0.4,
+  });
+  current.tracks[0].clips.push({ id: "clip-v7", patternId: "pattern-1", startTick: 96 });
+  current.tracks[0].mixer.effects.push({
+    instanceId: "effect-v7",
+    type: "klinto-filter",
+    version: 1,
+    bypassed: true,
+    params: { cutoffHz: 6_000, q: 1.2 },
+  });
+  const expected = canonicalizeV2Project(current);
+  const source = structuredClone(expected);
+  source.schemaVersion = 7;
+  const before = structuredClone(source);
+
+  const migrated = migrateProjectToV8(source);
+
+  assert.deepEqual(source, before);
+  assert.deepEqual(migrated, expected);
+  assert.deepEqual(migrateProjectToV8(migrated), migrated);
+
+  const forged = structuredClone(source);
+  forged.tracks[0].instrument = {
+    instanceId: "instrument-1",
+    type: "klinto-drums",
+    version: 1,
+    params: { ...KLINTO_DRUMS_CONTRACT.defaults },
+  };
+  assert.throws(
+    () => migrateProjectToV8(forged),
+    /Project schema 7 does not support Instrument type: klinto-drums/,
+  );
 });
 
 test("strict validation rejects unknown keys, unresolved links, device state, bounds and collisions", () => {
@@ -186,10 +338,10 @@ test("schemas 2 through 6 migrate with exact ticks, parameters, ordering and det
     if (schemaVersion === 2) delete source.patterns[0].rootOctave;
     if (schemaVersion <= 4) delete source.tracks[0].mixer.pan;
     const before = structuredClone(source);
-    const migrated = migrateProjectToV7(source);
+    const migrated = migrateProjectToV8(source);
 
     assert.deepEqual(source, before);
-    assert.equal(migrated.schemaVersion, 7);
+    assert.equal(migrated.schemaVersion, 8);
     assert.equal(migrated.metadata.title, "  Preserved title  ");
     assert.equal(migrated.transport.loop.startTick, 24);
     assert.equal(migrated.transport.loop.endTick, 744);
@@ -206,16 +358,17 @@ test("schemas 2 through 6 migrate with exact ticks, parameters, ordering and det
     assert.equal(migrated.tracks[0].clips[0].startTick, 72);
     assert.equal(migrated.tracks[0].clips[0].patternId, migrated.patterns[0].id);
     assert.equal(migrated.tracks[0].instrument.params.waveform, "saw");
+    assert.equal(migrated.tracks[0].instrument.type, "klinto-chip");
     assert.equal(migrated.tracks[0].mixer.pan, schemaVersion <= 4 ? 0 : -0.25);
     assert.equal(migrated.mixer.master.volume, 0.42);
     assert.equal("rootOctave" in migrated.patterns[0], false);
     assert.equal("visualiser" in migrated, false);
     assert.deepEqual(normalizeV2Project(migrated), migrated);
-    assert.deepEqual(migrateProjectToV7(source), migrated);
+    assert.deepEqual(migrateProjectToV8(source), migrated);
   }
 });
 
-test("schema 1 follows the production Pattern-library migration before V7 conversion", () => {
+test("schema 1 follows the production Pattern-library migration before V8 conversion", () => {
   const source = {
     schemaVersion: 1,
     metadata: { title: "Legacy tune" },
@@ -235,8 +388,10 @@ test("schema 1 follows the production Pattern-library migration before V7 conver
     }],
   };
 
-  const migrated = migrateProjectToV7(source);
+  const migrated = migrateProjectToV8(source);
 
+  assert.equal(migrated.schemaVersion, 8);
+  assert.equal(migrated.tracks[0].instrument.type, "klinto-chip");
   assert.equal(migrated.patterns[0].id, "pattern-1");
   assert.equal(migrated.patterns[0].notes[0].durationTicks, 18);
   assert.deepEqual(migrated.tracks[0].clips, [{ id: "clip-1", patternId: "pattern-1", startTick: 0 }]);
@@ -252,7 +407,7 @@ test("legacy full-gate repeats migrate as valid touching same-pitch notes", () =
     null,
   ];
 
-  const migrated = migrateProjectToV7(source);
+  const migrated = migrateProjectToV8(source);
 
   assert.deepEqual(
     migrated.patterns[0].notes.map(({ pitch, startTick, durationTicks }) => ({

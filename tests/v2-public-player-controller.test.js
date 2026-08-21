@@ -3,7 +3,12 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { createDefaultProject } from "../src/state/project-state.js";
-import { createDefaultV2Project } from "../src/v2/domain/schema.js";
+import {
+  createDefaultInstrumentInstance,
+  createDefaultV2Project,
+  normalizeV2Project,
+} from "../src/v2/domain/schema.js";
+import { createRenderPlan } from "../src/v2/audio/render-plan.js";
 import {
   createV2PublicPlayerController,
   createV2PublicVisualizationModel,
@@ -12,7 +17,7 @@ import {
 
 function playableProject() {
   const project = structuredClone(createDefaultV2Project());
-  project.metadata.title = "Public V7 fixture";
+  project.metadata.title = "Public V8 fixture";
   project.mixer.master.volume = 0.2;
   project.patterns[0].notes.push({
     durationTicks: 24,
@@ -44,7 +49,7 @@ function controls() {
   };
 }
 
-function createHarness() {
+function createHarness({ scheduleRenderPlan = false } = {}) {
   const calls = {
     engineDispose: 0,
     engineEnable: 0,
@@ -56,6 +61,8 @@ function createHarness() {
     schedulerPlay: [],
     schedulerStop: 0,
     synthDispose: 0,
+    synthEvents: [],
+    synthFactoryOptions: null,
     volumes: [],
   };
   const context = { currentTime: 3 };
@@ -81,7 +88,7 @@ function createHarness() {
   };
   const synth = {
     dispose() { calls.synthDispose += 1; return true; },
-    trigger: () => ({ stop() {} }),
+    trigger(event) { calls.synthEvents.push(event); return { stop() {} }; },
   };
   let schedulerOptions = null;
   let schedulerState = { status: "stopped" };
@@ -106,6 +113,10 @@ function createHarness() {
       calls.schedulerPlay.push(options);
       schedulerState = { status: "playing" };
       playheadTick = 48;
+      if (scheduleRenderPlan) {
+        const plan = createRenderPlan(schedulerOptions.getProject(), { mode: "song" });
+        for (const event of plan.events) schedulerOptions.getSynthRuntime().trigger(event);
+      }
       emit();
       return true;
     },
@@ -146,6 +157,7 @@ function createHarness() {
       },
       schedulerFactory(options) { schedulerOptions = options; return scheduler; },
       synthRuntimeFactory(options) {
+        calls.synthFactoryOptions = options;
         assert.equal(options.context, context);
         assert.equal(options.getOutputNode("track-1"), trackInput);
         return synth;
@@ -154,20 +166,20 @@ function createHarness() {
   };
 }
 
-test("native V7 validation fails closed before any audio factory is touched", () => {
+test("native V8 validation fails closed before any audio factory is touched", () => {
   let audioFactories = 0;
   const options = {
     audioEngineFactory() { audioFactories += 1; return {}; },
     project: createDefaultProject(),
   };
-  assert.throws(() => createV2PublicPlayerController(options), /V7 Project|Unsupported project schema/);
+  assert.throws(() => createV2PublicPlayerController(options), /V8 Project|Unsupported project schema/);
   assert.equal(audioFactories, 0);
 
   const future = playableProject();
-  future.schemaVersion = 8;
+  future.schemaVersion = 9;
   assert.throws(
     () => createV2PublicPlayerController({ ...options, project: future }),
-    /Unsupported project schema version: 8/,
+    /Unsupported project schema version: 9/,
   );
   assert.equal(audioFactories, 0);
 
@@ -180,7 +192,7 @@ test("native V7 validation fails closed before any audio factory is touched", ()
   assert.equal(audioFactories, 0);
 });
 
-test("V7 public playback composes the shared graph and keeps visitor volume post-master", async () => {
+test("V8 public playback composes the shared graph and keeps visitor volume post-master", async () => {
   const project = playableProject();
   const before = JSON.stringify(project);
   const harness = createHarness();
@@ -208,7 +220,8 @@ test("V7 public playback composes the shared graph and keeps visitor volume post
   await controller.play();
   assert.equal(harness.calls.engineEnable, 1);
   assert.equal(harness.calls.registryProjects.length, 1);
-  assert.equal(harness.calls.registryProjects[0].schemaVersion, 7);
+  assert.equal(harness.calls.registryProjects[0].schemaVersion, 8);
+  assert.equal(harness.calls.synthFactoryOptions.mode, "public");
   assert.equal(harness.schedulerOptions().getProject(), harness.calls.registryProjects[0]);
   assert.equal(harness.schedulerOptions().getSynthRuntime(), harness.synth);
   harness.schedulerOptions().onTrackInput("track-1", { releaseEndTime: 4.75 });
@@ -243,7 +256,7 @@ test("V7 public playback composes the shared graph and keeps visitor volume post
   assert.equal(harness.calls.engineDispose, 1);
 });
 
-test("the generic V7 visual is transient and Canvas failure remains safe", async () => {
+test("the generic V8 visual is transient and Canvas failure remains safe", async () => {
   const project = playableProject();
   const model = createV2PublicVisualizationModel(project);
   assert.deepEqual(Object.keys(model), ["arrangementEndTick", "notes"]);
@@ -274,7 +287,7 @@ test("the generic V7 visual is transient and Canvas failure remains safe", async
   assert.equal(await controller.dispose(), true);
 });
 
-test("an empty V7 snapshot never enables audio playback", async () => {
+test("an empty V8 snapshot never enables audio playback", async () => {
   const harness = createHarness();
   const controller = createV2PublicPlayerController({
     ...harness.factories,
@@ -287,11 +300,46 @@ test("an empty V7 snapshot never enables audio playback", async () => {
   await controller.dispose();
 });
 
-test("the browser entry dispatches V7 while retaining the legacy V1 player", async () => {
+test("current public playback exposes one mixed Chip and Drums synth route", async () => {
+  const project = playableProject();
+  project.tracks.push({
+    id: "track-drums",
+    name: "Drums",
+    instrument: structuredClone(createDefaultInstrumentInstance(
+      "instrument-drums",
+      "klinto-drums",
+    )),
+    mixer: { volume: 1, pan: 0, muted: false, solo: false, effects: [] },
+    clips: [{ id: "clip-drums", patternId: "pattern-1", startTick: 0 }],
+  });
+  const harness = createHarness({ scheduleRenderPlan: true });
+  const controller = createV2PublicPlayerController({
+    ...harness.factories,
+    controls: controls(),
+    project,
+  });
+  await controller.play();
+  assert.deepEqual(
+    harness.calls.synthEvents.map(({ instrumentType }) => instrumentType).sort(),
+    ["klinto-chip", "klinto-drums"],
+  );
+  assert.equal(harness.calls.synthFactoryOptions.mode, "public");
+  assert.equal(harness.calls.synthFactoryOptions.getOutputNode("track-drums"), harness.registry.getTrackInputNode());
+  await controller.dispose();
+});
+
+test("the browser entry migrates V7 into V8 while retaining the legacy V1 player", async () => {
   const source = await readFile(new URL("../src/player.js", import.meta.url), "utf8");
-  assert.match(source, /record\.document\.project\.schemaVersion === 7/);
+  assert.match(source, /\[7, CURRENT_PROJECT_SCHEMA_VERSION\]\.includes\(record\.document\.project\.schemaVersion\)/);
   assert.match(source, /createV2PublicPlayerController/);
+  assert.match(source, /project: normalizeV2Project\(record\.document\.project\)/);
   assert.match(source, /projectState = createProjectState\(record\.document\.project\)/);
   assert.match(source, /master \* visitorVolume/);
   assert.match(source, /v2Controller\.setVisitorVolume\(visitorVolume\)/);
+
+  const v7 = playableProject();
+  v7.schemaVersion = 7;
+  const migrated = normalizeV2Project(v7);
+  assert.equal(migrated.schemaVersion, 8);
+  assert.equal(migrated.patterns[0].notes[0].id, "note-public");
 });

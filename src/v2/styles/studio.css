@@ -554,6 +554,14 @@ body {
   color: var(--accent-bright);
 }
 
+.v2-pitch-label.has-drum-name {
+  padding-block: 1px;
+  font-size: 0.72rem;
+  line-height: 0.9;
+  text-align: right;
+  white-space: normal;
+}
+
 .v2-piano-note,
 .v2-piano-cursor {
   position: absolute;
@@ -1004,8 +1012,20 @@ body {
   background: var(--v2-panel);
 }
 
+.v2-add-instrument-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+.v2-add-instrument-controls select {
+  min-width: 0;
+}
+
 .v2-playlist-add-instrument {
-  width: 100%;
+  width: auto;
   min-height: 34px !important;
   white-space: nowrap;
 }
@@ -1315,6 +1335,42 @@ body {
   font-size: 0.64rem;
 }
 
+.v2-device-pitch-map-details {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--v2-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--v2-bg) 42%, transparent);
+}
+
+.v2-device-pitch-map-details summary {
+  cursor: pointer;
+  color: var(--v2-accent);
+  font-family: "Silkscreen", "Courier New", monospace;
+  font-size: 0.64rem;
+}
+
+.v2-device-pitch-map {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, auto) minmax(0, 1fr));
+  gap: 5px 8px;
+  margin: 10px 0 0;
+}
+
+.v2-device-pitch-map dt,
+.v2-device-pitch-map dd {
+  margin: 0;
+}
+
+.v2-device-pitch-map dt {
+  color: var(--v2-muted);
+}
+
+.v2-device-pitch-map dd {
+  color: var(--v2-text);
+}
+
 .v2-device-parameter {
   padding: 12px;
   border: 1px solid var(--v2-line);
@@ -1503,6 +1559,10 @@ body {
   .v2-device-body {
     grid-template-columns: minmax(0, 1fr);
     padding: 12px;
+  }
+
+  .v2-device-pitch-map {
+    grid-template-columns: auto minmax(0, 1fr);
   }
 }
 

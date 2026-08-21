@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createV2Scheduler } from "../src/v2/audio/occurrence-scheduler.js";
-import { createDefaultV2Project } from "../src/v2/domain/index.js";
+import {
+  createDefaultInstrumentInstance,
+  createDefaultV2Project,
+} from "../src/v2/domain/index.js";
 
 function note(id, pitch, startTick = 0, durationTicks = 24, velocity = 0.7) {
   return { id, pitch, startTick, durationTicks, velocity };
@@ -87,6 +90,24 @@ test("future scheduled voices count toward the canonical Track cap until retired
   assert.equal(harness.retired[0].record, harness.scheduled[0]);
   assert.equal(harness.retired[0].time, 10 + 16 / 192);
   assert.equal(harness.scheduler.getScheduledVoiceCount(), 16);
+});
+
+test("unmapped Drums notes consume no scheduler slot and emit no Track-input callback", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.tracks[0].instrument = structuredClone(createDefaultInstrumentInstance(
+    "instrument-drums",
+    "klinto-drums",
+  ));
+  project.patterns[0].notes = [note("outside-kit", 59, 0, 24)];
+  const inputEvents = [];
+  const harness = createHarness(project, {
+    onTrackInput(trackId, event) { inputEvents.push({ event, trackId }); },
+  });
+
+  assert.equal(harness.scheduler.play({ mode: "pattern" }), true);
+  assert.equal(harness.scheduled.length, 0);
+  assert.equal(harness.scheduler.getScheduledVoiceCount(), 0);
+  assert.deepEqual(inputEvents, []);
 });
 test("Pattern loop wrap keeps canonical identity and clips gates at the boundary", () => {
   const project = structuredClone(createDefaultV2Project());
@@ -302,6 +323,73 @@ test("syncProject retires deleted future Pattern voices while preserving unchang
   assert.equal(harness.scheduled.filter(({ event }) => event.noteId === "stable").length, 1);
   assert.equal(harness.scheduled.at(-1).event.noteId, "moving");
   assert.equal(harness.scheduled.at(-1).event.startTick, 72);
+});
+
+test("a retired Drums voice ending late cannot disown its syncProject replacement", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.tracks[0].instrument = structuredClone(createDefaultInstrumentInstance(
+    "instrument-drums",
+    "klinto-drums",
+  ));
+  project.patterns[0].notes = [note("future-kick", 60, 48, 12)];
+  const voices = [];
+  const retirements = [];
+  const synth = {
+    trigger(event) {
+      let ended = false;
+      const endedListeners = new Set();
+      const record = {
+        end() {
+          ended = true;
+          for (const listener of [...endedListeners]) listener();
+        },
+        event,
+      };
+      voices.push(record);
+      return {
+        addEndedListener(listener) {
+          endedListeners.add(listener);
+          return () => endedListeners.delete(listener);
+        },
+        get ended() { return ended; },
+        retire(time) {
+          retirements.push({ record, time });
+          return true;
+        },
+        stop() { return true; },
+      };
+    },
+  };
+  const harness = createHarness(project, {
+    getSynthRuntime: () => synth,
+    lookAheadSeconds: 0.5,
+    maxVoicesPerTrack: 1,
+  });
+
+  harness.scheduler.play({ mode: "pattern" });
+  const staleVoice = voices[0];
+  const nextProject = structuredClone(project);
+  nextProject.patterns[0].notes = [note("future-kick", 60, 72, 12)];
+  harness.project = nextProject;
+  harness.scheduler.syncProject();
+  const replacementVoice = voices[1];
+
+  assert.equal(staleVoice.event.occurrenceId, replacementVoice.event.occurrenceId);
+  assert.equal(retirements.some(({ record }) => record === staleVoice), true);
+  assert.equal(harness.scheduler.getScheduledVoiceCount(), 1);
+
+  staleVoice.end();
+  assert.equal(harness.scheduler.getScheduledVoiceCount(), 1);
+
+  const cappedProject = structuredClone(nextProject);
+  cappedProject.patterns[0].notes.push(note("future-snare", 62, 84, 12));
+  harness.project = cappedProject;
+  harness.scheduler.syncProject();
+
+  assert.equal(retirements.some(({ record }) => record === replacementVoice), true);
+  assert.equal(voices.length, 3);
+  assert.equal(voices.at(-1).event.noteId, "future-snare");
+  assert.equal(harness.scheduler.getScheduledVoiceCount(), 1);
 });
 
 test("syncProject retires future Song voices owned by deleted Tracks and clips", async (t) => {

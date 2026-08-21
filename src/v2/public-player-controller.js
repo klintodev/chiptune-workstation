@@ -6,7 +6,7 @@ import {
   createSongOccurrences,
   getV2ArrangementEndTick,
 } from "./domain/index.js";
-import { createKlintoChipSynthRuntime } from "./audio/klinto-chip-synth.js";
+import { createInstrumentSynthRouter } from "./audio/instrument-synth-router.js";
 import { createDeviceRuntimeRegistry } from "./audio/runtime-registry.js";
 import { createV2Scheduler } from "./audio/v2-scheduler.js";
 
@@ -42,7 +42,7 @@ function buildVisualizationModel(project) {
 }
 
 /**
- * Build the fixed public-player scene from musical data only. V7 deliberately
+ * Build the fixed public-player scene from musical data only. Project data deliberately
  * has no persisted visualiser state, so this model never enters Project data.
  */
 export function createV2PublicVisualizationModel(projectCandidate) {
@@ -115,7 +115,7 @@ function requireVolume(value) {
 }
 
 /**
- * Own native-V7 public playback. All browser/audio factories remain lazy and
+ * Own current-schema public playback. All browser/audio factories remain lazy and
  * injectable so malformed Projects fail before any AudioContext can exist.
  */
 export function createV2PublicPlayerController({
@@ -130,7 +130,7 @@ export function createV2PublicPlayerController({
   requestFrame = globalThis.requestAnimationFrame?.bind(globalThis),
   runtimeRegistryFactory = createDeviceRuntimeRegistry,
   schedulerFactory = createV2Scheduler,
-  synthRuntimeFactory = createKlintoChipSynthRuntime,
+  synthRuntimeFactory = createInstrumentSynthRouter,
 } = {}) {
   // Native validation is intentionally first: this path must never migrate or
   // partially activate malformed/future public snapshots.
@@ -288,6 +288,7 @@ export function createV2PublicPlayerController({
           if (!output) throw new RangeError(`Unknown public audio Track: ${trackId}.`);
           return output;
         },
+        mode: "public",
       });
       nextScheduler = schedulerFactory({
         bpm: project.transport.bpm,
