@@ -287,7 +287,7 @@ export async function createFirebaseClient({
         ? structuredClone(raw)
         : JSON.parse(JSON.stringify(raw));
     },
-    async listProjects(uid) {
+    async listProjects(uid, { targetSchemaVersion } = {}) {
       await prepareFirestore(uid);
       // Firestore orderBy excludes documents that lack the ordered field,
       // precisely the malformed records this recovery list must retain.
@@ -296,6 +296,7 @@ export async function createFirebaseClient({
         .map((entry) => summarizeCloudProjectRecordForRecovery(entry.data(), {
           ownerId: uid,
           recoveryKey: entry.id,
+          targetSchemaVersion,
         }))
         .sort((left, right) => {
           const leftTime = Date.parse(left.updatedAt ?? "") || 0;

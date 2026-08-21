@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  KLINTO_DRUMS_DEFAULT_PARAMS,
   MAX_PATTERN_CONTENT_TICKS,
   MAX_PROJECT_TRACKS,
   V2DomainError,
@@ -349,6 +350,51 @@ test("duplicateInstrument creates an adjacent independent Instrument Track as on
   assert.equal(project.redo(), true);
   assert.deepEqual(project.getState(), duplicated);
   assert.deepEqual(project.getTrack(duplicateId), duplicate);
+});
+
+test("Klinto Drums Track commands use the selected contract for defaults, edits, reset and duplication", () => {
+  const project = createV2ProjectState();
+  const beforeInvalidAdd = project.getState();
+  const beforeInvalidHistory = project.getHistoryState();
+  assert.throws(
+    () => project.addTrack("Unknown", "third-party-drums"),
+    /Unknown Instrument type/,
+  );
+  assert.equal(project.getState(), beforeInvalidAdd);
+  assert.deepEqual(project.getHistoryState(), beforeInvalidHistory);
+
+  const trackId = project.addTrack("Drums", "klinto-drums");
+  const created = project.getTrack(trackId);
+  assert.equal(created.instrument.type, "klinto-drums");
+  assert.equal(created.instrument.version, 1);
+  assert.deepEqual(created.instrument.params, KLINTO_DRUMS_DEFAULT_PARAMS);
+  assert.equal(Object.isFrozen(created.instrument.params), true);
+
+  project.setInstrumentParam(trackId, "tone", 0.8);
+  project.setInstrumentParam(trackId, "decaySeconds", 1.2);
+  project.setInstrumentParam(trackId, "level", 0.25);
+  const edited = project.getTrack(trackId).instrument.params;
+  assert.deepEqual(edited, { tone: 0.8, decaySeconds: 1.2, level: 0.25 });
+
+  const beforeWrongParam = project.getState();
+  assert.throws(
+    () => project.setInstrumentParam(trackId, "waveform", "square"),
+    /Unknown Instrument parameter/,
+  );
+  assert.equal(project.getState(), beforeWrongParam);
+
+  assert.equal(project.resetInstrument(trackId), true);
+  assert.deepEqual(project.getTrack(trackId).instrument.params, KLINTO_DRUMS_DEFAULT_PARAMS);
+  assert.equal(project.undo(), true);
+  assert.deepEqual(project.getTrack(trackId).instrument.params, edited);
+
+  const duplicateId = project.duplicateInstrument(trackId);
+  const duplicate = project.getTrack(duplicateId);
+  assert.equal(duplicate.instrument.type, "klinto-drums");
+  assert.equal(duplicate.instrument.version, 1);
+  assert.deepEqual(duplicate.instrument.params, edited);
+  assert.notEqual(duplicate.instrument.params, edited);
+  assert.notEqual(duplicate.instrument.instanceId, created.instrument.instanceId);
 });
 
 test("duplicateInstrument derives bounded repeated copy names and accepts an explicit name", () => {

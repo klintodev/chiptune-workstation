@@ -1,5 +1,8 @@
 import { createBoundedUniqueName } from "../../shared/bounded-name.js";
-import { createDefaultV2Project } from "../domain/schema.js";
+import {
+  PROJECT_SCHEMA_VERSION,
+  createDefaultV2Project,
+} from "../domain/schema.js";
 import {
   copyV2ProjectDocument,
   createV2ProjectDocument,
@@ -104,7 +107,7 @@ export function createV2ProjectPersistence({
   let volatileChanges = false;
   let pendingUpgradeSource = Number.isInteger(initialSourceSchemaVersion)
     && initialSourceSchemaVersion >= 1
-    && initialSourceSchemaVersion < 7
+    && initialSourceSchemaVersion < PROJECT_SCHEMA_VERSION
     ? initialSourceSchemaVersion
     : null;
 
@@ -133,7 +136,7 @@ export function createV2ProjectPersistence({
   function recordCommittedUpgrade(projectId, sourceSchemaVersion = pendingUpgradeSource) {
     if (!Number.isInteger(sourceSchemaVersion)
       || sourceSchemaVersion < 1
-      || sourceSchemaVersion >= 7) return null;
+      || sourceSchemaVersion >= PROJECT_SCHEMA_VERSION) return null;
     if (projectId === activeDocument.id) pendingUpgradeSource = null;
     const detail = Object.freeze({ fromSchemaVersion: sourceSchemaVersion, projectId });
     try {
@@ -160,14 +163,16 @@ export function createV2ProjectPersistence({
     return true;
   }
 
-  async function saveNow() {
+  async function saveNow(options = {}) {
+    const commitUpgrade = options?.commitUpgrade === true;
     cancelScheduledSave();
     if (savePromise) {
       await savePromise;
-      if (!dirty) return activeDocument;
+      if (!dirty && (!commitUpgrade || pendingUpgradeSource === null)) return activeDocument;
     }
-    if (!dirty) return activeDocument;
+    if (!dirty && (!commitUpgrade || pendingUpgradeSource === null)) return activeDocument;
     const generation = changeGeneration;
+    const hadDirtyChanges = dirty;
     const candidate = reviseV2ProjectDocument(activeDocument, projectState.getState(), {
       now: now(),
     });
@@ -187,7 +192,7 @@ export function createV2ProjectPersistence({
       }
       return activeDocument;
     } catch (error) {
-      dirty = true;
+      dirty = hadDirtyChanges || generation !== changeGeneration;
       setStatus("error", error, "error");
       throw error;
     } finally {
@@ -227,7 +232,7 @@ export function createV2ProjectPersistence({
     activeDocument = target;
     pendingUpgradeSource = Number.isInteger(sourceSchemaVersion)
       && sourceSchemaVersion >= 1
-      && sourceSchemaVersion < 7
+      && sourceSchemaVersion < PROJECT_SCHEMA_VERSION
       ? sourceSchemaVersion
       : null;
     changeGeneration += 1;
@@ -268,7 +273,10 @@ export function createV2ProjectPersistence({
     project.metadata.title = uniqueTitle(title, summaries);
     const document = createV2ProjectDocument(project, { id: createId(), now: now() });
     const saved = await repository.save(document);
-    return activate(saved, { flushCurrent: false, sourceSchemaVersion: 7 });
+    return activate(saved, {
+      flushCurrent: false,
+      sourceSchemaVersion: PROJECT_SCHEMA_VERSION,
+    });
   }
 
   async function createProjectFromTemplate(project) {
@@ -281,7 +289,7 @@ export function createV2ProjectPersistence({
     return activate(saved, {
       detail: { operation: "create-project-from-template" },
       flushCurrent: false,
-      sourceSchemaVersion: 7,
+      sourceSchemaVersion: PROJECT_SCHEMA_VERSION,
     });
   }
 
@@ -292,7 +300,10 @@ export function createV2ProjectPersistence({
     const source = reviseV2ProjectDocument(activeDocument, projectState.getState(), { now: now() });
     const copy = copyV2ProjectDocument(source, { id: createId(), now: now(), title });
     const saved = await repository.save(copy);
-    return activate(saved, { flushCurrent: false, sourceSchemaVersion: 7 });
+    return activate(saved, {
+      flushCurrent: false,
+      sourceSchemaVersion: PROJECT_SCHEMA_VERSION,
+    });
   }
 
   async function deleteProject(id) {
@@ -340,7 +351,7 @@ export function createV2ProjectPersistence({
     return activate(saved, {
       detail: upgradeDetail ?? {},
       flushCurrent: false,
-      sourceSchemaVersion: 7,
+      sourceSchemaVersion: PROJECT_SCHEMA_VERSION,
     });
   }
 
@@ -357,7 +368,7 @@ export function createV2ProjectPersistence({
     return activate(saved, {
       detail: { ...detail, ...(upgradeDetail ?? {}) },
       flushCurrent: false,
-      sourceSchemaVersion: 7,
+      sourceSchemaVersion: PROJECT_SCHEMA_VERSION,
     });
   }
 
@@ -399,6 +410,7 @@ export function createV2ProjectPersistence({
     exportProject,
     getActiveDocument: () => activeDocument,
     getExportText,
+    getPendingUpgradeSourceSchemaVersion: () => pendingUpgradeSource,
     getRawRecoveryText,
     getState,
     hasUnsavedChanges,

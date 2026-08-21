@@ -14,6 +14,7 @@ import {
   createDefaultEffectInstance,
   createDefaultInstrumentInstance,
   getEffectContract,
+  getInstrumentContract,
   KLINTO_CHIP_CONTRACT,
 } from "./device-contracts.js";
 import {
@@ -466,7 +467,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     return Object.freeze(copies.map((note) => note.id));
   }
 
-  function addTrack(name) {
+  function addTrack(name, instrumentType = KLINTO_CHIP_CONTRACT.type) {
     if (state.tracks.length >= MAX_PROJECT_TRACKS) {
       throw new RangeError(`A Project supports at most ${MAX_PROJECT_TRACKS} Tracks.`);
     }
@@ -485,7 +486,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
       tracks: [...state.tracks, {
         id,
         name: resolvedName,
-        instrument: createDefaultInstrumentInstance(instanceId),
+        instrument: createDefaultInstrumentInstance(instanceId, instrumentType),
         mixer: { volume: 1, pan: 0, muted: false, solo: false, effects: [] },
         clips: [],
       }],
@@ -788,19 +789,27 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
   }
 
   function setInstrumentParam(trackId, param, value) {
-    if (!KLINTO_CHIP_CONTRACT.paramKeys.includes(param)) throw new RangeError(`Unknown Instrument parameter: ${param}.`);
-    return updateTrack(trackId, (track) => track.instrument.params[param] === value ? track : {
-      ...track,
-      instrument: { ...track.instrument, params: { ...track.instrument.params, [param]: value } },
+    return updateTrack(trackId, (track) => {
+      const contract = getInstrumentContract(track.instrument.type);
+      if (!contract.paramKeys.includes(param)) {
+        throw new RangeError(`Unknown Instrument parameter: ${param}.`);
+      }
+      return track.instrument.params[param] === value ? track : {
+        ...track,
+        instrument: { ...track.instrument, params: { ...track.instrument.params, [param]: value } },
+      };
     }, { field: `instrument.params.${param}`, operation: "set-instrument-param" });
   }
 
   function resetInstrument(trackId) {
-    return updateTrack(trackId, (track) => KLINTO_CHIP_CONTRACT.paramKeys.every(
-      (param) => track.instrument.params[param] === KLINTO_CHIP_CONTRACT.defaults[param],
-    ) ? track : {
-      ...track,
-      instrument: { ...track.instrument, params: { ...KLINTO_CHIP_CONTRACT.defaults } },
+    return updateTrack(trackId, (track) => {
+      const contract = getInstrumentContract(track.instrument.type);
+      return contract.paramKeys.every(
+        (param) => track.instrument.params[param] === contract.defaults[param],
+      ) ? track : {
+        ...track,
+        instrument: { ...track.instrument, params: { ...contract.defaults } },
+      };
     }, { operation: "reset-instrument" });
   }
 

@@ -4,7 +4,7 @@ import test from "node:test";
 import { createSongOccurrences } from "../src/v2/domain/occurrence-projection.js";
 import {
   createDefaultV2Project,
-  migrateProjectToV7,
+  migrateProjectToV8,
   normalizeV2Project,
 } from "../src/v2/domain/schema.js";
 import {
@@ -69,7 +69,7 @@ function createBoundaryLegacyProject() {
   return project;
 }
 
-test("the V7 boundary consumes the shipped schema-1-through-6 migration chain", () => {
+test("the V8 boundary consumes the shipped schema-1-through-6 migration chain as Chip tracks", () => {
   const schemaSix = createBoundaryLegacyProject();
   for (let schemaVersion = 2; schemaVersion <= 6; schemaVersion += 1) {
     const source = structuredClone(schemaSix);
@@ -83,11 +83,17 @@ test("the V7 boundary consumes the shipped schema-1-through-6 migration chain", 
     }
     const before = structuredClone(source);
     const productionV6 = migrateV1Project(source);
-    const expected = migrateProjectToV7(productionV6);
-    const migrated = migrateProjectToV7(source);
+    const expected = migrateProjectToV8(productionV6);
+    const migrated = migrateProjectToV8(source);
 
     assert.deepEqual(source, before, `schema ${schemaVersion} source was mutated`);
     assert.deepEqual(migrated, expected, `schema ${schemaVersion} bypassed production migration`);
+    assert.equal(migrated.schemaVersion, 8);
+    assert.deepEqual(
+      migrated.tracks.map(({ instrument }) => instrument.type),
+      Array(migrated.tracks.length).fill("klinto-chip"),
+      `schema ${schemaVersion} introduced a non-historical Instrument`,
+    );
     assert.deepEqual(normalizeV2Project(migrated), migrated);
   }
 
@@ -117,15 +123,18 @@ test("the V7 boundary consumes the shipped schema-1-through-6 migration chain", 
     }],
   };
   const before = structuredClone(schemaOne);
+  const schemaOneMigrated = migrateProjectToV8(schemaOne);
+  assert.deepEqual(schemaOneMigrated, migrateProjectToV8(migrateV1Project(schemaOne)));
+  assert.equal(schemaOneMigrated.schemaVersion, 8);
   assert.deepEqual(
-    migrateProjectToV7(schemaOne),
-    migrateProjectToV7(migrateV1Project(schemaOne)),
+    schemaOneMigrated.tracks.map(({ instrument }) => instrument.type),
+    ["klinto-chip"],
   );
   assert.deepEqual(schemaOne, before);
 });
 
 test("migration pins every legacy Pattern length, waveform and scalar boundary", () => {
-  const migrated = migrateProjectToV7(createBoundaryLegacyProject());
+  const migrated = migrateProjectToV8(createBoundaryLegacyProject());
 
   assert.deepEqual(migrated.patterns.map(({ lengthTicks }) => lengthTicks), [96, 192, 384, 768]);
   for (const [index, pattern] of migrated.patterns.entries()) {
@@ -151,7 +160,7 @@ test("migration pins every legacy Pattern length, waveform and scalar boundary",
   assert.equal(createSongOccurrences(migrated).length, 4, "zero-velocity notes do not schedule voices");
 });
 
-test("canonical V7 validation accepts the exact maximum note and clip counts", () => {
+test("canonical V8 validation accepts the exact maximum note and clip counts", () => {
   const project = structuredClone(createDefaultV2Project());
   project.patterns = Array.from({ length: 64 }, (_, patternIndex) => ({
     id: `pattern-${patternIndex + 1}`,

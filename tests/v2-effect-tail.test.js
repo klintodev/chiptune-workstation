@@ -82,3 +82,36 @@ test("serial Track tails take the longest route then add the Master chain once",
   }), 10.53);
   assert.equal(MAX_DELAY_TAIL_SECONDS, 10);
 });
+
+test("generic Instrument tails support mixed release and one-shot decay policies", () => {
+  const project = {
+    transport: { bpm: 120 },
+    tracks: [
+      {
+        id: "chip",
+        instrument: { type: "klinto-chip", params: { releaseSeconds: 0.2 } },
+        mixer: { effects: [] },
+      },
+      {
+        id: "drums",
+        instrument: { type: "klinto-drums", params: { decaySeconds: 0.8 } },
+        mixer: { effects: [] },
+      },
+    ],
+    mixer: { master: { effects: [] } },
+  };
+  const getInstrumentTailSeconds = (instrument) => instrument.type === "klinto-drums"
+    ? instrument.params.decaySeconds + 0.005
+    : instrument.params.releaseSeconds;
+  assert.equal(calculateProjectExportTailSeconds(project, { getInstrumentTailSeconds }), 0.805);
+  assert.equal(calculateProjectExportTailSeconds(project, {
+    getInstrumentTailSeconds,
+    trackIds: ["chip"],
+  }), 0.2);
+  assert.equal(calculateSerialRouteTailSeconds({
+    bpm: 120,
+    instrumentTailSeconds: 0.805,
+    masterEffects: [],
+    trackEffects: [],
+  }), 0.805);
+});

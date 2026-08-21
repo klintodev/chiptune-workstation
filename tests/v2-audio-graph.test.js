@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createKlintoChipOutputRuntime,
   createKlintoDelayRuntime,
+  createKlintoDrumsOutputRuntime,
   createKlintoFilterRuntime,
 } from "../src/v2/audio/web-audio-runtime.js";
 import { createDeviceRuntimeRegistry } from "../src/v2/audio/runtime-registry.js";
@@ -116,6 +117,20 @@ function instrument(instanceId, overrides = {}) {
   };
 }
 
+function drums(instanceId, overrides = {}) {
+  return {
+    instanceId,
+    type: "klinto-drums",
+    version: 1,
+    params: {
+      tone: 0.5,
+      decaySeconds: 0.45,
+      level: 0.5,
+      ...overrides,
+    },
+  };
+}
+
 function effect(type, instanceId, overrides = {}, bypassed = false) {
   return type === "klinto-filter"
     ? {
@@ -198,6 +213,39 @@ test("Chip output is stable, smooths level and captures future voice parameters"
   assert.equal(runtime.output, output);
   assert.equal(runtime.getVoiceParameters().webAudioWaveform, "triangle");
   assert.deepEqual(output.gain.events.at(-1), ["ramp", 0.6, 2.015]);
+  assert.equal(runtime.dispose(), true);
+  assert.equal(runtime.dispose(), false);
+});
+
+test("Drums output stays stable, captures tone and decay, and smooths only level", () => {
+  const harness = createHarness();
+  const runtime = createKlintoDrumsOutputRuntime({
+    context: harness.context,
+    instance: drums("drums"),
+    scheduleTransition: harness.schedule,
+  });
+  const output = runtime.output;
+  assert.equal(runtime.input, output);
+  assert.deepEqual(runtime.getVoiceParameters(), {
+    decaySeconds: 0.45,
+    level: 0.5,
+    tone: 0.5,
+  });
+  const initialAutomation = output.gain.events.length;
+  assert.equal(runtime.update(drums("drums", { decaySeconds: 1.2, tone: 0.8 })), true);
+  assert.equal(runtime.output, output);
+  assert.equal(output.gain.events.length, initialAutomation);
+  assert.deepEqual(runtime.getVoiceParameters(), {
+    decaySeconds: 1.2,
+    level: 0.5,
+    tone: 0.8,
+  });
+  assert.equal(runtime.update(drums("drums", {
+    decaySeconds: 1.2,
+    level: 0.75,
+    tone: 0.8,
+  })), true);
+  assert.deepEqual(output.gain.events.at(-1), ["ramp", 0.75, 2.015]);
   assert.equal(runtime.dispose(), true);
   assert.equal(runtime.dispose(), false);
 });

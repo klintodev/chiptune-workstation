@@ -1,6 +1,6 @@
 import {
   createDefaultV2Project,
-  migrateProjectToV7,
+  migrateProjectToV8,
   normalizeV2Project,
 } from "../domain/schema.js";
 import { assertBoundedV2Structure } from "../domain/domain-utils.js";
@@ -51,7 +51,7 @@ export function normalizeV2ProjectDocument(candidate, { migrate = true } = {}) {
   }
 
   const project = migrate
-    ? migrateProjectToV7(candidate.project)
+    ? migrateProjectToV8(candidate.project)
     : normalizeV2Project(candidate.project);
   return Object.freeze({
     format: PROJECT_DOCUMENT_FORMAT,

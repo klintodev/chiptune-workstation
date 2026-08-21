@@ -1,6 +1,6 @@
 import {
   normalizeProjectDocument,
-  normalizeProjectDocumentToV7,
+  normalizeProjectDocumentToV8,
 } from "../persistence/project-document.js";
 
 export const PUBLICATION_FORMAT = "chiptune-workstation-publication";
@@ -144,14 +144,16 @@ export function normalizePublicationRecord(candidate, { ownerId } = {}) {
   return Object.freeze(record);
 }
 
-export function normalizePublicationRecordToV7(candidate, options) {
+export function normalizePublicationRecordToV8(candidate, options) {
   const source = normalizePublicationRecord(candidate, options);
   const record = Object.freeze({
     ...source,
-    document: normalizeProjectDocumentToV7(source.document),
+    document: normalizeProjectDocumentToV8(source.document),
   });
   if (encodedSize(record) > MAX_PUBLICATION_BYTES) {
     throw new RangeError("This project is too large to publish.");
   }
   return record;
 }
+
+export const normalizePublicationRecordToV7 = normalizePublicationRecordToV8;

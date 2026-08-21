@@ -1,10 +1,11 @@
 # Klinto Studio V2 Project schema contract
 
-Status: Normative draft for PRD 32 activation  
-Project schema: 7  
+Status: Normative current contract for PRD 32 and the schema 8 amendment
+Current Project schema: 8
+Frozen compatibility baseline: 7
 Outer document envelope: 1
 
-This is the single authoritative persisted shape for the first public V2 release. PRDs explain behaviour; validators, migrations, fixtures, Firestore bounds, JSON import/export, cloud records and publications must implement this contract. If a PRD example conflicts with this file, this file wins.
+This file preserves the exact schema 7 persisted shape from the first public V2 release and defines the current schema 8 amendment below. PRDs explain behaviour; validators, migrations, fixtures, Firestore bounds, JSON import/export, cloud records and publications must implement this contract. If a PRD example conflicts with this file, this file wins.
 
 ## Outer Project document
 
@@ -267,6 +268,35 @@ Schemas 1â€“6 first use the existing production migration chain to normaliz
 - Validation rejects additional keys rather than preserving hidden state.
 - A machine-readable JSON Schema or equivalent shared validator generated from this contract is required before V7 activation. Every local/cloud/public normalizer and fixture consumes the same rules.
 - Any persisted change to these keys, enums, meanings, bounds or defaults requires schema 8 or later. V7 never changes meaning in place.
+
+## Schema 8 amendment: Klinto Drums
+
+Schema 8 preserves every V7 key, bound, default and meaning while expanding the closed Instrument type enum to `klinto-chip | klinto-drums`. The outer Project shape and document version do not change.
+
+The new Instrument shape is:
+
+```json
+{
+  "instanceId": "instrument-track-2",
+  "type": "klinto-drums",
+  "version": 1,
+  "params": {
+    "tone": 0.5,
+    "decaySeconds": 0.45,
+    "level": 0.5
+  }
+}
+```
+
+- Instrument keys remain exactly `instanceId, type, version, params`.
+- `klinto-chip` version 1 retains the exact V7 parameter contract.
+- `klinto-drums` version 1 parameter keys are exactly `tone, decaySeconds, level`.
+- `tone` and `level` are finite numbers in 0…1; `decaySeconds` is a finite number in 0.05…2.
+- The defaults shown above are normative.
+- Existing schemas 1–6 follow the shipped migration chain to V7, then migrate to V8. Native V7 must first validate against the frozen Chip-only V7 contract; migration changes only `schemaVersion` before V8 canonicalization.
+- A V7 record containing `klinto-drums` is malformed V7, not an early V8 record. Schema 9 remains future/unavailable.
+
+See [PRD 33](./33-klinto-drums.md) for the fixed MIDI map, one-shot synthesis and interaction contract.
 
 
 

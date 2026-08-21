@@ -1,5 +1,5 @@
 import { normalizeV2Project } from "../domain/index.js";
-import { createKlintoChipSynthRuntime } from "./klinto-chip-synth.js";
+import { createInstrumentSynthRouter } from "./instrument-synth-router.js";
 import { createRenderPlan } from "./render-plan.js";
 import { createDeviceRuntimeRegistry } from "./runtime-registry.js";
 
@@ -56,6 +56,7 @@ function constructOfflineContext(Context, plan) {
 export async function renderV2ArrangementOffline(projectCandidate, {
   OfflineAudioContextClass = globalThis.OfflineAudioContext ?? globalThis.webkitOfflineAudioContext,
   createOfflineAudioContext,
+  createSynthRouter = createInstrumentSynthRouter,
   maxDurationSeconds = MAX_V2_RENDER_SECONDS,
   sampleRate = V2_EXPORT_SAMPLE_RATE,
 } = {}) {
@@ -77,9 +78,10 @@ export async function renderV2ArrangementOffline(projectCandidate, {
     destination: context.destination,
     scheduleTransition: noWallClockTransitions,
   });
-  const synth = createKlintoChipSynthRuntime({
+  const synth = createSynthRouter({
     context,
     getOutputNode: (trackId) => registry.getTrackInputNode(trackId),
+    mode: "offline",
   });
   const voices = new Map();
   try {
@@ -90,6 +92,7 @@ export async function renderV2ArrangementOffline(projectCandidate, {
         voices.delete(occurrenceId);
       }
       const voice = synth.trigger(Object.freeze({ ...event, startTime: event.startSeconds }));
+      if (!voice) continue;
       voices.set(event.occurrenceId, voice);
       registry.markTrackInput(event.trackId, event.releaseEndSeconds);
     }

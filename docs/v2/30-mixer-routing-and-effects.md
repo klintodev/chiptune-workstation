@@ -1,8 +1,10 @@
 # PRD 30: Mixer, routing and first-party effects
 
-Status: Draft  
-Release: Klinto Studio V2  
+Status: Draft
+Release: Klinto Studio V2
 Depends on: PRDs 27â€“29
+
+> Schema-8 extension: the closed Instrument enum also admits `klinto-drums`; Effect types and routing remain unchanged. See [PRD 33](./33-klinto-drums.md).
 
 ## Description
 

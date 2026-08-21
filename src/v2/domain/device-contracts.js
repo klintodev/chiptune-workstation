@@ -35,6 +35,22 @@ export const KLINTO_CHIP_CONTRACT = deepFreeze({
   },
 });
 
+export const KLINTO_DRUMS_CONTRACT = deepFreeze({
+  type: "klinto-drums",
+  version: 1,
+  paramKeys: ["tone", "decaySeconds", "level"],
+  defaults: {
+    tone: 0.5,
+    decaySeconds: 0.45,
+    level: 0.5,
+  },
+  parameters: {
+    tone: parameter("number", { minimum: 0, maximum: 1 }),
+    decaySeconds: parameter("number", { minimum: 0.05, maximum: 2 }),
+    level: parameter("number", { minimum: 0, maximum: 1 }),
+  },
+});
+
 export const KLINTO_FILTER_CONTRACT = deepFreeze({
   type: "klinto-filter",
   version: 1,
@@ -60,6 +76,7 @@ export const KLINTO_DELAY_CONTRACT = deepFreeze({
 
 export const INSTRUMENT_CONTRACTS = deepFreeze({
   [KLINTO_CHIP_CONTRACT.type]: KLINTO_CHIP_CONTRACT,
+  [KLINTO_DRUMS_CONTRACT.type]: KLINTO_DRUMS_CONTRACT,
 });
 
 export const EFFECT_CONTRACTS = deepFreeze({
@@ -68,6 +85,7 @@ export const EFFECT_CONTRACTS = deepFreeze({
 });
 
 export const KLINTO_CHIP_DEFAULT_PARAMS = KLINTO_CHIP_CONTRACT.defaults;
+export const KLINTO_DRUMS_DEFAULT_PARAMS = KLINTO_DRUMS_CONTRACT.defaults;
 export const KLINTO_FILTER_DEFAULT_PARAMS = KLINTO_FILTER_CONTRACT.defaults;
 export const KLINTO_DELAY_DEFAULT_PARAMS = KLINTO_DELAY_CONTRACT.defaults;
 export const KLINTO_CHIP_WAVEFORMS = WAVEFORMS;
@@ -155,12 +173,16 @@ export function validateEffectInstance(candidate, options) {
   return true;
 }
 
-export function createDefaultInstrumentInstance(instanceId = "instrument-1") {
+export function createDefaultInstrumentInstance(
+  instanceId = "instrument-1",
+  type = KLINTO_CHIP_CONTRACT.type,
+) {
+  const contract = getInstrumentContract(type);
   return normalizeInstrumentInstance({
     instanceId,
-    type: KLINTO_CHIP_CONTRACT.type,
-    version: KLINTO_CHIP_CONTRACT.version,
-    params: { ...KLINTO_CHIP_CONTRACT.defaults },
+    type: contract.type,
+    version: contract.version,
+    params: { ...contract.defaults },
   });
 }
 

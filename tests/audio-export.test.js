@@ -12,6 +12,8 @@ import {
 } from "../src/audio/pitch-policy.js";
 import { encodePcm16Wave } from "../src/audio/wav-encoder.js";
 import { createDefaultProject } from "../src/state/project-state.js";
+import { renderProjectArrangementOffline } from "../src/features/audio-export/audio-export.js";
+import { createDefaultV2Project } from "../src/v2/domain/index.js";
 
 function createSong() {
   const project = structuredClone(createDefaultProject());
@@ -117,4 +119,17 @@ test("WAV encoder writes stereo signed 16-bit PCM with a valid header", () => {
   assert.equal(view.getInt16(46, true), -32_768);
   assert.equal(view.getInt16(48, true), 32_767);
   assert.equal(view.getInt16(50, true), 32_767);
+});
+
+test("audio export dispatches both schema 7 compatibility and current schema 8 to V2 rendering", async () => {
+  const schema8 = createDefaultV2Project();
+  const schema7 = { ...structuredClone(schema8), schemaVersion: 7 };
+  await assert.rejects(
+    renderProjectArrangementOffline(schema7),
+    /audible Playlist note/,
+  );
+  await assert.rejects(
+    renderProjectArrangementOffline(schema8),
+    /audible Playlist note/,
+  );
 });

@@ -1,8 +1,10 @@
 # PRD 31: Playlist arrangement
 
-Status: Draft  
-Release: Klinto Studio V2  
+Status: Draft
+Release: Klinto Studio V2
 Depends on: PRDs 27â€“29
+
+> Schema-8 extension: Playlist and Mixer Add Instrument controls choose between Klinto Chip and Klinto Drums. All Track ownership, duplication, naming and cap rules below apply to either registered type. See [PRD 33](./33-klinto-drums.md).
 
 ## Description
 

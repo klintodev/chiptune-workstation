@@ -129,18 +129,21 @@ export function adaptKlintoChipVoiceParameters(params) {
   });
 }
 
-/** Stable per-Instrument output. Voice-specific values are captured on demand. */
-export function createKlintoChipOutputRuntime({
+/** Stable per-Instrument output shared by first-party synth definitions. */
+export function createInstrumentOutputRuntime({
+  adaptParameters = (state) => Object.freeze({ ...state }),
   context,
   destination,
   instance,
+  name = "Instrument",
   params,
   scheduleTransition = defaultScheduleTransition,
   smoothingSeconds = AUDIO_PARAM_SMOOTHING_SECONDS,
+  validateParameters = () => {},
 } = {}) {
-  if (!context?.createGain) throw new TypeError("Klinto Chip requires an AudioContext-like object.");
+  if (!context?.createGain) throw new TypeError(`${name} requires an AudioContext-like object.`);
   let state = { ...resolveParams(instance ?? params) };
-  assertRange(state.level, 0, 1, "Instrument level");
+  validateParameters(state);
   const output = context.createGain();
   const external = createExternalConnector(output);
   let disposed = false;
@@ -151,8 +154,7 @@ export function createKlintoChipOutputRuntime({
   function update(next) {
     if (disposed) return false;
     const nextParams = { ...resolveParams(next, state) };
-    assertRange(nextParams.level, 0, 1, "Instrument level");
-    toWebAudioWaveform(nextParams.waveform);
+    validateParameters(nextParams);
     const changed = Object.keys(nextParams).some((key) => nextParams[key] !== state[key]);
     if (!changed) return false;
     if (nextParams.level !== state.level) {
@@ -186,9 +188,35 @@ export function createKlintoChipOutputRuntime({
     get input() { return output; },
     get output() { return output; },
     getState: () => Object.freeze({ ...state }),
-    getVoiceParameters: () => adaptKlintoChipVoiceParameters(state),
+    getVoiceParameters: () => adaptParameters(state),
     retire,
     update,
+  });
+}
+
+/** Stable per-Klinto-Chip output. Voice-specific values are captured on demand. */
+export function createKlintoChipOutputRuntime(options = {}) {
+  return createInstrumentOutputRuntime({
+    ...options,
+    adaptParameters: adaptKlintoChipVoiceParameters,
+    name: "Klinto Chip",
+    validateParameters(state) {
+      assertRange(state.level, 0, 1, "Instrument level");
+      toWebAudioWaveform(state.waveform);
+    },
+  });
+}
+
+/** Stable per-Klinto-Drums output; tone and decay are captured by future voices. */
+export function createKlintoDrumsOutputRuntime(options = {}) {
+  return createInstrumentOutputRuntime({
+    ...options,
+    name: "Klinto Drums",
+    validateParameters(state) {
+      assertRange(state.tone, 0, 1, "Drum tone");
+      assertRange(state.decaySeconds, 0.05, 2, "Drum decay");
+      assertRange(state.level, 0, 1, "Instrument level");
+    },
   });
 }
 

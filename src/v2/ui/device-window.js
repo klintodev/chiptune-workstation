@@ -1,6 +1,8 @@
 import { DEVICE_REGISTRY } from "../audio/device-registry.js";
 import { createElement, clearElement, setPressed } from "./dom.js";
+import { getInstrumentPitchEntries } from "./device-presentation.js";
 import { createDraggableWindow } from "./draggable-window.js";
+import { formatMidiPitch } from "./music-format.js";
 
 const RANGE_EDIT_KEYS = new Set([
   "ArrowDown",
@@ -111,17 +113,15 @@ export function createDeviceWindow({
     type: "button",
     onClick: onClose,
   });
-  const reset = device.kind === "effect"
-    ? createElement("button", {
-        dataset: { deviceAction: "reset" },
-        textContent: "Reset",
-        type: "button",
-      })
-    : null;
+  const reset = createElement("button", {
+    dataset: { deviceAction: "reset" },
+    textContent: "Reset",
+    type: "button",
+  });
   const body = createElement("div", { className: "v2-device-body" });
   const header = createElement("header", {
-    className: `v2-device-header${reset ? " has-device-reset" : ""}`,
-  }, reset ? [title, reset, close] : [title, close]);
+    className: "v2-device-header has-device-reset",
+  }, [title, reset, close]);
   node.append(header, body);
   const dragController = createDraggableWindow({
     disabled: currentMobile || !dragTarget,
@@ -187,6 +187,24 @@ export function createDeviceWindow({
 
   function createRegisteredEditor({ definition, instance, onParamChange, ownerName }) {
     let editorDisposed = false;
+    if (definition.kind === "instrument") {
+      const pitchEntries = getInstrumentPitchEntries(instance);
+      if (pitchEntries.length > 0) {
+        const pitchMap = createElement("dl", { className: "v2-device-pitch-map" });
+        for (const [pitch, drumName] of pitchEntries) {
+          pitchMap.append(
+            createElement("dt", { textContent: formatMidiPitch(pitch) }),
+            createElement("dd", { textContent: drumName }),
+          );
+        }
+        body.append(createElement("details", {
+          className: "v2-device-pitch-map-details",
+        }, [
+          createElement("summary", { textContent: "Drum note map" }),
+          pitchMap,
+        ]));
+      }
+    }
     for (const section of definition.ui.sections) {
       const sectionId = `device-${instance.instanceId}-${section.id}`;
       const sectionNode = createElement("section", {
@@ -245,6 +263,7 @@ export function createDeviceWindow({
     const definition = DEVICE_REGISTRY.instruments.require(instrument.type, instrument.version);
     title.textContent = `${track.name}, ${definition.name}`;
     node.setAttribute("aria-label", title.textContent);
+    reset.setAttribute("aria-label", `Reset ${track.name}, ${definition.name}`);
     resolvedOwner = { kind: "track", trackId: track.id };
     mountDefinition(
       definition,
@@ -259,6 +278,7 @@ export function createDeviceWindow({
     const definition = DEVICE_REGISTRY.effects.require(effect.type, effect.version);
     title.textContent = `${ownerName}, ${definition.name}`;
     node.setAttribute("aria-label", title.textContent);
+    reset.setAttribute("aria-label", `Reset ${ownerName}, ${definition.name}`);
     resolvedOwner = owner;
     mountDefinition(
       definition,
@@ -312,6 +332,7 @@ export function createDeviceWindow({
       .require(instance.type, instance.version);
     title.textContent = `${ownerName}, ${definition.name}`;
     node.setAttribute("aria-label", title.textContent);
+    reset.setAttribute("aria-label", `Reset ${ownerName}, ${definition.name}`);
     for (const [key, control] of controls) {
       control.setLabel(`${ownerName}, ${definition.name}, ${definition.ui.parameters[key].label}`);
     }
@@ -324,7 +345,12 @@ export function createDeviceWindow({
     for (const [key, control] of controls) control.setValue(params[key]);
   }
 
-  reset?.addEventListener("click", () => {
+  reset.addEventListener("click", () => {
+    if (device.kind === "instrument") {
+      const record = instrumentRecord();
+      if (record) projectState.resetInstrument(record.track.id);
+      return;
+    }
     const record = effectRecord();
     if (record) projectState.resetEffect(record.effect.instanceId);
   }, { signal: lifecycle.signal });

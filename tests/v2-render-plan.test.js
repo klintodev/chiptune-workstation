@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   RENDER_PLAN_ADAPTERS,
+  applyTrackVoiceLimit,
   createPlaybackOccurrences,
   createRenderPlan,
 } from "../src/v2/audio/render-plan.js";
@@ -145,4 +146,52 @@ test("voice limits are independent per Track", () => {
   const song = createRenderPlan(project, { mode: "song" });
   assert.equal(song.events.length, 32);
   assert.deepEqual(song.events.flatMap(({ retireOccurrenceIds }) => retireOccurrenceIds), []);
+});
+
+test("mixed Chip and Drums plans dispatch typed one-shots and omit unmapped drum pitches", () => {
+  const project = structuredClone(createDefaultV2Project());
+  project.patterns[0].notes = [
+    note("unmapped-for-drums", 59, 0),
+    note("kick", 60, 24, 96, 0.4),
+  ];
+  project.tracks[0].clips = [{ id: "clip-chip", patternId: "pattern-1", startTick: 0 }];
+  project.tracks.push({
+    id: "track-drums",
+    name: "Drums",
+    instrument: structuredClone(createDefaultInstrumentInstance(
+      "instrument-drums",
+      "klinto-drums",
+    )),
+    mixer: { volume: 1, pan: 0, muted: false, solo: false, effects: [] },
+    clips: [{ id: "clip-drums", patternId: "pattern-1", startTick: 0 }],
+  });
+
+  const plan = createRenderPlan(project, { mode: "song" });
+  const chipEvents = plan.events.filter(({ instrumentType }) => instrumentType === "klinto-chip");
+  const drumEvents = plan.events.filter(({ instrumentType }) => instrumentType === "klinto-drums");
+  assert.equal(chipEvents.length, 2, "existing Chip notes remain unchanged");
+  assert.equal(drumEvents.length, 1, "MIDI 59 produces no Drums render event");
+  assert.equal(drumEvents[0].noteId, "kick");
+  assert.equal(drumEvents[0].instrumentInstanceId, "instrument-drums");
+  assert.equal(drumEvents[0].instrumentVersion, 1);
+  assert.equal(drumEvents[0].instrumentLevel, 0.5);
+  assert.equal(drumEvents[0].drumPiece, "kick");
+  assert.equal(drumEvents[0].oneShot, true);
+  assert.equal(drumEvents[0].noteDurationSeconds, 0.5);
+  assert.equal(drumEvents[0].durationSeconds, 0.45, "one-shot decay ignores the note gate");
+  assert.equal(drumEvents[0].voiceEndOffsetSeconds, 0.455);
+  assert.equal(drumEvents[0].releaseEndSeconds, 0.125 + 0.455 + 0.01);
+  assert.equal(plan.tailSeconds, 0.455);
+});
+
+test("unmapped adapter results are filtered before Track voice-cap arbitration", () => {
+  const events = Array.from({ length: 16 }, (_, index) => ({
+    occurrenceId: `mapped-${index}`,
+    releaseEndSeconds: 10,
+    startSeconds: 0,
+    trackId: "drums",
+  }));
+  const planned = applyTrackVoiceLimit([null, ...events]);
+  assert.equal(planned.length, 16);
+  assert.deepEqual(planned.flatMap(({ retireOccurrenceIds }) => retireOccurrenceIds), []);
 });

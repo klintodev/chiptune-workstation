@@ -14,6 +14,10 @@ import {
   getVisualiserTrackColour,
 } from "./visualiser/visualiser-palette.js";
 import { createV2PublicPlayerController } from "./v2/public-player-controller.js";
+import {
+  PROJECT_SCHEMA_VERSION as CURRENT_PROJECT_SCHEMA_VERSION,
+  normalizeV2Project,
+} from "./v2/domain/schema.js";
 
 const elements = {
   canvas: document.querySelector("#player-canvas"),
@@ -145,7 +149,7 @@ async function play() {
 
 function createPlayer(record) {
   let hasArrangement = false;
-  if (record.document.project.schemaVersion === 7) {
+  if ([7, CURRENT_PROJECT_SCHEMA_VERSION].includes(record.document.project.schemaVersion)) {
     v2Controller = createV2PublicPlayerController({
       canvas: elements.canvas,
       controls: {
@@ -160,7 +164,7 @@ function createPlayer(record) {
         context: "Shared playback failed.",
         fallback: "Playback stopped because the published snapshot could not be played safely.",
       })),
-      project: record.document.project,
+      project: normalizeV2Project(record.document.project),
       reducedMotion,
     });
     hasArrangement = v2Controller.hasPlayableArrangement();

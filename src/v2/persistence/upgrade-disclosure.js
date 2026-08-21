@@ -1,7 +1,9 @@
+import { PROJECT_SCHEMA_VERSION } from "../domain/constants.js";
+
 const PENDING_PREFIX = "chiptune-workstation:v2-upgrade-pending:";
 const SHOWN_PREFIX = "chiptune-workstation:v2-upgrade-shown:";
 
-export const V2_UPGRADE_DISCLOSURE_COPY = "This project was upgraded to the Studio V2 format when it was first saved. Older Studio builds cannot edit it, but the recovery build can still list and download the raw V2 record.";
+export const V2_UPGRADE_DISCLOSURE_COPY = "This project was upgraded to the current Studio format when it was first saved. Older Studio builds cannot edit it, but the recovery build can still list and download the raw record.";
 
 function validDetail(candidate) {
   return candidate
@@ -9,7 +11,7 @@ function validDetail(candidate) {
     && candidate.projectId.trim() !== ""
     && Number.isInteger(candidate.fromSchemaVersion)
     && candidate.fromSchemaVersion >= 1
-    && candidate.fromSchemaVersion < 7;
+    && candidate.fromSchemaVersion < PROJECT_SCHEMA_VERSION;
 }
 
 function storageKey(prefix, projectId) {

@@ -10,6 +10,7 @@ import {
 } from "../src/firebase/cloud-project.js";
 import { createProjectDocument } from "../src/persistence/project-document.js";
 import { createDefaultProject } from "../src/state/project-state.js";
+import { createDefaultV2Project } from "../src/v2/domain/schema.js";
 
 const NOW = "2026-07-20T12:00:00.000Z";
 
@@ -55,6 +56,49 @@ test("cloud recovery summaries retain future and malformed records by Firestore 
   assert.equal(malformedSummary.updatedAt, null);
   assert.equal(malformedSummary.title, "<Unavailable & untouched>");
   assert.equal(serializeRawCloudProjectRecord(malformed), `${JSON.stringify(malformed, null, 2)}\n`);
+});
+
+test("cloud recovery summaries classify historical V7 and current V8 against the runtime schema", () => {
+  const v8Project = structuredClone(createDefaultV2Project());
+  v8Project.metadata.title = "Current V8 tune";
+  const v7Project = structuredClone(v8Project);
+  v7Project.schemaVersion = 7;
+  v7Project.metadata.title = "Historical V7 tune";
+  const records = [
+    createCloudProjectRecord("user-one", createProjectDocument(v7Project, {
+      id: "native-v7",
+      now: NOW,
+    }), 4),
+    createCloudProjectRecord("user-one", createProjectDocument(v8Project, {
+      id: "native-v8",
+      now: NOW,
+    }), 5),
+  ];
+  const before = structuredClone(records);
+
+  for (const [index, record] of records.entries()) {
+    const recoveryKey = `firestore-v${index + 7}`;
+    const recoverySummary = summarizeCloudProjectRecordForRecovery(record, {
+      ownerId: "user-one",
+      recoveryKey,
+      targetSchemaVersion: 6,
+    });
+    assert.equal(recoverySummary.availability, "unavailable");
+    assert.equal(recoverySummary.id, null);
+    assert.equal(recoverySummary.recoveryKey, recoveryKey);
+    assert.match(recoverySummary.reason, /unavailable/);
+
+    const currentSummary = summarizeCloudProjectRecordForRecovery(record, {
+      ownerId: "user-one",
+      recoveryKey,
+      targetSchemaVersion: 8,
+    });
+    assert.equal(currentSummary.availability, "ready");
+    assert.equal(currentSummary.id, record.projectId);
+    assert.equal(currentSummary.schemaVersion, index + 7);
+  }
+
+  assert.deepEqual(records, before);
 });
 
 test("cloud records reject projects with excessive collection counts", () => {

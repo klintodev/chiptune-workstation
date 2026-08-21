@@ -5,6 +5,7 @@ import { createCloudProjectRecord } from "../src/firebase/cloud-project.js";
 import { createFirebaseClient } from "../src/firebase/firebase-client.js";
 import { createProjectDocument } from "../src/persistence/project-document.js";
 import { createDefaultProject } from "../src/state/project-state.js";
+import { createDefaultV2Project } from "../src/v2/domain/schema.js";
 
 function createSdkDouble() {
   const calls = {
@@ -159,7 +160,7 @@ test("App Check initialises before Auth while Firestore remains lazy", async () 
   assert.deepEqual(order, ["app-check", "auth", "firestore"]);
 });
 
-test("cloud listing retains every raw Firestore document and raw reads do not normalize", async () => {
+test("cloud listing classifies raw records for the requested runtime without normalizing raw reads", async () => {
   const document = createProjectDocument(createDefaultProject(), {
     id: "project-one",
     now: "2026-08-04T12:00:00.000Z",
@@ -176,8 +177,21 @@ test("cloud listing retains every raw Firestore document and raw reads do not no
     title: "Malformed cloud tune",
     nested: { exact: ["raw", 17] },
   };
+  const v8Project = structuredClone(createDefaultV2Project());
+  const v7Project = structuredClone(v8Project);
+  v7Project.schemaVersion = 7;
+  const nativeV7 = createCloudProjectRecord("user-one", createProjectDocument(v7Project, {
+    id: "native-v7",
+    now: "2026-08-04T12:00:00.000Z",
+  }), 2);
+  const nativeV8 = createCloudProjectRecord("user-one", createProjectDocument(v8Project, {
+    id: "native-v8",
+    now: "2026-08-04T12:00:00.000Z",
+  }), 3);
   const records = new Map([
     ["ready-key", ready],
+    ["native-v7-key", nativeV7],
+    ["native-v8-key", nativeV8],
     ["future-key", future],
     ["malformed-key", malformed],
   ]);
@@ -222,13 +236,19 @@ test("cloud listing retains every raw Firestore document and raw reads do not no
     }),
   });
 
-  const summaries = await client.listProjects("user-one");
+  const recoverySummaries = await client.listProjects("user-one", { targetSchemaVersion: 6 });
+  const currentSummaries = await client.listProjects("user-one", { targetSchemaVersion: 8 });
 
   assert.equal(listedCollection, "users/user-one/projects");
-  assert.equal(summaries.length, 3);
-  assert.equal(summaries.find(({ recoveryKey }) => recoveryKey === "ready-key").availability, "ready");
-  assert.equal(summaries.find(({ recoveryKey }) => recoveryKey === "future-key").availability, "unavailable");
-  assert.equal(summaries.find(({ recoveryKey }) => recoveryKey === "malformed-key").availability, "unavailable");
+  assert.equal(recoverySummaries.length, 5);
+  assert.equal(recoverySummaries.find(({ recoveryKey }) => recoveryKey === "ready-key").availability, "ready");
+  assert.equal(recoverySummaries.find(({ recoveryKey }) => recoveryKey === "native-v7-key").availability, "unavailable");
+  assert.equal(recoverySummaries.find(({ recoveryKey }) => recoveryKey === "native-v8-key").availability, "unavailable");
+  assert.equal(recoverySummaries.find(({ recoveryKey }) => recoveryKey === "future-key").availability, "unavailable");
+  assert.equal(recoverySummaries.find(({ recoveryKey }) => recoveryKey === "malformed-key").availability, "unavailable");
+  assert.equal(currentSummaries.find(({ recoveryKey }) => recoveryKey === "native-v7-key").availability, "ready");
+  assert.equal(currentSummaries.find(({ recoveryKey }) => recoveryKey === "native-v8-key").availability, "ready");
   assert.deepEqual(await client.getRawProject("user-one", "malformed-key"), malformed);
+  assert.deepEqual(await client.getRawProject("user-one", "native-v8-key"), nativeV8);
   assert.equal(records.get("malformed-key").nested.exact[0], "raw");
 });

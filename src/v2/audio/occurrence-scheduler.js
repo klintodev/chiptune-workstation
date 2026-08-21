@@ -11,6 +11,7 @@ import {
 } from "../domain/index.js";
 import {
   PLAYBACK_MODES,
+  VOICE_DISCONNECT_GRACE_SECONDS,
   adaptOccurrenceToRenderEvent,
   createPlaybackOccurrences,
 } from "./render-plan.js";
@@ -204,12 +205,12 @@ export function createOccurrenceScheduler({
       records.has(occurrence.occurrenceId)
     ))) return false;
     const event = adaptOccurrenceToRenderEvent(activeSession.project, occurrence, activeSession.bpm);
+    if (event === null) return false;
     const startTime = activeSession.anchorAudioTime
       + ticksToSeconds(occurrence.transportTick - activeSession.anchorTransportTick, activeSession.bpm);
     const releaseEndTime = startTime
-      + event.durationSeconds
-      + event.releaseSeconds
-      + 0.01;
+      + event.voiceEndOffsetSeconds
+      + VOICE_DISCONNECT_GRACE_SECONDS;
     let trackVoices = activeSession.voicesByTrack.get(event.trackId);
     if (!trackVoices) {
       trackVoices = new Map();
@@ -233,7 +234,11 @@ export function createOccurrenceScheduler({
       voice,
     };
     trackVoices.set(scheduledEvent.occurrenceId, record);
-    voice.addEndedListener?.(() => trackVoices.delete(scheduledEvent.occurrenceId));
+    voice.addEndedListener?.(() => {
+      if (trackVoices.get(scheduledEvent.occurrenceId) === record) {
+        trackVoices.delete(scheduledEvent.occurrenceId);
+      }
+    });
     onTrackInput(scheduledEvent.trackId, scheduledEvent);
     return true;
   }

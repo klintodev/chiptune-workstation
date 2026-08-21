@@ -22,6 +22,7 @@ import {
   createProjectDocument,
   parseProjectDocument,
   parseProjectDocumentToV7,
+  parseProjectDocumentToV8,
 } from "../src/persistence/project-document.js";
 import {
   MAX_NOTES_PER_PATTERN,
@@ -148,7 +149,8 @@ function oversizedNotes() {
 
 const localParsers = Object.freeze([
   ["compatibility parser", parseProjectDocument],
-  ["explicit V7 parser", parseProjectDocumentToV7],
+  ["explicit V8 parser", parseProjectDocumentToV8],
+  ["legacy V7-named parser alias", parseProjectDocumentToV7],
   ["V2 persistence parser", parsePersistedV2ProjectDocument],
   ["V2 domain parser", parseDomainV2ProjectDocument],
 ]);
@@ -167,7 +169,7 @@ function assertRejectedAtEveryTrustBoundary(document, expected, fixtureName) {
   }
 }
 
-test("all local V7 import adapters accept exactly 2 MB and reject one byte more", () => {
+test("all local current-schema import adapters accept exactly 2 MB and reject one byte more", () => {
   const document = createProjectDocument(createDefaultV2Project(), {
     id: "project-local-boundary",
     now: NOW,
@@ -290,6 +292,18 @@ test("malformed and oversized collections fail equivalently at local, cloud, and
       expected: /Unsupported klinto-chip version/,
       mutate(document) {
         document.project.tracks[0].instrument.version = 2;
+      },
+    },
+    {
+      name: "unknown Drums version",
+      expected: /Unsupported klinto-drums version/,
+      mutate(document) {
+        document.project.tracks[0].instrument = {
+          instanceId: "instrument-1",
+          type: "klinto-drums",
+          version: 2,
+          params: { tone: 0.5, decaySeconds: 0.45, level: 0.5 },
+        };
       },
     },
   ];

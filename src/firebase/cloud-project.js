@@ -1,6 +1,7 @@
 import {
   normalizeProjectDocument,
-  normalizeProjectDocumentToV7,
+  normalizeProjectDocumentForSchema,
+  normalizeProjectDocumentToV8,
   summarizeProjectDocument,
 } from "../persistence/project-document.js";
 
@@ -71,17 +72,24 @@ export function normalizeCloudProjectRecord(candidate, { ownerId } = {}) {
   return createCloudProjectRecord(normalizedOwnerId, document, candidate.cloudRevision);
 }
 
-export function normalizeCloudProjectRecordToV7(candidate, options) {
+export function normalizeCloudProjectRecordToV8(candidate, options) {
   const source = normalizeCloudProjectRecord(candidate, options);
   return createCloudProjectRecord(
     source.ownerId,
-    normalizeProjectDocumentToV7(source.document),
+    normalizeProjectDocumentToV8(source.document),
     source.cloudRevision,
   );
 }
 
+export const normalizeCloudProjectRecordToV7 = normalizeCloudProjectRecordToV8;
+
 export function summarizeCloudProjectRecord(candidate, options) {
   const record = normalizeCloudProjectRecord(candidate, options);
+  if (options?.targetSchemaVersion !== undefined) {
+    // Compatibility is runtime-specific. Keep the returned summary/source
+    // schema untouched after proving that this Studio can activate it.
+    normalizeProjectDocumentForSchema(record.document, options.targetSchemaVersion);
+  }
   return Object.freeze({
     ...summarizeProjectDocument(record.document),
     cloudRevision: record.cloudRevision,
@@ -98,9 +106,14 @@ export function summarizeCloudProjectRecord(candidate, options) {
 export function summarizeCloudProjectRecordForRecovery(candidate, {
   ownerId,
   recoveryKey,
+  targetSchemaVersion,
 } = {}) {
   try {
-    return summarizeCloudProjectRecord(candidate, { ownerId, recoveryKey });
+    return summarizeCloudProjectRecord(candidate, {
+      ownerId,
+      recoveryKey,
+      targetSchemaVersion,
+    });
   } catch (error) {
     const document = candidate?.document;
     const nestedTitle = document?.project?.metadata?.title;

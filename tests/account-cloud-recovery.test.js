@@ -2,9 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createCloudProjectRecord,
+  serializeRawCloudProjectRecord,
+  summarizeCloudProjectRecordForRecovery,
+} from "../src/firebase/cloud-project.js";
+import {
   downloadUnavailableCloudRecovery,
   getCloudProjectRowModel,
 } from "../src/features/account/account.js";
+import { createProjectDocument } from "../src/persistence/project-document.js";
+import { createDefaultV2Project } from "../src/v2/domain/schema.js";
+
+function createNativeV8CloudRecord() {
+  const project = structuredClone(createDefaultV2Project());
+  project.metadata.title = "Native V8 tune";
+  const document = createProjectDocument(project, {
+    id: "native-v8",
+    now: "2026-08-04T12:00:00.000Z",
+  });
+  return createCloudProjectRecord("user-one", document, 4);
+}
 
 test("unavailable cloud rows expose raw download only", () => {
   const ready = getCloudProjectRowModel({
@@ -15,14 +32,15 @@ test("unavailable cloud rows expose raw download only", () => {
     title: "Ready cloud tune",
     updatedAt: "2026-08-04T12:00:00.000Z",
   });
-  const unavailable = getCloudProjectRowModel({
-    availability: "unavailable",
-    id: null,
-    reason: "Unsupported project schema version: 99.",
-    recoveryKey: "future-firestore-key",
-    title: "Future cloud tune",
-    updatedAt: null,
-  });
+  const unavailableSummary = summarizeCloudProjectRecordForRecovery(
+    createNativeV8CloudRecord(),
+    {
+      ownerId: "user-one",
+      recoveryKey: "native-v8-firestore-key",
+      targetSchemaVersion: 6,
+    },
+  );
+  const unavailable = getCloudProjectRowModel(unavailableSummary);
 
   assert.deepEqual({
     canDelete: ready.canDelete,
@@ -34,18 +52,19 @@ test("unavailable cloud rows expose raw download only", () => {
     canOpen: unavailable.canOpen,
     canRecover: unavailable.canRecover,
   }, { canDelete: false, canOpen: false, canRecover: true });
-  assert.equal(unavailable.recoveryKey, "future-firestore-key");
+  assert.equal(unavailable.recoveryKey, "native-v8-firestore-key");
   assert.match(unavailable.meta, /Unavailable/);
 });
 
 test("cloud recovery preserves raw JSON and uses the Firestore document key", async () => {
-  const rawText = '{"title":"Future","document":{"project":{"schemaVersion":99}}}\n';
+  const record = createNativeV8CloudRecord();
+  const rawText = serializeRawCloudProjectRecord(record);
   const calls = [];
-  const summary = {
-    availability: "unavailable",
+  const summary = summarizeCloudProjectRecordForRecovery(record, {
+    ownerId: "user-one",
     recoveryKey: "opaque-firestore-key",
-    title: "Future cloud tune",
-  };
+    targetSchemaVersion: 6,
+  });
 
   const result = await downloadUnavailableCloudRecovery(summary, {
     cloudProjectService: {
@@ -63,6 +82,6 @@ test("cloud recovery preserves raw JSON and uses the Firestore document key", as
   assert.equal(result, "downloaded");
   assert.deepEqual(calls, [
     { recoveryKey: "opaque-firestore-key" },
-    { text: rawText, title: "Future cloud tune cloud recovery" },
+    { text: rawText, title: "Native V8 tune cloud recovery" },
   ]);
 });
