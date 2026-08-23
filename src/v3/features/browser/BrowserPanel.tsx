@@ -79,7 +79,7 @@ export function BrowserPanel() {
               </span>
               <span className={styles.itemCopy}>
                 <strong>{item.name}</strong>
-                <small>{itemKind === "pattern" ? `Pattern ${index + 1}` : "Chip instrument"}</small>
+                <small>{itemKind === "pattern" ? `Pattern ${index + 1}` : "Instrument"}</small>
               </span>
             </button>
           );
@@ -87,8 +87,6 @@ export function BrowserPanel() {
 
         {items.length === 0 ? <p className={styles.empty}>No matching {browserView}.</p> : null}
       </div>
-
-      <footer className={styles.footer}>Local project · Unsaved</footer>
     </section>
   );
 }

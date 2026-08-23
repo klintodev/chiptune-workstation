@@ -47,12 +47,6 @@
   white-space: nowrap;
 }
 
-.selectionCard p {
-  color: var(--v3-text-dim);
-  font-size: 0.61rem;
-  margin: 0.22rem 0 0;
-}
-
 .section {
   border-bottom: 1px solid var(--v3-border);
   padding: 0.58rem 0.12rem 0.66rem;
@@ -92,46 +86,3 @@
   text-transform: capitalize;
   white-space: nowrap;
 }
-
-.waveform {
-  align-items: center;
-  background: var(--v3-display);
-  border: 1px solid var(--v3-border-strong);
-  border-radius: var(--v3-radius-sm);
-  display: flex;
-  height: 2.4rem;
-  margin-top: 0.48rem;
-  overflow: hidden;
-  padding: 0 0.5rem;
-}
-
-.waveform span {
-  border-color: var(--v3-accent);
-  border-style: solid;
-  border-width: 1px 1px 0 0;
-  height: 0.72rem;
-  width: 25%;
-}
-
-.waveform span:nth-child(even) {
-  border-width: 0 1px 1px 0;
-  transform: translateY(0.72rem);
-}
-
-.meter {
-  background: var(--v3-input);
-  border: 1px solid var(--v3-border);
-  border-radius: 999px;
-  height: 0.36rem;
-  margin-top: 0.48rem;
-  overflow: hidden;
-}
-
-.meter span {
-  background: linear-gradient(90deg, var(--v3-positive), var(--v3-warning));
-  display: block;
-  height: 100%;
-  opacity: 0.36;
-  width: 12%;
-}
-

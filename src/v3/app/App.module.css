@@ -2,7 +2,7 @@
   background: var(--v3-background);
   color: var(--v3-text);
   display: grid;
-  grid-template-rows: var(--v3-header-height) minmax(0, 1fr) var(--v3-status-height);
+  grid-template-rows: var(--v3-header-height) minmax(0, 1fr);
   height: 100%;
   min-height: 34rem;
   min-width: 46rem;
@@ -16,7 +16,7 @@
   box-shadow: 0 0.2rem 0.9rem rgb(0 0 0 / 22%);
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(18rem, 1fr) auto minmax(10rem, 1fr);
+  grid-template-columns: minmax(18rem, 1fr) auto minmax(18rem, 1fr);
   min-width: 0;
   padding: 0 0.7rem;
   position: relative;
@@ -65,7 +65,6 @@
 .brand {
   display: grid;
   flex: 0 0 auto;
-  gap: 0.12rem;
   margin-left: 0.55rem;
 }
 
@@ -77,25 +76,11 @@
   white-space: nowrap;
 }
 
-.brand span {
-  color: var(--v3-accent-bright);
-  font-size: 0.49rem;
-  font-weight: 800;
-  letter-spacing: 0.105em;
-  text-transform: uppercase;
-}
-
 .projectDivider {
   background: var(--v3-border-strong);
   height: 1.55rem;
   margin: 0 0.65rem;
   width: 1px;
-}
-
-.runtimeStatus {
-  display: flex;
-  justify-content: flex-end;
-  min-width: 0;
 }
 
 .workspace,
@@ -125,45 +110,10 @@
   background: var(--v3-accent);
 }
 
-.statusBar {
-  align-items: center;
-  background: var(--v3-status-background);
-  border-top: 1px solid var(--v3-border-strong);
-  color: var(--v3-text-dim);
-  display: flex;
-  font: 600 0.56rem/1 var(--v3-font-mono);
-  gap: 1rem;
-  justify-content: space-between;
-  letter-spacing: 0.02em;
-  min-width: 0;
-  padding: 0 0.68rem;
-  text-transform: uppercase;
-}
-
-.statusBar > * {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.statusBar div {
-  align-items: center;
-  color: var(--v3-text-muted);
-  display: flex;
-  gap: 0.36rem;
-}
-
-.readyDot {
-  background: var(--v3-positive);
-  border-radius: 50%;
-  height: 0.35rem;
-  width: 0.35rem;
-}
-
 @media (max-width: 1000px) {
   .topBar {
     gap: 0.5rem;
-    grid-template-columns: minmax(13rem, 1fr) auto auto;
+    grid-template-columns: minmax(13rem, 1fr) auto minmax(13rem, 1fr);
   }
 
   .brand {

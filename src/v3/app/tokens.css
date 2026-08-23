@@ -21,11 +21,9 @@
   --v3-surface-raised: #151b24;
   --v3-header-top: #171e28;
   --v3-header-bottom: #111720;
-  --v3-status-background: #0d1219;
   --v3-control: #1a222d;
   --v3-control-active: #273240;
   --v3-input: #0c1118;
-  --v3-display: #071116;
 
   --v3-border: #252f3b;
   --v3-border-strong: #344150;
@@ -36,20 +34,15 @@
   --v3-text: #d9e0e8;
   --v3-text-muted: #9aa7b5;
   --v3-text-dim: #697787;
-  --v3-display-text: #85f0d2;
 
   --v3-accent: #36c6a7;
   --v3-accent-bright: #75ead0;
   --v3-accent-muted: #143b37;
-  --v3-positive: #54d494;
-  --v3-warning: #d9a34a;
-  --v3-danger: #ee6e7a;
 
   --v3-radius-sm: 0.25rem;
   --v3-radius-md: 0.42rem;
   --v3-shadow-sm: 0 0.22rem 0.7rem rgb(0 0 0 / 20%);
   --v3-header-height: 3.35rem;
-  --v3-status-height: 1.45rem;
 }
 
 * {

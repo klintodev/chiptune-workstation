@@ -190,55 +190,6 @@
   position: absolute;
 }
 
-.surfaceNotice {
-  color: var(--v3-text-dim);
-  display: grid;
-  gap: 0.3rem;
-  left: 50%;
-  position: absolute;
-  text-align: center;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: min(22rem, 75%);
-}
-
-.surfaceNotice strong {
-  color: var(--v3-text-muted);
-  font-size: 0.78rem;
-}
-
-.surfaceNotice span {
-  font-size: 0.66rem;
-  line-height: 1.45;
-}
-
-.velocityLane {
-  background: var(--v3-surface);
-  border-top: 1px solid var(--v3-border-strong);
-  display: grid;
-  flex: 0 0 4.2rem;
-  grid-template-columns: 4.2rem minmax(0, 1fr);
-}
-
-.velocityLane span {
-  color: var(--v3-text-dim);
-  font: 700 0.52rem/1 var(--v3-font-sans);
-  letter-spacing: 0.05em;
-  padding: 0.5rem 0.42rem;
-  text-transform: uppercase;
-}
-
-.velocityLane div {
-  background-image: repeating-linear-gradient(
-    to right,
-    transparent 0,
-    transparent calc(3.125% - 1px),
-    var(--v3-grid-minor) calc(3.125% - 1px),
-    var(--v3-grid-minor) 3.125%
-  );
-  border-left: 1px solid var(--v3-border-strong);
-}
-
 .trackList {
   flex: 1 1 auto;
   min-height: 0;

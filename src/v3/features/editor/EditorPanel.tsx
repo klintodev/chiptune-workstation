@@ -58,8 +58,7 @@ function PatternSurface() {
           <strong>{selectedPattern.name}</strong>
         </div>
         <div className={styles.contextMeta}>
-          <span>1/16 grid</span>
-          <span>{selectedNotes.length} notes</span>
+          <span>{selectedNotes.length === 1 ? "1 note" : `${selectedNotes.length} notes`}</span>
         </div>
       </div>
 
@@ -98,18 +97,7 @@ function PatternSurface() {
               />
             );
           })}
-          {selectedNotes.length === 0 ? (
-            <div className={styles.surfaceNotice}>
-              <strong>Pattern surface ready</strong>
-              <span>Canvas editing and playback connect in later parts.</span>
-            </div>
-          ) : null}
         </div>
-      </div>
-
-      <div className={styles.velocityLane}>
-        <span>Velocity</span>
-        <div />
       </div>
     </div>
   );
@@ -143,8 +131,7 @@ function ArrangementSurface() {
           <strong>Arrangement</strong>
         </div>
         <div className={styles.contextMeta}>
-          <span>{tracks.length} tracks</span>
-          <span>16 bars</span>
+          <span>{tracks.length === 1 ? "1 track" : `${tracks.length} tracks`}</span>
         </div>
       </div>
 
@@ -178,7 +165,7 @@ function ArrangementSurface() {
 
                 return (
                   <span className={styles.clip} key={clip.id} style={clipStyle}>
-                    {pattern?.name ?? "Missing pattern"}
+                    {pattern?.name ?? "Pattern unavailable"}
                   </span>
                 );
               })}

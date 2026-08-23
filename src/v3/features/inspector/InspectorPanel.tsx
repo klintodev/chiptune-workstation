@@ -60,13 +60,6 @@ export function InspectorPanel() {
         <section className={styles.selectionCard}>
           <span className={styles.selectionKind}>{selectionKind}</span>
           <h3>{selectionTitle}</h3>
-          <p>
-            {selectedPattern
-              ? "Pattern data"
-              : selectedInstrument
-                ? "Klinto Chip"
-                : "Project channel"}
-          </p>
         </section>
 
         {selectedPattern ? (
@@ -82,20 +75,7 @@ export function InspectorPanel() {
           <section className={styles.section}>
             <h4>Instrument</h4>
             <ValueRow label="Type" value={selectedInstrument.kind} />
-            <ValueRow
-              label="Wave"
-              value={typeof waveform === "string" ? waveform : "Engine-defined"}
-            />
-            <ValueRow
-              label="Parameters"
-              value={String(Object.keys(selectedInstrument.parameters).length)}
-            />
-            <div className={styles.waveform} aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
+            {typeof waveform === "string" ? <ValueRow label="Wave" value={waveform} /> : null}
           </section>
         ) : null}
 
@@ -108,9 +88,6 @@ export function InspectorPanel() {
               value={selectedTrack.pan === 0 ? "Centre" : selectedTrack.pan.toFixed(2)}
             />
             <ValueRow label="Clips" value={String(selectedClipCount)} />
-            <div className={styles.meter} aria-label="Channel level, inactive">
-              <span />
-            </div>
           </section>
         ) : null}
 
@@ -118,10 +95,8 @@ export function InspectorPanel() {
           <h4>Project</h4>
           <ValueRow label="Tempo" value={`${project.transport.bpm} BPM`} />
           <ValueRow label="Tracks" value={String(project.tracks.order.length)} />
-          <ValueRow label="Revision" value={String(project.revision)} />
         </section>
       </div>
-
     </section>
   );
 }

@@ -163,13 +163,3 @@
   margin: 1.25rem 0.5rem;
   text-align: center;
 }
-
-.footer {
-  border-top: 1px solid var(--v3-border);
-  color: var(--v3-text-dim);
-  flex: 0 0 auto;
-  font: 600 0.57rem/1 var(--v3-font-mono);
-  letter-spacing: 0.035em;
-  padding: 0.55rem 0.65rem;
-  text-transform: uppercase;
-}
