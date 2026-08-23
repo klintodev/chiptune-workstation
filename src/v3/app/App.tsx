@@ -77,7 +77,6 @@ export function App() {
           <span className={styles.readyDot} aria-hidden="true" />
           UI ready
         </div>
-        <span>Project and workspace state · Redux Toolkit</span>
         <span>Audio runtime · outside application state</span>
       </footer>
     </div>
