@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createProject } from "../project/create-project";
-import { requireOwnEntity } from "../project/entity-collection";
+import { requireEntityById } from "../project/entities";
 import type { Note, Project } from "../project/project";
 import { compileProject } from "./compile-project";
 import { ProjectCompilationError, type ProjectCompilationErrorCode } from "./compiler-error";
@@ -21,8 +21,8 @@ function projectWithNotes(notes: Array<Omit<Note, "patternId">>): Project {
     ids,
     timestamp: "2026-08-23T12:00:00.000Z",
   });
-  const pattern = requireOwnEntity(project.patterns, ids.pattern);
-  const track = requireOwnEntity(project.tracks, ids.track);
+  const pattern = requireEntityById(project.patterns, ids.pattern);
+  const track = requireEntityById(project.tracks, ids.track);
 
   project.notes = {
     byId: Object.fromEntries(notes.map((note) => [note.id, { ...note, patternId: pattern.id }])),
@@ -59,8 +59,8 @@ function expectCompilationError(compile: () => unknown, code: ProjectCompilation
   expect(caught).toMatchObject({ code });
 }
 
-describe("compileProject", () => {
-  it("projects clips into deterministically ordered playback events", () => {
+describe("when a project is compiled", () => {
+  it("then clips should become deterministically ordered playback events", () => {
     const project = projectWithNotes([
       { id: "note-high", pitch: 72, startTick: 48, durationTicks: 24, velocity: 0.6 },
       { id: "note-low", pitch: 60, startTick: 0, durationTicks: 48, velocity: 0.8 },
@@ -81,7 +81,7 @@ describe("compileProject", () => {
     ]);
   });
 
-  it("uses locale-independent IDs to break musical event ties", () => {
+  it("then locale-independent IDs should break musical event ties", () => {
     const project = projectWithNotes([
       { id: "note-a", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
       { id: "note-Z", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
@@ -96,7 +96,7 @@ describe("compileProject", () => {
     ).toEqual(["note-Z", "note-a"]);
   });
 
-  it("rejects pathological clip expansion before allocating playback events", () => {
+  it("then pathological clip expansion should be rejected before playback events are allocated", () => {
     const noteCount = 101;
     const project = projectWithNotes(
       Array.from({ length: noteCount }, (_, index) => ({
@@ -122,19 +122,19 @@ describe("compileProject", () => {
     expectCompilationError(() => compileProject(project), "PLAYBACK_EVENT_LIMIT_EXCEEDED");
   });
 
-  it("rejects unsafe tick arithmetic in an in-memory project", () => {
+  it("then unsafe tick arithmetic in an in-memory project should be rejected", () => {
     const project = projectWithNotes([]);
-    const clip = requireOwnEntity(project.clips, "clip-later");
+    const clip = requireEntityById(project.clips, "clip-later");
     clip.startTick = Number.MAX_SAFE_INTEGER;
 
     expectCompilationError(() => compileProject(project), "TICK_RANGE_EXCEEDED");
   });
 
-  it("applies mute and solo policy without changing project state", () => {
+  it("then mute and solo policy should be applied without changing project state", () => {
     const project = projectWithNotes([
       { id: "note-1", pitch: 60, startTick: 0, durationTicks: 24, velocity: 1 },
     ]);
-    const firstTrack = requireOwnEntity(project.tracks, ids.track);
+    const firstTrack = requireEntityById(project.tracks, ids.track);
     project.tracks.byId["track-solo"] = {
       ...firstTrack,
       id: "track-solo",
@@ -153,9 +153,9 @@ describe("compileProject", () => {
     expect(JSON.stringify(project)).toBe(before);
   });
 
-  it("copies engine-facing instrument data instead of leaking project references", () => {
+  it("then engine-facing instrument data should be copied instead of leaking project references", () => {
     const project = projectWithNotes([]);
-    const projectInstrument = requireOwnEntity(project.instruments, ids.instrument);
+    const projectInstrument = requireEntityById(project.instruments, ids.instrument);
     const nestedParameter = { levels: [0.25, 0.75] };
     projectInstrument.parameters["nested"] = nestedParameter;
 
@@ -168,7 +168,7 @@ describe("compileProject", () => {
   });
 
   it.each(PROTOTYPE_PROPERTY_NAMES)(
-    "rejects inherited %s properties in ordered collections",
+    "then inherited %s properties in ordered collections should be rejected",
     (id) => {
       const project = projectWithNotes([]);
       project.tracks = { byId: {}, order: [id] };
@@ -178,10 +178,10 @@ describe("compileProject", () => {
   );
 
   it.each(PROTOTYPE_PROPERTY_NAMES)(
-    "rejects inherited %s properties used as compiler references",
+    "then inherited %s properties used as compiler references should be rejected",
     (instrumentId) => {
       const project = projectWithNotes([]);
-      const track = requireOwnEntity(project.tracks, ids.track);
+      const track = requireEntityById(project.tracks, ids.track);
       track.instrumentId = instrumentId;
 
       expectCompilationError(() => compileProject(project), "TRACK_INSTRUMENT_NOT_FOUND");

@@ -17,8 +17,8 @@ function renderWithStore(element: ReactElement) {
   return render(<Provider store={store}>{element}</Provider>);
 }
 
-describe("V3 panels", () => {
-  it("renders and switches the project browser", () => {
+describe("when V3 panels render", () => {
+  it("then the project browser should render and switch views", () => {
     renderWithStore(<BrowserPanel />);
 
     expect(screen.getByRole("button", { name: /Pattern 1/ })).toBeTruthy();
@@ -28,7 +28,7 @@ describe("V3 panels", () => {
     expect(screen.getByText("Pulse")).toBeTruthy();
   });
 
-  it("renders and switches the editor surface", () => {
+  it("then the editor surface should render and switch views", () => {
     renderWithStore(<EditorPanel />);
 
     expect(screen.getByText("Editing pattern")).toBeTruthy();
@@ -39,7 +39,7 @@ describe("V3 panels", () => {
     expect(screen.getByText("Arrangement")).toBeTruthy();
   });
 
-  it("renders project-backed inspector values", () => {
+  it("then the inspector should render project-backed values", () => {
     renderWithStore(<InspectorPanel />);
 
     expect(screen.getByText("Pulse 1")).toBeTruthy();
@@ -48,7 +48,7 @@ describe("V3 panels", () => {
     expect(screen.getByText("Project")).toBeTruthy();
   });
 
-  it("renders the project tempo without fake runtime state", () => {
+  it("then the transport should render project tempo without fake runtime state", () => {
     render(<TransportBar bpm={128} />);
 
     expect(screen.getByText("128")).toBeTruthy();

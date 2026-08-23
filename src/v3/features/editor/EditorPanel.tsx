@@ -1,9 +1,13 @@
 import { useMemo, type CSSProperties } from "react";
 
-import { firstEntity, orderedEntities } from "../../app/entity-collection";
+import {
+  findEntityById,
+  findFirstEntityInOrder,
+  listEntitiesInOrder,
+  type Clip,
+} from "../../project";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { editorViewChanged, workspaceSelectionChanged } from "../../app/workspace-slice";
-import { getOwnEntity, type Clip } from "../../project";
 import { PanelHeading } from "../workspace/PanelHeading";
 import styles from "./EditorPanel.module.css";
 
@@ -124,10 +128,10 @@ function ViewTabs() {
 function PatternSurface() {
   const project = useAppSelector((state) => state.project.document);
   const selection = useAppSelector((state) => state.workspace.selection);
-  const notes = useMemo(() => orderedEntities(project.notes), [project.notes]);
+  const notes = useMemo(() => listEntitiesInOrder(project.notes), [project.notes]);
   const selectedPattern =
-    (selection?.kind === "pattern" ? getOwnEntity(project.patterns, selection.id) : undefined) ??
-    firstEntity(project.patterns);
+    (selection?.kind === "pattern" ? findEntityById(project.patterns, selection.id) : undefined) ??
+    findFirstEntityInOrder(project.patterns);
   const selectedNotes = useMemo(
     () => (selectedPattern ? notes.filter((note) => note.patternId === selectedPattern.id) : []),
     [notes, selectedPattern],
@@ -212,8 +216,8 @@ function PatternSurface() {
 function ArrangementSurface() {
   const dispatch = useAppDispatch();
   const project = useAppSelector((state) => state.project.document);
-  const tracks = useMemo(() => orderedEntities(project.tracks), [project.tracks]);
-  const clips = useMemo(() => orderedEntities(project.clips), [project.clips]);
+  const tracks = useMemo(() => listEntitiesInOrder(project.tracks), [project.tracks]);
+  const clips = useMemo(() => listEntitiesInOrder(project.clips), [project.clips]);
   const clipsByTrack = useMemo(() => {
     const result = new Map<string, Clip[]>();
 
@@ -231,7 +235,7 @@ function ArrangementSurface() {
   const arrangementEndTick = useMemo(
     () =>
       clips.reduce((endTick, clip) => {
-        const patternLength = getOwnEntity(project.patterns, clip.patternId)?.lengthTicks ?? 0;
+        const patternLength = findEntityById(project.patterns, clip.patternId)?.lengthTicks ?? 0;
         return Math.max(endTick, clip.startTick + Math.max(1, patternLength));
       }, 0),
     [clips, project.patterns],
@@ -283,7 +287,7 @@ function ArrangementSurface() {
             </button>
             <div className={styles.clipLane}>
               {(clipsByTrack.get(track.id) ?? []).map((clip) => {
-                const pattern = getOwnEntity(project.patterns, clip.patternId);
+                const pattern = findEntityById(project.patterns, clip.patternId);
                 const clipStyle: CSSProperties = {
                   left: `${(clip.startTick / arrangementLength) * 100}%`,
                   width: `${Math.max(((pattern?.lengthTicks ?? 0) / arrangementLength) * 100, 3)}%`,

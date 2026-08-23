@@ -1,6 +1,5 @@
-import { firstEntity, orderedEntities } from "../../app/entity-collection";
+import { findEntityById, findFirstEntityInOrder, listEntitiesInOrder } from "../../project";
 import { useAppSelector } from "../../app/hooks";
-import { getOwnEntity } from "../../project";
 import { PanelHeading } from "../workspace/PanelHeading";
 import styles from "./InspectorPanel.module.css";
 
@@ -17,26 +16,27 @@ export function InspectorPanel() {
   const project = useAppSelector((state) => state.project.document);
   const selection = useAppSelector((state) => state.workspace.selection);
 
-  const defaultTrack = firstEntity(project.tracks);
+  const defaultTrack = findFirstEntityInOrder(project.tracks);
   const selectedTrack =
     selection?.kind === "track"
-      ? getOwnEntity(project.tracks, selection.id)
+      ? findEntityById(project.tracks, selection.id)
       : selection === null
         ? defaultTrack
         : undefined;
   const selectedPattern =
-    selection?.kind === "pattern" ? getOwnEntity(project.patterns, selection.id) : undefined;
+    selection?.kind === "pattern" ? findEntityById(project.patterns, selection.id) : undefined;
   const selectedInstrument =
     selection?.kind === "instrument"
-      ? getOwnEntity(project.instruments, selection.id)
+      ? findEntityById(project.instruments, selection.id)
       : selectedTrack
-        ? getOwnEntity(project.instruments, selectedTrack.instrumentId)
+        ? findEntityById(project.instruments, selectedTrack.instrumentId)
         : undefined;
   const selectedNoteCount = selectedPattern
-    ? orderedEntities(project.notes).filter((note) => note.patternId === selectedPattern.id).length
+    ? listEntitiesInOrder(project.notes).filter((note) => note.patternId === selectedPattern.id)
+        .length
     : 0;
   const selectedClipCount = selectedTrack
-    ? orderedEntities(project.clips).filter((clip) => clip.trackId === selectedTrack.id).length
+    ? listEntitiesInOrder(project.clips).filter((clip) => clip.trackId === selectedTrack.id).length
     : 0;
   const waveform = selectedInstrument?.parameters.waveform;
 

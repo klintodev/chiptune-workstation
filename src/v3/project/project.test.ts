@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createProject, createProjectFile } from "./create-project";
-import { requireOwnEntity } from "./entity-collection";
+import { requireEntityById } from "./entities";
 import { parseProject, parseProjectFile } from "./project-schema";
 
 const PROTOTYPE_PROPERTY_NAMES = ["toString", "valueOf", "constructor"] as const;
@@ -17,8 +17,8 @@ const deterministicOptions = {
   },
 } as const;
 
-describe("createProject", () => {
-  it("is deterministic when IDs and the timestamp are supplied", () => {
+describe("when a project is created", () => {
+  it("then it should be deterministic when IDs and the timestamp are supplied", () => {
     const first = createProject(deterministicOptions);
     const second = createProject(deterministicOptions);
 
@@ -38,7 +38,7 @@ describe("createProject", () => {
     });
   });
 
-  it("creates a JSON-safe version 1 project file", () => {
+  it("then it should create a JSON-safe version 1 project file", () => {
     const file = createProjectFile(createProject(deterministicOptions));
     const roundTrip = JSON.parse(JSON.stringify(file)) as unknown;
 
@@ -50,16 +50,16 @@ describe("createProject", () => {
   });
 });
 
-describe("project boundary validation", () => {
-  it("rejects unknown fields instead of silently accepting schema drift", () => {
+describe("when a project crosses the application boundary", () => {
+  it("then unknown fields should be rejected instead of silently accepting schema drift", () => {
     const project = createProject(deterministicOptions);
 
     expect(() => parseProject({ ...project, legacyState: {} })).toThrow();
   });
 
-  it("rejects dangling cross-entity references", () => {
+  it("then dangling cross-entity references should be rejected", () => {
     const project = createProject(deterministicOptions);
-    const track = requireOwnEntity(project.tracks, "track-test");
+    const track = requireEntityById(project.tracks, "track-test");
 
     const candidate = {
       ...project,
@@ -75,7 +75,7 @@ describe("project boundary validation", () => {
     expect(() => parseProject(candidate)).toThrow(/unknown instrument/i);
   });
 
-  it("rejects clips whose end tick cannot be represented safely", () => {
+  it("then clips whose end tick cannot be represented safely should be rejected", () => {
     const project = createProject(deterministicOptions);
     const clipId = "clip-overflow";
     const candidate = {
@@ -96,7 +96,7 @@ describe("project boundary validation", () => {
     expect(() => parseProject(candidate)).toThrow(/safe integer range/i);
   });
 
-  it("rejects collection records and ordering that disagree", () => {
+  it("then collection records and ordering that disagree should be rejected", () => {
     const project = createProject(deterministicOptions);
     const candidate = {
       ...project,
@@ -110,7 +110,7 @@ describe("project boundary validation", () => {
   });
 
   it.each(PROTOTYPE_PROPERTY_NAMES)(
-    "rejects inherited %s properties used as ordered entity IDs",
+    "then inherited %s properties used as ordered entity IDs should be rejected",
     (id) => {
       const project = createProject(deterministicOptions);
       const candidate = {
@@ -123,10 +123,10 @@ describe("project boundary validation", () => {
   );
 
   it.each(PROTOTYPE_PROPERTY_NAMES)(
-    "rejects inherited %s properties used as entity references",
+    "then inherited %s properties used as entity references should be rejected",
     (instrumentId) => {
       const project = createProject(deterministicOptions);
-      const track = requireOwnEntity(project.tracks, deterministicOptions.ids.track);
+      const track = requireEntityById(project.tracks, deterministicOptions.ids.track);
       const candidate = {
         ...project,
         tracks: {

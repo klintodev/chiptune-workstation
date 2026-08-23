@@ -1,6 +1,6 @@
-import { requireOwnEntity } from "../project/entity-collection";
+import { requireEntityById } from "../project/entities";
 import type {
-  EntityCollection,
+  OrderedEntityCollection,
   InstrumentDefinition,
   JsonValue,
   Project,
@@ -16,9 +16,9 @@ import type {
 } from "./playback-plan";
 
 export function compileProject(project: Project): PlaybackPlan {
-  const tracksInOrder = getOrderedEntities(project.tracks, "track");
-  const notesInOrder = getOrderedEntities(project.notes, "note");
-  const clipsInOrder = getOrderedEntities(project.clips, "clip");
+  const tracksInOrder = requireEntitiesInOrder(project.tracks, "track");
+  const notesInOrder = requireEntitiesInOrder(project.notes, "note");
+  const clipsInOrder = requireEntitiesInOrder(project.clips, "clip");
   const notesByPattern = groupBy(notesInOrder, (note) => note.patternId);
   const clipsByTrack = groupBy(clipsInOrder, (clip) => clip.trackId);
   const hasSoloTrack = tracksInOrder.some((track) => track.solo && !track.muted);
@@ -26,7 +26,7 @@ export function compileProject(project: Project): PlaybackPlan {
   let expandedEventCount = 0;
 
   for (const note of notesInOrder) {
-    const pattern = requireOwnEntity(
+    const pattern = requireEntityById(
       project.patterns,
       note.patternId,
       () =>
@@ -44,7 +44,7 @@ export function compileProject(project: Project): PlaybackPlan {
   }
 
   for (const clip of clipsInOrder) {
-    requireOwnEntity(
+    requireEntityById(
       project.tracks,
       clip.trackId,
       () =>
@@ -53,7 +53,7 @@ export function compileProject(project: Project): PlaybackPlan {
           `Clip ${clip.id} references unknown track ${clip.trackId}.`,
         ),
     );
-    const pattern = requireOwnEntity(
+    const pattern = requireEntityById(
       project.patterns,
       clip.patternId,
       () =>
@@ -76,7 +76,7 @@ export function compileProject(project: Project): PlaybackPlan {
   }
 
   const tracks: PlaybackTrackPlan[] = tracksInOrder.map((track) => {
-    const instrument = requireOwnEntity(
+    const instrument = requireEntityById(
       project.instruments,
       track.instrumentId,
       () =>
@@ -88,7 +88,7 @@ export function compileProject(project: Project): PlaybackPlan {
 
     const events: PlaybackNoteEvent[] = [];
     for (const clip of clipsByTrack.get(track.id) ?? []) {
-      const pattern = requireOwnEntity(
+      const pattern = requireEntityById(
         project.patterns,
         clip.patternId,
         () =>
@@ -150,18 +150,18 @@ function compileInstrument(instrument: InstrumentDefinition): PlaybackInstrument
   };
 }
 
-function getOrderedEntities<T extends { id: string }>(
-  collection: EntityCollection<T>,
-  label: string,
+function requireEntitiesInOrder<T extends { id: string }>(
+  entities: OrderedEntityCollection<T>,
+  entityKind: string,
 ): T[] {
-  return collection.order.map((id) =>
-    requireOwnEntity(
-      collection,
-      id,
+  return entities.order.map((entityId) =>
+    requireEntityById(
+      entities,
+      entityId,
       () =>
         new ProjectCompilationError(
           "ORDERED_ENTITY_NOT_FOUND",
-          `Ordered ${label} ${id} is missing.`,
+          `Ordered ${entityKind} ${entityId} is missing.`,
         ),
     ),
   );

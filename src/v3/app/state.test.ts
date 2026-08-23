@@ -9,8 +9,8 @@ import {
   workspaceSelectionChanged,
 } from "./workspace-slice";
 
-describe("V3 application state", () => {
-  it("creates a fresh project document for each store", () => {
+describe("when V3 application state changes", () => {
+  it("then it should create a fresh project document for each store", () => {
     const firstStore = createAppStore();
     const secondStore = createAppStore();
 
@@ -21,7 +21,7 @@ describe("V3 application state", () => {
     expect(firstDocument.id).not.toBe(secondDocument.id);
   });
 
-  it("commits a project rename as one semantic revision", () => {
+  it("then it should commit a project rename as one semantic revision", () => {
     const initialState = projectReducer(undefined, { type: "test/initial" });
     const committedAt = timestampRelativeTo(initialState.document.updatedAt, 1_000);
 
@@ -38,7 +38,7 @@ describe("V3 application state", () => {
     expect(initialState.document.name).toBe("Untitled chiptune");
   });
 
-  it("does not create a revision for an empty or unchanged project name", () => {
+  it("then it should not create a revision for an empty or unchanged project name", () => {
     const initialState = projectReducer(undefined, { type: "test/initial" });
     const committedAt = timestampRelativeTo(initialState.document.updatedAt, 1_000);
 
@@ -55,7 +55,7 @@ describe("V3 application state", () => {
     expect(unchangedNameState).toBe(initialState);
   });
 
-  it("rejects rename commits without a strict ISO timestamp", () => {
+  it("then it should reject rename commits without a strict ISO timestamp", () => {
     const initialState = projectReducer(undefined, { type: "test/initial" });
 
     for (const committedAt of [
@@ -72,7 +72,7 @@ describe("V3 application state", () => {
     }
   });
 
-  it("rejects rename commits older than the project or its latest revision", () => {
+  it("then it should reject rename commits older than the project or its latest revision", () => {
     const initialState = projectReducer(undefined, { type: "test/initial" });
     const beforeCreation = timestampRelativeTo(initialState.document.createdAt, -1_000);
     const currentCommit = timestampRelativeTo(initialState.document.updatedAt, 2_000);
@@ -96,7 +96,7 @@ describe("V3 application state", () => {
     ).toBe(currentState);
   });
 
-  it("keeps editor-only choices in the workspace slice", () => {
+  it("then it should keep editor-only choices in the workspace slice", () => {
     const initialState = workspaceReducer(undefined, { type: "test/initial" });
     const selectedState = workspaceReducer(
       workspaceReducer(

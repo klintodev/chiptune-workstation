@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { getOwnEntity } from "./entity-collection";
+import { findEntityById } from "./entities";
 import {
   PROJECT_FORMAT,
   PROJECT_FORMAT_VERSION,
   TICKS_PER_QUARTER,
   type Clip,
-  type EntityCollection,
+  type OrderedEntityCollection,
   type InstrumentDefinition,
   type JsonValue,
   type Note,
@@ -42,57 +42,57 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   ]),
 );
 
-function createEntityCollectionSchema<T extends { id: string }>(
+function createOrderedEntityCollectionSchema<T extends { id: string }>(
   entitySchema: z.ZodType<T>,
   { maximum, minimum = 0 }: { maximum: number; minimum?: number },
-): z.ZodType<EntityCollection<T>> {
+): z.ZodType<OrderedEntityCollection<T>> {
   return z
     .object({
       byId: z.record(idSchema, entitySchema),
       order: z.array(idSchema).max(maximum),
     })
     .strict()
-    .superRefine((collection, context) => {
-      if (collection.order.length < minimum) {
+    .superRefine((entities, context) => {
+      if (entities.order.length < minimum) {
         context.addIssue({
           code: "custom",
-          message: `Collection requires at least ${minimum} item${minimum === 1 ? "" : "s"}.`,
+          message: `Entity order requires at least ${minimum} ${minimum === 1 ? "entity" : "entities"}.`,
           path: ["order"],
         });
       }
 
-      const orderedIds = new Set<string>();
-      for (const [index, id] of collection.order.entries()) {
-        if (orderedIds.has(id)) {
+      const entityIdsInOrder = new Set<string>();
+      for (const [orderIndex, entityId] of entities.order.entries()) {
+        if (entityIdsInOrder.has(entityId)) {
           context.addIssue({
             code: "custom",
-            message: `Duplicate ordered ID: ${id}`,
-            path: ["order", index],
+            message: `Duplicate ordered ID: ${entityId}`,
+            path: ["order", orderIndex],
           });
         }
-        orderedIds.add(id);
-        if (!getOwnEntity(collection, id)) {
+        entityIdsInOrder.add(entityId);
+        if (!findEntityById(entities, entityId)) {
           context.addIssue({
             code: "custom",
-            message: `Ordered ID has no entity: ${id}`,
-            path: ["order", index],
+            message: `Ordered ID has no entity: ${entityId}`,
+            path: ["order", orderIndex],
           });
         }
       }
 
-      for (const [id, entity] of Object.entries(collection.byId)) {
-        if (entity.id !== id) {
+      for (const [entityId, entity] of Object.entries(entities.byId)) {
+        if (entity.id !== entityId) {
           context.addIssue({
             code: "custom",
-            message: `Entity ID ${entity.id} does not match key ${id}.`,
-            path: ["byId", id, "id"],
+            message: `Entity ID ${entity.id} does not match key ${entityId}.`,
+            path: ["byId", entityId, "id"],
           });
         }
-        if (!orderedIds.has(id)) {
+        if (!entityIdsInOrder.has(entityId)) {
           context.addIssue({
             code: "custom",
-            message: `Entity is missing from order: ${id}`,
-            path: ["byId", id],
+            message: `Entity is missing from order: ${entityId}`,
+            path: ["byId", entityId],
           });
         }
       }
@@ -179,17 +179,17 @@ export const projectSchema: z.ZodType<Project> = z
     createdAt: timestampSchema,
     updatedAt: timestampSchema,
     transport: transportSettingsSchema,
-    instruments: createEntityCollectionSchema(instrumentDefinitionSchema, {
+    instruments: createOrderedEntityCollectionSchema(instrumentDefinitionSchema, {
       maximum: 64,
       minimum: 1,
     }),
-    patterns: createEntityCollectionSchema(patternSchema, {
+    patterns: createOrderedEntityCollectionSchema(patternSchema, {
       maximum: 1_024,
       minimum: 1,
     }),
-    notes: createEntityCollectionSchema(noteSchema, { maximum: 8_192 }),
-    tracks: createEntityCollectionSchema(trackSchema, { maximum: 64, minimum: 1 }),
-    clips: createEntityCollectionSchema(clipSchema, { maximum: 8_192 }),
+    notes: createOrderedEntityCollectionSchema(noteSchema, { maximum: 8_192 }),
+    tracks: createOrderedEntityCollectionSchema(trackSchema, { maximum: 64, minimum: 1 }),
+    clips: createOrderedEntityCollectionSchema(clipSchema, { maximum: 8_192 }),
     master: z
       .object({
         volume: unitIntervalSchema,
@@ -207,8 +207,8 @@ export const projectSchema: z.ZodType<Project> = z
     }
 
     for (const trackId of project.tracks.order) {
-      const track = getOwnEntity(project.tracks, trackId);
-      if (track && !getOwnEntity(project.instruments, track.instrumentId)) {
+      const track = findEntityById(project.tracks, trackId);
+      if (track && !findEntityById(project.instruments, track.instrumentId)) {
         context.addIssue({
           code: "custom",
           message: `Track ${track.id} references unknown instrument ${track.instrumentId}.`,
@@ -218,9 +218,9 @@ export const projectSchema: z.ZodType<Project> = z
     }
 
     for (const noteId of project.notes.order) {
-      const note = getOwnEntity(project.notes, noteId);
+      const note = findEntityById(project.notes, noteId);
       if (!note) continue;
-      const pattern = getOwnEntity(project.patterns, note.patternId);
+      const pattern = findEntityById(project.patterns, note.patternId);
       if (!pattern) {
         context.addIssue({
           code: "custom",
@@ -237,16 +237,16 @@ export const projectSchema: z.ZodType<Project> = z
     }
 
     for (const clipId of project.clips.order) {
-      const clip = getOwnEntity(project.clips, clipId);
+      const clip = findEntityById(project.clips, clipId);
       if (!clip) continue;
-      if (!getOwnEntity(project.tracks, clip.trackId)) {
+      if (!findEntityById(project.tracks, clip.trackId)) {
         context.addIssue({
           code: "custom",
           message: `Clip ${clip.id} references unknown track ${clip.trackId}.`,
           path: ["clips", "byId", clipId, "trackId"],
         });
       }
-      const pattern = getOwnEntity(project.patterns, clip.patternId);
+      const pattern = findEntityById(project.patterns, clip.patternId);
       if (!pattern) {
         context.addIssue({
           code: "custom",

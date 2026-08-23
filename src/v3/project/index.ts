@@ -1,4 +1,4 @@
 export * from "./create-project";
-export * from "./entity-collection";
+export * from "./entities";
 export * from "./project";
 export * from "./project-schema";

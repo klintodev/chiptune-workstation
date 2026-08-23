@@ -5,7 +5,7 @@ export const TICKS_PER_QUARTER = 96 as const;
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
-export interface EntityCollection<T extends { id: string }> {
+export interface OrderedEntityCollection<T extends { id: string }> {
   byId: Record<string, T>;
   order: string[];
 }
@@ -66,11 +66,11 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
   transport: TransportSettings;
-  instruments: EntityCollection<InstrumentDefinition>;
-  patterns: EntityCollection<Pattern>;
-  notes: EntityCollection<Note>;
-  tracks: EntityCollection<Track>;
-  clips: EntityCollection<Clip>;
+  instruments: OrderedEntityCollection<InstrumentDefinition>;
+  patterns: OrderedEntityCollection<Pattern>;
+  notes: OrderedEntityCollection<Note>;
+  tracks: OrderedEntityCollection<Track>;
+  clips: OrderedEntityCollection<Clip>;
   master: {
     volume: number;
   };

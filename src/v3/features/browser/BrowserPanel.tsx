@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import { orderedEntities } from "../../app/entity-collection";
+import { listEntitiesInOrder } from "../../project";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { browserViewChanged, workspaceSelectionChanged } from "../../app/workspace-slice";
 import { PanelHeading } from "../workspace/PanelHeading";
@@ -15,8 +15,8 @@ export function BrowserPanel() {
   const items = useMemo(() => {
     const itemsForActiveView =
       browserView === "patterns"
-        ? orderedEntities(project.patterns)
-        : orderedEntities(project.instruments);
+        ? listEntitiesInOrder(project.patterns)
+        : listEntitiesInOrder(project.instruments);
     const normalizedQuery = query.trim().toLocaleLowerCase();
 
     if (!normalizedQuery) return itemsForActiveView;
