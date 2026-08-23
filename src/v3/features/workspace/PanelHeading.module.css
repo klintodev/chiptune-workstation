@@ -1,0 +1,32 @@
+.heading {
+  align-items: center;
+  background: var(--v3-surface-raised);
+  border-bottom: 1px solid var(--v3-border);
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  min-height: 2.85rem;
+  padding: 0.45rem 0.7rem;
+}
+
+.heading span {
+  color: var(--v3-text-dim);
+  display: block;
+  font: 700 0.55rem/1.1 var(--v3-font-sans);
+  letter-spacing: 0.105em;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+}
+
+.heading h2 {
+  color: var(--v3-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.trailing {
+  align-items: center;
+  display: flex;
+}

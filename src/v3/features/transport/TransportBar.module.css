@@ -1,0 +1,31 @@
+.transport {
+  align-items: center;
+  display: flex;
+}
+
+.tempo {
+  align-items: baseline;
+  background: var(--v3-control);
+  border: 1px solid var(--v3-border);
+  border-radius: var(--v3-radius-sm);
+  display: flex;
+  gap: 0.28rem;
+  padding: 0.42rem 0.52rem;
+}
+
+.tempo strong {
+  font: 650 0.75rem/1 var(--v3-font-mono);
+}
+
+.tempo span {
+  color: var(--v3-text-dim);
+  font-size: 0.55rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 680px) {
+  .tempo {
+    display: none;
+  }
+}
