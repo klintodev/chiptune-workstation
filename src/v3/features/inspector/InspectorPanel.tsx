@@ -122,9 +122,6 @@ export function InspectorPanel() {
         </section>
       </div>
 
-      <footer className={styles.footer}>
-        <span>Changes become project commands</span>
-      </footer>
     </section>
   );
 }
