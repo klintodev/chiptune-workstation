@@ -1,5 +1,9 @@
 import type { PlaybackPlan } from "../playback";
 
+/**
+ * `disposed` is terminal. Once disposal completes, the last snapshot remains readable while
+ * commands reject and subscriptions no longer emit.
+ */
 export type AudioEnginePhase = "idle" | "ready" | "playing" | "paused" | "error" | "disposed";
 
 export type AudioRuntimeState = "unavailable" | "suspended" | "running" | "closed";
@@ -54,5 +58,9 @@ export interface AudioEngine {
   seek(tick: number): Promise<void>;
   getSnapshot(): AudioEngineSnapshot;
   subscribe(listener: AudioEngineListener): () => void;
+  /**
+   * Releases the runtime and all listeners. Disposal is idempotent; after it resolves,
+   * `getSnapshot()` returns the terminal `disposed` / `closed` state.
+   */
   dispose(): Promise<void>;
 }

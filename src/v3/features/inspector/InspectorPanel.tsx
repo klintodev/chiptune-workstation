@@ -1,5 +1,6 @@
 import { firstEntity, orderedEntities } from "../../app/entity-collection";
 import { useAppSelector } from "../../app/hooks";
+import { getOwnEntity } from "../../project";
 import { PanelHeading } from "../workspace/PanelHeading";
 import styles from "./InspectorPanel.module.css";
 
@@ -19,17 +20,17 @@ export function InspectorPanel() {
   const defaultTrack = firstEntity(project.tracks);
   const selectedTrack =
     selection?.kind === "track"
-      ? project.tracks.byId[selection.id]
+      ? getOwnEntity(project.tracks, selection.id)
       : selection === null
         ? defaultTrack
         : undefined;
   const selectedPattern =
-    selection?.kind === "pattern" ? project.patterns.byId[selection.id] : undefined;
+    selection?.kind === "pattern" ? getOwnEntity(project.patterns, selection.id) : undefined;
   const selectedInstrument =
     selection?.kind === "instrument"
-      ? project.instruments.byId[selection.id]
+      ? getOwnEntity(project.instruments, selection.id)
       : selectedTrack
-        ? project.instruments.byId[selectedTrack.instrumentId]
+        ? getOwnEntity(project.instruments, selectedTrack.instrumentId)
         : undefined;
   const selectedNoteCount = selectedPattern
     ? orderedEntities(project.notes).filter((note) => note.patternId === selectedPattern.id).length

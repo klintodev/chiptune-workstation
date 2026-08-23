@@ -8,7 +8,7 @@ const rootReducer = combineReducers({
   workspace: workspaceReducer,
 });
 
-function createAppStore() {
+export function createAppStore() {
   return configureStore({
     reducer: rootReducer,
   });
@@ -17,4 +17,5 @@ function createAppStore() {
 export const store = createAppStore();
 
 export type RootState = ReturnType<typeof rootReducer>;
-export type AppDispatch = typeof store.dispatch;
+export type AppStore = ReturnType<typeof createAppStore>;
+export type AppDispatch = AppStore["dispatch"];

@@ -1,6 +1,13 @@
-import type { EntityCollection, InstrumentDefinition, JsonValue, Project } from "../project";
+import { requireOwnEntity } from "../project/entity-collection";
+import type {
+  EntityCollection,
+  InstrumentDefinition,
+  JsonValue,
+  Project,
+} from "../project/project";
 
 import { MAX_PLAYBACK_EVENTS } from "./playback-plan";
+import { ProjectCompilationError } from "./compiler-error";
 import type {
   PlaybackInstrument,
   PlaybackNoteEvent,
@@ -19,26 +26,46 @@ export function compileProject(project: Project): PlaybackPlan {
   let expandedEventCount = 0;
 
   for (const note of notesInOrder) {
-    const pattern = project.patterns.byId[note.patternId];
-    if (!pattern) {
-      throw new Error(`Note ${note.id} references unknown pattern ${note.patternId}.`);
-    }
+    const pattern = requireOwnEntity(
+      project.patterns,
+      note.patternId,
+      () =>
+        new ProjectCompilationError(
+          "NOTE_PATTERN_NOT_FOUND",
+          `Note ${note.id} references unknown pattern ${note.patternId}.`,
+        ),
+    );
     if (note.startTick > pattern.lengthTicks - note.durationTicks) {
-      throw new RangeError(`Note ${note.id} extends beyond pattern ${pattern.id}.`);
+      throw new ProjectCompilationError(
+        "NOTE_OUTSIDE_PATTERN",
+        `Note ${note.id} extends beyond pattern ${pattern.id}.`,
+      );
     }
   }
 
   for (const clip of clipsInOrder) {
-    if (!project.tracks.byId[clip.trackId]) {
-      throw new Error(`Clip ${clip.id} references unknown track ${clip.trackId}.`);
-    }
-    const pattern = project.patterns.byId[clip.patternId];
-    if (!pattern) {
-      throw new Error(`Clip ${clip.id} references unknown pattern ${clip.patternId}.`);
-    }
+    requireOwnEntity(
+      project.tracks,
+      clip.trackId,
+      () =>
+        new ProjectCompilationError(
+          "CLIP_TRACK_NOT_FOUND",
+          `Clip ${clip.id} references unknown track ${clip.trackId}.`,
+        ),
+    );
+    const pattern = requireOwnEntity(
+      project.patterns,
+      clip.patternId,
+      () =>
+        new ProjectCompilationError(
+          "CLIP_PATTERN_NOT_FOUND",
+          `Clip ${clip.id} references unknown pattern ${clip.patternId}.`,
+        ),
+    );
     expandedEventCount += notesByPattern.get(pattern.id)?.length ?? 0;
     if (expandedEventCount > MAX_PLAYBACK_EVENTS) {
-      throw new RangeError(
+      throw new ProjectCompilationError(
+        "PLAYBACK_EVENT_LIMIT_EXCEEDED",
         `Project expands beyond the ${MAX_PLAYBACK_EVENTS} playback-event limit.`,
       );
     }
@@ -49,17 +76,27 @@ export function compileProject(project: Project): PlaybackPlan {
   }
 
   const tracks: PlaybackTrackPlan[] = tracksInOrder.map((track) => {
-    const instrument = project.instruments.byId[track.instrumentId];
-    if (!instrument) {
-      throw new Error(`Track ${track.id} references unknown instrument ${track.instrumentId}.`);
-    }
+    const instrument = requireOwnEntity(
+      project.instruments,
+      track.instrumentId,
+      () =>
+        new ProjectCompilationError(
+          "TRACK_INSTRUMENT_NOT_FOUND",
+          `Track ${track.id} references unknown instrument ${track.instrumentId}.`,
+        ),
+    );
 
     const events: PlaybackNoteEvent[] = [];
     for (const clip of clipsByTrack.get(track.id) ?? []) {
-      const pattern = project.patterns.byId[clip.patternId];
-      if (!pattern) {
-        throw new Error(`Clip ${clip.id} references unknown pattern ${clip.patternId}.`);
-      }
+      const pattern = requireOwnEntity(
+        project.patterns,
+        clip.patternId,
+        () =>
+          new ProjectCompilationError(
+            "CLIP_PATTERN_NOT_FOUND",
+            `Clip ${clip.id} references unknown pattern ${clip.patternId}.`,
+          ),
+      );
       for (const note of notesByPattern.get(pattern.id) ?? []) {
         events.push({
           id: `${track.id}:${clip.id}:${note.id}`,
@@ -117,11 +154,17 @@ function getOrderedEntities<T extends { id: string }>(
   collection: EntityCollection<T>,
   label: string,
 ): T[] {
-  return collection.order.map((id) => {
-    const entity = collection.byId[id];
-    if (!entity) throw new Error(`Ordered ${label} ${id} is missing.`);
-    return entity;
-  });
+  return collection.order.map((id) =>
+    requireOwnEntity(
+      collection,
+      id,
+      () =>
+        new ProjectCompilationError(
+          "ORDERED_ENTITY_NOT_FOUND",
+          `Ordered ${label} ${id} is missing.`,
+        ),
+    ),
+  );
 }
 
 function addTicks(left: number, right: number, label: string): number {
@@ -132,7 +175,10 @@ function addTicks(left: number, right: number, label: string): number {
     right < 0 ||
     left > Number.MAX_SAFE_INTEGER - right
   ) {
-    throw new RangeError(`${label} exceeds the safe integer range.`);
+    throw new ProjectCompilationError(
+      "TICK_RANGE_EXCEEDED",
+      `${label} exceeds the safe integer range.`,
+    );
   }
   return left + right;
 }

@@ -13,14 +13,16 @@ export function BrowserPanel() {
   const [query, setQuery] = useState("");
 
   const items = useMemo(() => {
-    const candidates =
+    const itemsForActiveView =
       browserView === "patterns"
         ? orderedEntities(project.patterns)
         : orderedEntities(project.instruments);
     const normalizedQuery = query.trim().toLocaleLowerCase();
 
-    if (!normalizedQuery) return candidates;
-    return candidates.filter((item) => item.name.toLocaleLowerCase().includes(normalizedQuery));
+    if (!normalizedQuery) return itemsForActiveView;
+    return itemsForActiveView.filter((item) =>
+      item.name.toLocaleLowerCase().includes(normalizedQuery),
+    );
   }, [browserView, project.instruments, project.patterns, query]);
 
   const itemKind = browserView === "patterns" ? "pattern" : "instrument";

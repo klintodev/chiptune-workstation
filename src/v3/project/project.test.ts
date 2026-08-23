@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { createProject, createProjectFile } from "./create-project";
+import { requireOwnEntity } from "./entity-collection";
 import { parseProject, parseProjectFile } from "./project-schema";
+
+const PROTOTYPE_PROPERTY_NAMES = ["toString", "valueOf", "constructor"] as const;
 
 const deterministicOptions = {
   name: "Test tune",
@@ -56,8 +59,7 @@ describe("project boundary validation", () => {
 
   it("rejects dangling cross-entity references", () => {
     const project = createProject(deterministicOptions);
-    const track = project.tracks.byId["track-test"];
-    if (!track) throw new Error("Expected the default track.");
+    const track = requireOwnEntity(project.tracks, "track-test");
 
     const candidate = {
       ...project,
@@ -106,4 +108,37 @@ describe("project boundary validation", () => {
 
     expect(() => parseProject(candidate)).toThrow(/no entity|missing from order/i);
   });
+
+  it.each(PROTOTYPE_PROPERTY_NAMES)(
+    "rejects inherited %s properties used as ordered entity IDs",
+    (id) => {
+      const project = createProject(deterministicOptions);
+      const candidate = {
+        ...project,
+        patterns: { byId: {}, order: [id] },
+      };
+
+      expect(() => parseProject(candidate)).toThrow(/no entity/i);
+    },
+  );
+
+  it.each(PROTOTYPE_PROPERTY_NAMES)(
+    "rejects inherited %s properties used as entity references",
+    (instrumentId) => {
+      const project = createProject(deterministicOptions);
+      const track = requireOwnEntity(project.tracks, deterministicOptions.ids.track);
+      const candidate = {
+        ...project,
+        tracks: {
+          ...project.tracks,
+          byId: {
+            ...project.tracks.byId,
+            [track.id]: { ...track, instrumentId },
+          },
+        },
+      };
+
+      expect(() => parseProject(candidate)).toThrow(/unknown instrument/i);
+    },
+  );
 });

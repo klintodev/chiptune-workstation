@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { getOwnEntity } from "./entity-collection";
 import {
   PROJECT_FORMAT,
   PROJECT_FORMAT_VERSION,
@@ -70,7 +71,7 @@ function createEntityCollectionSchema<T extends { id: string }>(
           });
         }
         orderedIds.add(id);
-        if (!collection.byId[id]) {
+        if (!getOwnEntity(collection, id)) {
           context.addIssue({
             code: "custom",
             message: `Ordered ID has no entity: ${id}`,
@@ -206,8 +207,8 @@ export const projectSchema: z.ZodType<Project> = z
     }
 
     for (const trackId of project.tracks.order) {
-      const track = project.tracks.byId[trackId];
-      if (track && !project.instruments.byId[track.instrumentId]) {
+      const track = getOwnEntity(project.tracks, trackId);
+      if (track && !getOwnEntity(project.instruments, track.instrumentId)) {
         context.addIssue({
           code: "custom",
           message: `Track ${track.id} references unknown instrument ${track.instrumentId}.`,
@@ -217,9 +218,9 @@ export const projectSchema: z.ZodType<Project> = z
     }
 
     for (const noteId of project.notes.order) {
-      const note = project.notes.byId[noteId];
+      const note = getOwnEntity(project.notes, noteId);
       if (!note) continue;
-      const pattern = project.patterns.byId[note.patternId];
+      const pattern = getOwnEntity(project.patterns, note.patternId);
       if (!pattern) {
         context.addIssue({
           code: "custom",
@@ -236,16 +237,16 @@ export const projectSchema: z.ZodType<Project> = z
     }
 
     for (const clipId of project.clips.order) {
-      const clip = project.clips.byId[clipId];
+      const clip = getOwnEntity(project.clips, clipId);
       if (!clip) continue;
-      if (!project.tracks.byId[clip.trackId]) {
+      if (!getOwnEntity(project.tracks, clip.trackId)) {
         context.addIssue({
           code: "custom",
           message: `Clip ${clip.id} references unknown track ${clip.trackId}.`,
           path: ["clips", "byId", clipId, "trackId"],
         });
       }
-      const pattern = project.patterns.byId[clip.patternId];
+      const pattern = getOwnEntity(project.patterns, clip.patternId);
       if (!pattern) {
         context.addIssue({
           code: "custom",

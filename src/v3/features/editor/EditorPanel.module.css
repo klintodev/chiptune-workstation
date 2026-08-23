@@ -109,7 +109,7 @@
 
 .rulerTicks {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  min-width: 0;
 }
 
 .rulerTicks span {
@@ -124,13 +124,15 @@
   flex: 1 1 auto;
   grid-template-columns: 4.2rem minmax(0, 1fr);
   min-height: 12rem;
+  overflow: auto;
 }
 
 .keys {
   background: var(--v3-surface);
   border-right: 1px solid var(--v3-border-strong);
   display: grid;
-  grid-template-rows: repeat(8, minmax(1.5rem, 1fr));
+  grid-template-rows: repeat(var(--piano-row-count), minmax(1.35rem, 1fr));
+  min-height: 100%;
 }
 
 .keys span {
@@ -143,10 +145,7 @@
   padding-right: 0.42rem;
 }
 
-.keys span:nth-child(2),
-.keys span:nth-child(4),
-.keys span:nth-child(5),
-.keys span:nth-child(7) {
+.keys span[data-accidental="true"] {
   background: var(--v3-control);
   color: var(--v3-text-muted);
 }
@@ -154,30 +153,56 @@
 .noteGrid,
 .clipLane {
   background-color: var(--v3-canvas);
+  min-width: 0;
+  position: relative;
+}
+
+.noteGrid {
   background-image:
     repeating-linear-gradient(
       to right,
       transparent 0,
-      transparent calc(3.125% - 1px),
-      var(--v3-grid-minor) calc(3.125% - 1px),
-      var(--v3-grid-minor) 3.125%
+      transparent calc(var(--timeline-minor-step) - 1px),
+      var(--v3-grid-minor) calc(var(--timeline-minor-step) - 1px),
+      var(--v3-grid-minor) var(--timeline-minor-step)
     ),
     repeating-linear-gradient(
       to right,
       transparent 0,
-      transparent calc(12.5% - 1px),
-      var(--v3-grid-major) calc(12.5% - 1px),
-      var(--v3-grid-major) 12.5%
+      transparent calc(var(--timeline-major-step) - 1px),
+      var(--v3-grid-major) calc(var(--timeline-major-step) - 1px),
+      var(--v3-grid-major) var(--timeline-major-step)
     ),
     repeating-linear-gradient(
       to bottom,
       transparent 0,
-      transparent calc(12.5% - 1px),
-      var(--v3-grid-minor) calc(12.5% - 1px),
-      var(--v3-grid-minor) 12.5%
+      transparent calc(var(--piano-row-step) - 1px),
+      var(--v3-grid-minor) calc(var(--piano-row-step) - 1px),
+      var(--v3-grid-minor) var(--piano-row-step)
     );
-  min-width: 0;
-  position: relative;
+  min-height: 100%;
+}
+
+.clipLane {
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(var(--timeline-minor-step) - 1px),
+      var(--v3-grid-minor) calc(var(--timeline-minor-step) - 1px),
+      var(--v3-grid-minor) var(--timeline-minor-step)
+    ),
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(var(--timeline-major-step) - 1px),
+      var(--v3-grid-major) calc(var(--timeline-major-step) - 1px),
+      var(--v3-grid-major) var(--timeline-major-step)
+    );
+}
+
+.surface[data-empty="true"] .clipLane {
+  background-image: none;
 }
 
 .note {
@@ -185,7 +210,6 @@
   border: 1px solid color-mix(in srgb, var(--v3-accent-bright), white 28%);
   border-radius: 0.16rem;
   box-shadow: 0 2px 5px color-mix(in srgb, var(--v3-accent), transparent 64%);
-  height: 0.8rem;
   min-width: 0.35rem;
   position: absolute;
 }

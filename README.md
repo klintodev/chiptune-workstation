@@ -16,8 +16,6 @@ npm run v3:dev
 
 Run its complete type, lint, architecture, dead-code, unit, build and bundle-size gate with `npm run v3:check`.
 
-See [the V3 foundation notes](./docs/v3/README.md) for the dependency direction, scope and next slices.
-
 ## Run locally
 
 Serve the repository over HTTP from its root:
