@@ -1,0 +1,316 @@
+.panel {
+  background: var(--v3-canvas);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.viewTabs {
+  align-items: center;
+  background: var(--v3-input);
+  border: 1px solid var(--v3-border);
+  border-radius: var(--v3-radius-sm);
+  display: flex;
+  padding: 0.14rem;
+}
+
+.viewTabs button {
+  background: transparent;
+  border: 0;
+  border-radius: 0.18rem;
+  color: var(--v3-text-dim);
+  cursor: pointer;
+  font: 700 0.59rem/1 var(--v3-font-sans);
+  letter-spacing: 0.035em;
+  padding: 0.38rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.viewTabs button[aria-pressed="true"] {
+  background: var(--v3-control-active);
+  box-shadow: var(--v3-shadow-sm);
+  color: var(--v3-text);
+}
+
+.surface {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.contextBar {
+  align-items: center;
+  background: var(--v3-surface);
+  border-bottom: 1px solid var(--v3-border);
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: space-between;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.7rem;
+}
+
+.contextBar > div:first-child span,
+.contextBar > div:first-child strong {
+  display: block;
+}
+
+.contextBar > div:first-child span {
+  color: var(--v3-text-dim);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.contextBar > div:first-child strong {
+  color: var(--v3-text);
+  font-size: 0.72rem;
+  margin-top: 0.14rem;
+}
+
+.contextMeta {
+  display: flex;
+  gap: 0.42rem;
+}
+
+.contextMeta span {
+  background: var(--v3-control);
+  border: 1px solid var(--v3-border);
+  border-radius: var(--v3-radius-sm);
+  color: var(--v3-text-muted);
+  font: 600 0.56rem/1 var(--v3-font-mono);
+  padding: 0.33rem 0.42rem;
+  text-transform: uppercase;
+}
+
+.ruler {
+  background: var(--v3-surface-raised);
+  border-bottom: 1px solid var(--v3-border-strong);
+  display: grid;
+  flex: 0 0 1.6rem;
+  grid-template-columns: 4.2rem minmax(0, 1fr);
+}
+
+.rulerCorner {
+  align-items: center;
+  border-right: 1px solid var(--v3-border-strong);
+  color: var(--v3-text-dim);
+  display: flex;
+  font: 700 0.52rem/1 var(--v3-font-sans);
+  letter-spacing: 0.075em;
+  padding: 0 0.45rem;
+  text-transform: uppercase;
+}
+
+.rulerTicks {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.rulerTicks span {
+  border-right: 1px solid var(--v3-border);
+  color: var(--v3-text-dim);
+  font: 600 0.56rem/1.6rem var(--v3-font-mono);
+  padding-left: 0.3rem;
+}
+
+.pianoRoll {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 4.2rem minmax(0, 1fr);
+  min-height: 12rem;
+}
+
+.keys {
+  background: var(--v3-surface);
+  border-right: 1px solid var(--v3-border-strong);
+  display: grid;
+  grid-template-rows: repeat(8, minmax(1.5rem, 1fr));
+}
+
+.keys span {
+  align-items: center;
+  border-bottom: 1px solid var(--v3-border);
+  color: var(--v3-text-dim);
+  display: flex;
+  font: 600 0.55rem/1 var(--v3-font-mono);
+  justify-content: flex-end;
+  padding-right: 0.42rem;
+}
+
+.keys span:nth-child(2),
+.keys span:nth-child(4),
+.keys span:nth-child(5),
+.keys span:nth-child(7) {
+  background: var(--v3-control);
+  color: var(--v3-text-muted);
+}
+
+.noteGrid,
+.clipLane {
+  background-color: var(--v3-canvas);
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(3.125% - 1px),
+      var(--v3-grid-minor) calc(3.125% - 1px),
+      var(--v3-grid-minor) 3.125%
+    ),
+    repeating-linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(12.5% - 1px),
+      var(--v3-grid-major) calc(12.5% - 1px),
+      var(--v3-grid-major) 12.5%
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(12.5% - 1px),
+      var(--v3-grid-minor) calc(12.5% - 1px),
+      var(--v3-grid-minor) 12.5%
+    );
+  min-width: 0;
+  position: relative;
+}
+
+.note {
+  background: linear-gradient(180deg, var(--v3-accent-bright), var(--v3-accent));
+  border: 1px solid color-mix(in srgb, var(--v3-accent-bright), white 28%);
+  border-radius: 0.16rem;
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--v3-accent), transparent 64%);
+  height: 0.8rem;
+  min-width: 0.35rem;
+  position: absolute;
+}
+
+.surfaceNotice {
+  color: var(--v3-text-dim);
+  display: grid;
+  gap: 0.3rem;
+  left: 50%;
+  position: absolute;
+  text-align: center;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(22rem, 75%);
+}
+
+.surfaceNotice strong {
+  color: var(--v3-text-muted);
+  font-size: 0.78rem;
+}
+
+.surfaceNotice span {
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.velocityLane {
+  background: var(--v3-surface);
+  border-top: 1px solid var(--v3-border-strong);
+  display: grid;
+  flex: 0 0 4.2rem;
+  grid-template-columns: 4.2rem minmax(0, 1fr);
+}
+
+.velocityLane span {
+  color: var(--v3-text-dim);
+  font: 700 0.52rem/1 var(--v3-font-sans);
+  letter-spacing: 0.05em;
+  padding: 0.5rem 0.42rem;
+  text-transform: uppercase;
+}
+
+.velocityLane div {
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(3.125% - 1px),
+    var(--v3-grid-minor) calc(3.125% - 1px),
+    var(--v3-grid-minor) 3.125%
+  );
+  border-left: 1px solid var(--v3-border-strong);
+}
+
+.trackList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.trackRow {
+  border-bottom: 1px solid var(--v3-border);
+  display: grid;
+  grid-template-columns: 4.2rem minmax(0, 1fr);
+  height: 4.4rem;
+}
+
+.trackName {
+  align-items: flex-start;
+  background: var(--v3-surface);
+  border: 0;
+  border-right: 1px solid var(--v3-border-strong);
+  color: var(--v3-text-muted);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font: 650 0.59rem/1.25 var(--v3-font-sans);
+  gap: 0.38rem;
+  overflow: hidden;
+  padding: 0.55rem 0.42rem;
+  text-align: left;
+}
+
+.trackName:hover {
+  background: var(--v3-control);
+  color: var(--v3-text);
+}
+
+.trackName span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.trackColour {
+  background: var(--v3-accent);
+  border-radius: 999px;
+  height: 0.2rem;
+  width: 1.25rem;
+}
+
+.clipLane {
+  background-size: auto 100%;
+}
+
+.clip {
+  background: color-mix(in srgb, var(--v3-accent), transparent 18%);
+  border: 1px solid var(--v3-accent-bright);
+  border-radius: 0.18rem;
+  color: #07101a;
+  font-size: 0.58rem;
+  font-weight: 750;
+  height: calc(100% - 0.8rem);
+  overflow: hidden;
+  padding: 0.4rem;
+  position: absolute;
+  text-overflow: ellipsis;
+  top: 0.4rem;
+  white-space: nowrap;
+}
+
+.blankState {
+  color: var(--v3-text-dim);
+  display: grid;
+  flex: 1;
+  font-size: 0.72rem;
+  place-items: center;
+}

@@ -1,8 +1,22 @@
 # Chiptune Workstation
 
-A browser chiptune workstation built with the Web Audio API and native ES modules. The app has no runtime framework; esbuild is used only to prepare production assets.
+A browser chiptune workstation built with the Web Audio API and native ES modules. The current beta has no runtime framework; esbuild is used only to prepare its production assets.
 
 The current product includes a playable keyboard, reusable patterns, a multi-track clip arrangement, per-note expression, mixer controls, transport and looping, bounded undo/redo, local project persistence, JSON recovery, WAV export, optional accounts and cloud backup, public sharing, and a composition-projected visualiser.
+
+## V3 foundation
+
+V3 is a greenfield React and TypeScript application being built beside the beta. Part 1 establishes the framework-free project, playback and engine boundaries plus the automated checks that keep those boundaries intact. It does not replace or migrate the existing application.
+
+Start the isolated V3 development entry:
+
+```powershell
+npm run v3:dev
+```
+
+Run its complete type, lint, architecture, dead-code, unit, build and bundle-size gate with `npm run v3:check`.
+
+See [the V3 foundation notes](./docs/v3/README.md) for the dependency direction, scope and next slices.
 
 ## Run locally
 
@@ -22,7 +36,7 @@ Each story owns a `mount({ canvas, scenario })` lifecycle and returns a disposer
 
 ## Test
 
-Node 22 or later is required.
+Node 24 LTS is required by the checked-in toolchain.
 
 ```powershell
 npm test

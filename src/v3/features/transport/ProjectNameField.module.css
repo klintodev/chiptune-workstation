@@ -1,0 +1,43 @@
+.field {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.field span {
+  color: var(--v3-text-dim);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.field input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--v3-radius-sm);
+  color: var(--v3-text);
+  font: 600 0.78rem/1 var(--v3-font-sans);
+  min-width: 7rem;
+  padding: 0.42rem 0.48rem;
+  width: min(18vw, 15rem);
+}
+
+.field input:hover {
+  background: var(--v3-surface-raised);
+  border-color: var(--v3-border);
+}
+
+.field input:focus {
+  background: var(--v3-surface-raised);
+  border-color: var(--v3-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--v3-accent), transparent 75%);
+  outline: none;
+}
+
+@media (max-width: 850px) {
+  .field span {
+    display: none;
+  }
+}

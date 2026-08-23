@@ -1,0 +1,145 @@
+.panel {
+  background: var(--v3-surface);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.scrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.62rem;
+}
+
+.selectionCard {
+  background:
+    radial-gradient(
+      circle at 90% 0,
+      color-mix(in srgb, var(--v3-accent), transparent 72%),
+      transparent 48%
+    ),
+    var(--v3-surface-raised);
+  border: 1px solid var(--v3-border-strong);
+  border-radius: var(--v3-radius-md);
+  box-shadow: var(--v3-shadow-sm);
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+  padding: 0.72rem;
+}
+
+.selectionKind {
+  color: var(--v3-accent-bright);
+  font-size: 0.54rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.selectionCard h3 {
+  color: var(--v3-text);
+  font-size: 0.84rem;
+  margin: 0.28rem 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectionCard p {
+  color: var(--v3-text-dim);
+  font-size: 0.61rem;
+  margin: 0.22rem 0 0;
+}
+
+.section {
+  border-bottom: 1px solid var(--v3-border);
+  padding: 0.58rem 0.12rem 0.66rem;
+}
+
+.section:last-child {
+  border-bottom: 0;
+}
+
+.section h4 {
+  color: var(--v3-text-muted);
+  font-size: 0.59rem;
+  font-weight: 800;
+  letter-spacing: 0.075em;
+  margin: 0 0 0.42rem;
+  text-transform: uppercase;
+}
+
+.valueRow {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 1.65rem;
+}
+
+.valueRow span {
+  color: var(--v3-text-dim);
+  font-size: 0.64rem;
+}
+
+.valueRow strong {
+  color: var(--v3-text);
+  font: 600 0.63rem/1 var(--v3-font-mono);
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.waveform {
+  align-items: center;
+  background: var(--v3-display);
+  border: 1px solid var(--v3-border-strong);
+  border-radius: var(--v3-radius-sm);
+  display: flex;
+  height: 2.4rem;
+  margin-top: 0.48rem;
+  overflow: hidden;
+  padding: 0 0.5rem;
+}
+
+.waveform span {
+  border-color: var(--v3-accent);
+  border-style: solid;
+  border-width: 1px 1px 0 0;
+  height: 0.72rem;
+  width: 25%;
+}
+
+.waveform span:nth-child(even) {
+  border-width: 0 1px 1px 0;
+  transform: translateY(0.72rem);
+}
+
+.meter {
+  background: var(--v3-input);
+  border: 1px solid var(--v3-border);
+  border-radius: 999px;
+  height: 0.36rem;
+  margin-top: 0.48rem;
+  overflow: hidden;
+}
+
+.meter span {
+  background: linear-gradient(90deg, var(--v3-positive), var(--v3-warning));
+  display: block;
+  height: 100%;
+  opacity: 0.36;
+  width: 12%;
+}
+
+.footer {
+  border-top: 1px solid var(--v3-border);
+  color: var(--v3-text-dim);
+  flex: 0 0 auto;
+  font-size: 0.58rem;
+  line-height: 1.3;
+  padding: 0.54rem 0.65rem;
+}
