@@ -309,10 +309,16 @@ function migrateSchemaTwoThroughSix(candidate) {
   };
 }
 
-export function migrateProjectToV7(candidate) {
+export function migrateProjectToV8(candidate) {
   assertBoundedV2Structure(candidate, { label: "Project" });
   assertRecord(candidate, "Project");
   if (candidate.schemaVersion === PROJECT_SCHEMA_VERSION) return canonicalizeV2Project(candidate);
+  if (candidate.schemaVersion === 7) {
+    // Validate using the shipped V7 meaning before upgrading. In particular,
+    // stale lengths must not introduce overlaps or silently change old Songs.
+    const previous = canonicalizeV2Project(candidate, { schemaVersion: 7 });
+    return canonicalizeV2Project({ ...previous, schemaVersion: PROJECT_SCHEMA_VERSION });
+  }
   if (!Number.isInteger(candidate.schemaVersion) || candidate.schemaVersion < 1 || candidate.schemaVersion > 6) {
     throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
   }
@@ -324,8 +330,11 @@ export function migrateProjectToV7(candidate) {
 }
 
 export function normalizeV2Project(candidate) {
-  return migrateProjectToV7(candidate);
+  return migrateProjectToV8(candidate);
 }
+
+// Retain the existing adapter entry point for callers upgrading to Studio V2.
+export const migrateProjectToV7 = migrateProjectToV8;
 
 function validateTimestamp(value, field) {
   if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {

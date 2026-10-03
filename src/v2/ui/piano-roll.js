@@ -1143,6 +1143,12 @@ export function createPianoRollSurface({
     playheadElement = null;
     clearElement(canvas);
 
+    canvas.append(createElement("div", {
+      "aria-hidden": "true",
+      className: "v2-pattern-end",
+      style: { left: `${LABEL_WIDTH + pattern.lengthTicks * pixelsPerTick}px` },
+    }));
+
     for (let pitch = MAX_PITCH; pitch >= MIN_PITCH; pitch -= 1) {
       const row = createElement("div", {
         "aria-hidden": "true",
@@ -1311,6 +1317,34 @@ export function createPianoRollSurface({
       renderEditor();
     });
 
+    const lengthSelect = createElement("select", {
+      "aria-label": "Pattern length",
+      title: "Includes trailing silence. Drawing past the end adds whole bars; deleting notes keeps the length.",
+    });
+    if (pattern.lengthTicks % PIANO_BAR_TICKS !== 0) {
+      lengthSelect.append(createElement("option", {
+        textContent: `${formatDurationTicks(pattern.lengthTicks)} (imported)`,
+        value: String(pattern.lengthTicks),
+      }));
+    }
+    for (let bars = 1; bars <= MAX_PATTERN_CONTENT_TICKS / PIANO_BAR_TICKS; bars += 1) {
+      lengthSelect.append(createElement("option", {
+        textContent: `${bars} ${bars === 1 ? "bar" : "bars"}`,
+        value: String(bars * PIANO_BAR_TICKS),
+      }));
+    }
+    lengthSelect.value = String(pattern.lengthTicks);
+    lengthSelect.addEventListener("change", () => {
+      try {
+        projectState.setPatternLength(pattern.id, Number(lengthSelect.value));
+        announce(`${pattern.name} length: ${formatDurationTicks(activePattern().lengthTicks)}.`);
+      } catch (error) {
+        lengthSelect.value = String(activePattern().lengthTicks);
+        announce(error instanceof Error ? error.message : "The Pattern length could not be changed.");
+      }
+      header.querySelector('[aria-label="Pattern length"]')?.focus();
+    });
+
     const audible = pattern.notes.some(({ velocity }) => velocity > 0);
     const add = createElement("button", {
       className: "v2-primary-action",
@@ -1362,6 +1396,7 @@ export function createPianoRollSurface({
       createElement("label", {}, ["Audition Track", auditionSelect]),
       toolGroup,
       createElement("label", {}, ["Snap", snapSelect]),
+      createElement("label", {}, ["Length", lengthSelect]),
       add,
       history,
       actions,

@@ -17,10 +17,10 @@ const LATE = "2026-08-04T13:00:00.000Z";
 
 function recoveryFixtures() {
   const ready = createProjectDocument(createDefaultProject(), { id: "ready-v1", now: EARLY });
-  const v7 = createProjectDocument(createDefaultV2Project(), { id: "native-v7", now: LATE });
+  const v7 = createProjectDocument({ ...createDefaultV2Project(), schemaVersion: 7 }, { id: "native-v7", now: LATE });
   const future = structuredClone(v7);
   future.id = "future";
-  future.project.schemaVersion = 8;
+  future.project.schemaVersion = 9;
   future.project.metadata.title = "Future tune";
   const malformed = structuredClone(ready);
   malformed.id = "malformed";
@@ -44,7 +44,7 @@ test("the V1 repository lists V7, future and malformed records instead of omitti
     .sort(), ["future", "malformed", "native-v7"]);
   assert.equal(summaries.find(({ id }) => id === "native-v7").schemaVersion, 7);
   assert.match(summaries.find(({ id }) => id === "native-v7").reason, /unavailable in the current Studio/);
-  assert.equal(summaries.find(({ id }) => id === "future").schemaVersion, 8);
+  assert.equal(summaries.find(({ id }) => id === "future").schemaVersion, 9);
   assert.match(summaries.find(({ id }) => id === "malformed").reason, /tempo/);
   assert.deepEqual(await repository.getRaw("native-v7"), fixtures.v7);
   assert.deepEqual(await repository.getRaw("future"), fixtures.future);

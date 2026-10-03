@@ -1,5 +1,6 @@
 import {
   DEFAULT_PATTERN_ID,
+  DEFAULT_PATTERN_LENGTH_TICKS,
   DEFAULT_TRANSPORT_LOOP_END_TICKS,
   DEFAULT_TRACK_ID,
   LOOP_MODES,
@@ -39,7 +40,7 @@ import {
   deepFreeze,
   rangesOverlap,
 } from "./domain-utils.js";
-import { derivePatternLengthTicks, EMPTY_PATTERN_LENGTH_TICKS } from "./pattern-span.js";
+import { derivePatternLengthTicks } from "./pattern-span.js";
 
 function normalizeLoop(candidate) {
   assertExactKeys(candidate, ["enabled", "mode", "startTick", "endTick"], "Transport loop");
@@ -105,7 +106,7 @@ function assertSamePitchNotesDoNotOverlap(notes, patternId) {
   }
 }
 
-export function normalizeV2Pattern(candidate) {
+export function normalizeV2Pattern(candidate, { contentDerived = false } = {}) {
   assertExactKeys(candidate, ["id", "name", "lengthTicks", "notes"], "Pattern");
   assertDomainId(candidate.id, "Pattern id");
   assertName(candidate.name, `Pattern ${candidate.id} name`, MAX_PATTERN_NAME_LENGTH);
@@ -121,10 +122,14 @@ export function normalizeV2Pattern(candidate) {
   const noteIds = new Set();
   const notes = candidate.notes.map((note) => normalizeNote(note, candidate.id, noteIds)).sort(compareNotes);
   assertSamePitchNotesDoNotOverlap(notes, candidate.id);
+  const contentEndTick = derivePatternLengthTicks(notes);
+  if (!contentDerived && candidate.lengthTicks < contentEndTick) {
+    throw new RangeError(`Pattern ${candidate.id} length cannot end before its notes.`);
+  }
   return {
     id: candidate.id,
     name: candidate.name,
-    lengthTicks: derivePatternLengthTicks(notes),
+    lengthTicks: contentDerived ? contentEndTick : candidate.lengthTicks,
     notes,
   };
 }
@@ -209,9 +214,9 @@ function normalizeMasterMixer(candidate, usedInstanceIds) {
   };
 }
 
-export function canonicalizeV2Project(candidate) {
+export function canonicalizeV2Project(candidate, { schemaVersion = PROJECT_SCHEMA_VERSION } = {}) {
   assertExactKeys(candidate, ["schemaVersion", "metadata", "transport", "patterns", "tracks", "mixer"], "V7 Project");
-  if (candidate.schemaVersion !== PROJECT_SCHEMA_VERSION) {
+  if (![7, PROJECT_SCHEMA_VERSION].includes(schemaVersion) || candidate.schemaVersion !== schemaVersion) {
     throw new RangeError(`Unsupported project schema version: ${candidate.schemaVersion}.`);
   }
 
@@ -225,7 +230,7 @@ export function canonicalizeV2Project(candidate) {
   }
   const patternIds = new Set();
   const patterns = candidate.patterns.map((pattern) => {
-    const normalized = normalizeV2Pattern(pattern);
+    const normalized = normalizeV2Pattern(pattern, { contentDerived: schemaVersion === 7 });
     if (patternIds.has(normalized.id)) throw new RangeError(`Project has duplicate Pattern id ${normalized.id}.`);
     patternIds.add(normalized.id);
     return normalized;
@@ -253,7 +258,7 @@ export function canonicalizeV2Project(candidate) {
   const master = normalizeMasterMixer(candidate.mixer.master, usedInstanceIds);
 
   return deepFreeze({
-    schemaVersion: PROJECT_SCHEMA_VERSION,
+    schemaVersion,
     metadata: { title: candidate.metadata.title },
     transport: { bpm: candidate.transport.bpm, loop: normalizeLoop(candidate.transport.loop) },
     patterns,
@@ -275,7 +280,7 @@ export function createDefaultV2Project() {
       bpm: 120,
       loop: { enabled: false, mode: "custom", startTick: 0, endTick: DEFAULT_TRANSPORT_LOOP_END_TICKS },
     },
-    patterns: [{ id: DEFAULT_PATTERN_ID, name: "Pattern 1", lengthTicks: EMPTY_PATTERN_LENGTH_TICKS, notes: [] }],
+    patterns: [{ id: DEFAULT_PATTERN_ID, name: "Pattern 1", lengthTicks: DEFAULT_PATTERN_LENGTH_TICKS, notes: [] }],
     tracks: [{
       id: DEFAULT_TRACK_ID,
       name: "Pulse 1",

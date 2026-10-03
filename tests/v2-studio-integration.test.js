@@ -710,7 +710,7 @@ test("Playlist note previews map timing, pitch, velocity, and reuse Pattern geom
     { durationTicks: 24, pitch: 64, startTick: 0, velocity: 0.8 },
   ]);
   projectState.addClip("track-1", "pattern-1", 0);
-  projectState.addClip("track-1", "pattern-1", 24);
+  projectState.addClip("track-1", "pattern-1", 384);
   const workspaceState = createWorkspaceState(projectState);
   const surface = createPlaylistSurface({ projectState, workspaceState });
   const symbolBefore = surface.node.querySelectorAll("symbol")[0];

@@ -155,9 +155,10 @@ test("disabled Pattern looping plays once through the complete containing bar", 
   assert.equal(harness.scheduled.length, 1);
 });
 
-test("a paused Pattern cue is repaired when an edit removes its trailing bar", () => {
+test("a paused Pattern cue is repaired when its explicit length is shortened", () => {
   const project = structuredClone(createDefaultV2Project());
   project.patterns[0].notes = [note("late", 60, 500, 24)];
+  project.patterns[0].lengthTicks = 768;
   const harness = createHarness(project, { getPatternLoopEnabled: () => false });
 
   assert.equal(harness.scheduler.play({ mode: "pattern", startTick: 500 }), true);
@@ -165,6 +166,7 @@ test("a paused Pattern cue is repaired when an edit removes its trailing bar", (
   assert.equal(harness.scheduler.getState().retainedTick, 500);
 
   project.patterns[0].notes = [note("short", 60, 0, 24)];
+  project.patterns[0].lengthTicks = 384;
   assert.equal(harness.scheduler.syncProject(project), true);
   assert.equal(harness.scheduler.getState().retainedTick, 383);
   assert.equal(harness.scheduler.play({ mode: "pattern" }), true);
@@ -175,9 +177,10 @@ test("a paused Pattern cue is repaired when an edit removes its trailing bar", (
 test("a paused cue is repaired when the active Pattern changes to a shorter performance span", () => {
   const project = structuredClone(createDefaultV2Project());
   project.patterns[0].notes = [note("late", 60, 500, 24)];
+  project.patterns[0].lengthTicks = 768;
   project.patterns.push({
     id: "pattern-2",
-    lengthTicks: 24,
+    lengthTicks: 384,
     name: "Pattern 2",
     notes: [note("short", 64, 0, 24)],
   });

@@ -11,7 +11,7 @@ import { createDeviceRuntimeRegistry } from "./audio/runtime-registry.js";
 import { createKlintoChipSynthRuntime } from "./audio/klinto-chip-synth.js";
 import { createV2KeyboardAudition } from "./audio/keyboard-audition.js";
 import { createV2Scheduler } from "./audio/occurrence-scheduler.js";
-import { MAX_PATTERN_NAME_LENGTH } from "./domain/constants.js";
+import { MAX_PATTERN_NAME_LENGTH, PROJECT_SCHEMA_VERSION } from "./domain/constants.js";
 import { getPatternPlaybackEndTick } from "./domain/pattern-span.js";
 import { createV2ProjectState } from "./domain/project-state.js";
 import { normalizeV2Project } from "./domain/schema.js";
@@ -54,7 +54,7 @@ function prepareDocument(documentLike) {
 
   const root = documentLike.createElement("div");
   root.className = "v2-workspace";
-  root.dataset.schemaVersion = "7";
+  root.dataset.schemaVersion = String(PROJECT_SCHEMA_VERSION);
   const shellContainer = documentLike.createElement("div");
   shellContainer.className = "v2-workspace-shell";
   const content = documentLike.createElement("main");

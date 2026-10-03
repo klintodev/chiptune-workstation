@@ -588,7 +588,7 @@ test("opening a V1 cloud Project into V2 queues the one-time upgrade disclosure"
 
   const opened = await service.openProject(source.id);
 
-  assert.equal(opened.project.schemaVersion, 7);
+  assert.equal(opened.project.schemaVersion, 8);
   assert.deepEqual(upgrades, [{
     fromSchemaVersion: 6,
     projectId: source.id,

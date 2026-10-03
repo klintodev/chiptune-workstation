@@ -7,8 +7,8 @@ import {
 export const EMPTY_PATTERN_LENGTH_TICKS = 1;
 
 /**
- * Pattern span is content-derived. The one-tick empty span keeps transport
- * arithmetic well-defined without exposing a user-controlled Pattern size.
+ * The content end is independent of the musical length, including silence.
+ * A one-tick minimum also preserves the exact spans of schema-7 projects.
  */
 export function derivePatternLengthTicks(patternOrNotes) {
   const notes = Array.isArray(patternOrNotes)
@@ -23,15 +23,18 @@ export function derivePatternLengthTicks(patternOrNotes) {
 }
 
 /**
- * Pattern playback completes the 4/4 bar containing the final note. This is a
- * transport boundary only: persisted Pattern length and Playlist clip width
- * remain content-derived.
+ * Round new content up to a complete 4/4 bar when growing a Pattern.
  */
-export function getPatternPlaybackEndTick(patternOrNotes) {
+export function getContainingBarEndTick(patternOrNotes) {
   const barTicks = PPQ * 4;
   const contentEndTick = derivePatternLengthTicks(patternOrNotes);
   const playbackEndTick = Math.ceil(contentEndTick / barTicks) * barTicks;
   return Math.min(MAX_PATTERN_CONTENT_TICKS, Math.max(barTicks, playbackEndTick));
+}
+
+/** Playback, Playlist repetitions and export use the same persisted length. */
+export function getPatternPlaybackEndTick(patternOrNotes) {
+  return patternOrNotes?.lengthTicks ?? getContainingBarEndTick(patternOrNotes);
 }
 
 /**

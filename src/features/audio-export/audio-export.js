@@ -12,7 +12,7 @@ function safeFilename(title) {
 }
 
 export async function renderProjectArrangementOffline(project, options) {
-  if (project?.schemaVersion === 7) {
+  if ([7, 8].includes(project?.schemaVersion)) {
     const rendered = await renderV2ArrangementOffline(project, options);
     return rendered.audioBuffer;
   }

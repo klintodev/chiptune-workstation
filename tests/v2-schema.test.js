@@ -49,7 +49,7 @@ function legacyProject(schemaVersion = 6) {
   };
 }
 
-test("the default is the exact, deeply frozen canonical schema-7 Project", () => {
+test("the default is the exact, deeply frozen canonical schema-8 Project", () => {
   const project = createDefaultV2Project();
 
   assert.equal(project.schemaVersion, PROJECT_SCHEMA_VERSION);
@@ -58,7 +58,7 @@ test("the default is the exact, deeply frozen canonical schema-7 Project", () =>
     bpm: 120,
     loop: { enabled: false, mode: "custom", startTick: 0, endTick: 384 },
   });
-  assert.deepEqual(project.patterns, [{ id: "pattern-1", name: "Pattern 1", lengthTicks: 1, notes: [] }]);
+  assert.deepEqual(project.patterns, [{ id: "pattern-1", name: "Pattern 1", lengthTicks: 384, notes: [] }]);
   assert.deepEqual(project.tracks[0].instrument.params, KLINTO_CHIP_CONTRACT.defaults);
   assert.deepEqual(project.mixer, { master: { volume: 0.35, effects: [] } });
   assert.equal(Object.isFrozen(project.tracks[0].instrument.params), true);
@@ -97,7 +97,7 @@ test("strict validation rejects unknown keys, unresolved links, device state, bo
   assert.equal(canonicalizeV2Project({
     ...valid,
     patterns: [{ ...valid.patterns[0], lengthTicks: 100 }],
-  }).patterns[0].lengthTicks, 1);
+  }).patterns[0].lengthTicks, 100);
 });
 
 test("canonicalization sorts notes and clips while retaining Pattern, Track and Effect-chain order", () => {
@@ -189,7 +189,7 @@ test("schemas 2 through 6 migrate with exact ticks, parameters, ordering and det
     const migrated = migrateProjectToV7(source);
 
     assert.deepEqual(source, before);
-    assert.equal(migrated.schemaVersion, 7);
+    assert.equal(migrated.schemaVersion, 8);
     assert.equal(migrated.metadata.title, "  Preserved title  ");
     assert.equal(migrated.transport.loop.startTick, 24);
     assert.equal(migrated.transport.loop.endTick, 744);

@@ -1,5 +1,7 @@
 import {
   DEFAULT_SNAP_TICKS,
+  DEFAULT_PATTERN_LENGTH_TICKS,
+  MAX_PATTERN_CONTENT_TICKS,
   MAX_ARRANGEMENT_TICKS,
   MAX_CLIPS_PER_TRACK,
   MAX_EFFECTS_PER_CHAIN,
@@ -33,7 +35,7 @@ import {
   getV2ArrangementEndTick,
   normalizeV2Pattern,
 } from "./project-schema.js";
-import { derivePatternLengthTicks, EMPTY_PATTERN_LENGTH_TICKS } from "./pattern-span.js";
+import { derivePatternLengthTicks, getContainingBarEndTick } from "./pattern-span.js";
 
 function projectsEqual(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -269,7 +271,9 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     const updatedPattern = update(pattern);
     const nextPattern = updatedPattern === pattern ? pattern : normalizeV2Pattern({
       ...updatedPattern,
-      lengthTicks: derivePatternLengthTicks(updatedPattern.notes),
+      lengthTicks: derivePatternLengthTicks(updatedPattern.notes) > updatedPattern.lengthTicks
+        ? getContainingBarEndTick(updatedPattern.notes)
+        : updatedPattern.lengthTicks,
     });
     if (nextPattern === pattern) return false;
     if (nextPattern.lengthTicks > pattern.lengthTicks) {
@@ -301,6 +305,21 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     }, { trackId, ...detail });
   }
 
+  function setPatternLength(patternId, lengthTicks) {
+    assertInteger(lengthTicks, "Pattern length", 1, MAX_PATTERN_CONTENT_TICKS);
+    const pattern = getPattern(patternId);
+    if (lengthTicks < derivePatternLengthTicks(pattern.notes)) {
+      throw new V2DomainError(
+        "Move or shorten notes beyond the requested length first.",
+        "PATTERN_LENGTH_BEFORE_NOTES",
+        { patternId, lengthTicks },
+      );
+    }
+    return updatePattern(patternId, (current) => current.lengthTicks === lengthTicks
+      ? current
+      : { ...current, lengthTicks }, { operation: "set-pattern-length" });
+  }
+
   function createPattern(name) {
     if (state.patterns.length >= MAX_PROJECT_PATTERNS) {
       throw new RangeError(`A Project supports at most ${MAX_PROJECT_PATTERNS} Patterns.`);
@@ -316,7 +335,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
       patterns: [...state.patterns, {
         id,
         name: resolvedName,
-        lengthTicks: EMPTY_PATTERN_LENGTH_TICKS,
+        lengthTicks: DEFAULT_PATTERN_LENGTH_TICKS,
         notes: [],
       }],
     }, { operation: "create-pattern", patternId: id });
@@ -345,7 +364,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
       patterns: [...state.patterns, {
         id,
         name: resolvedName,
-        lengthTicks: derivePatternLengthTicks(notes),
+        lengthTicks: source.lengthTicks,
         notes,
       }],
     }, { operation: "duplicate-pattern", patternId: id, sourcePatternId: patternId });
@@ -1005,6 +1024,7 @@ export function createV2ProjectState(initialProject = createDefaultV2Project()) 
     setInstrumentParam,
     setLoop,
     setMasterVolume,
+    setPatternLength,
     setTrackMixer,
     undo,
     updateNote,

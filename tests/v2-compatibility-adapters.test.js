@@ -48,6 +48,7 @@ function createV1Document({ id = "project-v1" } = {}) {
 
 function createV7Document({ id = "project-v7" } = {}) {
   const project = structuredClone(createDefaultV2Project());
+  project.schemaVersion = 7;
   project.metadata.title = "Native V7 tune";
   project.patterns[0].notes.push({
     id: "note-native",
@@ -89,7 +90,7 @@ test("the explicit V7 adapter migrates V1 purely, canonically, and idempotently"
   const migrated = normalizeProjectDocumentToV7(source);
 
   assert.equal(JSON.stringify(source), before);
-  assert.equal(migrated.project.schemaVersion, 7);
+  assert.equal(migrated.project.schemaVersion, 8);
   assert.equal(migrated.project.patterns[0].lengthTicks, 6);
   assert.deepEqual(migrated.project.patterns[0].notes[0], {
     id: migrated.project.patterns[0].notes[0].id,
@@ -104,20 +105,20 @@ test("the explicit V7 adapter migrates V1 purely, canonically, and idempotently"
   assert.equal(migrated.project.tracks[0].instrument.type, "klinto-chip");
   assert.equal(migrated.project.tracks[0].mixer.effects.length, 0);
   assert.deepEqual(normalizeProjectDocumentToV7(migrated), migrated);
-  assert.deepEqual(normalizeProjectDocumentForSchema(source, 7), migrated);
+  assert.deepEqual(normalizeProjectDocumentForSchema(source, 8), migrated);
 });
 
 test("portable parsing has source-preserving and explicit-to-V7 paths", () => {
   const v1 = createV1Document();
   const text = serializeProjectDocument(v1);
   assert.equal(parseProjectDocument(text).project.schemaVersion, 6);
-  assert.equal(parseProjectDocumentToV7(text).project.schemaVersion, 7);
-  assert.equal(parseProjectDocument(serializeProjectDocumentToV7(v1)).project.schemaVersion, 7);
+  assert.equal(parseProjectDocumentToV7(text).project.schemaVersion, 8);
+  assert.equal(parseProjectDocument(serializeProjectDocumentToV7(v1)).project.schemaVersion, 8);
 });
 
 test("future and malformed nested state fails closed at every document adapter", () => {
   const future = structuredClone(createV7Document());
-  future.project.schemaVersion = 8;
+  future.project.schemaVersion = 9;
   assert.throws(() => normalizeProjectDocument(future), /Unsupported project schema version/);
   assert.throws(() => normalizeProjectDocumentToV7(future), /Unsupported project schema version/);
 
@@ -127,7 +128,7 @@ test("future and malformed nested state fails closed at every document adapter",
   assert.throws(() => normalizeProjectDocumentToV7(malformed), /Unknown Instrument type/);
   assert.throws(() => normalizeProjectDocumentForSchema(createV7Document(), 6), /unavailable/);
   assert.throws(
-    () => normalizeProjectDocumentForSchema(createV1Document(), 8),
+    () => normalizeProjectDocumentForSchema(createV1Document(), 9),
     /Unsupported target project schema version/,
   );
 });
@@ -139,7 +140,7 @@ test("cloud record adapters preserve either source family and explicitly migrate
   assert.equal(normalizeCloudProjectRecord(v1Record).document.project.schemaVersion, 6);
   assert.equal(normalizeCloudProjectRecord(v7Record).document.project.schemaVersion, 7);
   const migrated = normalizeCloudProjectRecordToV7(v1Record, { ownerId: "user-one" });
-  assert.equal(migrated.document.project.schemaVersion, 7);
+  assert.equal(migrated.document.project.schemaVersion, 8);
   assert.equal(migrated.cloudRevision, 3);
   assert.throws(
     () => normalizeCloudProjectRecordToV7(v1Record, { ownerId: "user-two" }),
@@ -153,7 +154,7 @@ test("publication and remix adapters validate before producing a V7 editable cop
 
   assert.equal(normalizePublicationRecord(v1Publication).document.project.schemaVersion, 6);
   assert.equal(normalizePublicationRecord(v7Publication).document.project.schemaVersion, 7);
-  assert.equal(normalizePublicationRecordToV7(v1Publication).document.project.schemaVersion, 7);
+  assert.equal(normalizePublicationRecordToV7(v1Publication).document.project.schemaVersion, 8);
 
   const remix = createV2RemixImport(v1Publication, {
     createId: () => "project-remix-v7",
@@ -161,7 +162,7 @@ test("publication and remix adapters validate before producing a V7 editable cop
     now: NOW,
   });
   assert.equal(remix.document.id, "project-remix-v7");
-  assert.equal(remix.document.project.schemaVersion, 7);
+  assert.equal(remix.document.project.schemaVersion, 8);
   assert.equal(remix.document.project.patterns[0].id, "pattern-1");
   assert.equal(remix.document.project.tracks[0].id, "track-1");
 
@@ -173,7 +174,7 @@ test("publication and remix adapters validate before producing a V7 editable cop
     projectRepository,
     provenanceRepository: createMemoryRemixProvenanceRepository(),
   });
-  assert.equal((await service.importPublication("publication-compat", 2)).document.project.schemaVersion, 7);
+  assert.equal((await service.importPublication("publication-compat", 2)).document.project.schemaVersion, 8);
 
   const malformed = structuredClone(v7Publication);
   malformed.document.project.tracks[0].mixer.effects.push({
@@ -188,14 +189,14 @@ test("publication and remix adapters validate before producing a V7 editable cop
 
 test("repository recovery lists unsupported records and exposes untouched raw data", async () => {
   const future = structuredClone(createV7Document({ id: "future-project" }));
-  future.project.schemaVersion = 8;
+  future.project.schemaVersion = 9;
   const before = structuredClone(future);
   const repository = createMemoryProjectRepository([future]);
 
   const [summary] = await repository.list();
   assert.equal(summary.id, "future-project");
   assert.equal(summary.title, "Native V7 tune");
-  assert.equal(summary.schemaVersion, 8);
+  assert.equal(summary.schemaVersion, 9);
   assert.equal(summary.availability, "unavailable");
   assert.deepEqual(await repository.getRaw("future-project"), before);
   await assert.rejects(repository.get("future-project"), /Unsupported project schema version/);
@@ -205,7 +206,7 @@ test("repository recovery lists unsupported records and exposes untouched raw da
 
 test("initial loading skips unavailable records and can migrate V1 for a V7 runtime", async () => {
   const future = structuredClone(createV7Document({ id: "future-project" }));
-  future.project.schemaVersion = 8;
+  future.project.schemaVersion = 9;
   future.updatedAt = "2026-08-04T13:00:00.000Z";
   const v1 = createV1Document({ id: "safe-v1" });
   const repository = createMemoryProjectRepository([future, v1]);
@@ -213,9 +214,9 @@ test("initial loading skips unavailable records and can migrate V1 for a V7 runt
   const legacy = await loadInitialProjectDocument({ repository });
   assert.equal(legacy.id, "safe-v1");
   assert.equal(legacy.project.schemaVersion, 6);
-  const v2 = await loadInitialProjectDocument({ repository, targetSchemaVersion: 7 });
+  const v2 = await loadInitialProjectDocument({ repository, targetSchemaVersion: 8 });
   assert.equal(v2.id, "safe-v1");
-  assert.equal(v2.project.schemaVersion, 7);
+  assert.equal(v2.project.schemaVersion, 8);
   assert.equal((await repository.getRaw("safe-v1")).project.schemaVersion, 6);
 });
 
@@ -239,9 +240,9 @@ test("V1 persistence rejects V7 import before any repository write", async () =>
   persistence.dispose();
 });
 
-test("Firestore rules admit only bounded schema 6 or schema 7 envelopes", async () => {
+test("Firestore rules admit only bounded schema 6, 7 or 8 envelopes", async () => {
   const rules = await readFile(new URL("../firestore.rules", import.meta.url), "utf8");
-  assert.match(rules, /project\.schemaVersion in \[6, 7\]/);
+  assert.match(rules, /project\.schemaVersion in \[6, 7, 8\]/);
   assert.match(rules, /function validV1Project/);
   assert.match(rules, /function validV2Project/);
   assert.match(rules, /project\.transport\.loop\.endTick <= 6144/);

@@ -9,7 +9,10 @@ import {
 } from "../src/v2/domain/index.js";
 
 function makeAudible(state, patternId = "pattern-1", pitch = 60, startTick = 0, durationTicks = 24) {
-  return state.addNote(patternId, { pitch, startTick, durationTicks, velocity: 0.7 });
+  const id = state.addNote(patternId, { pitch, startTick, durationTicks, velocity: 0.7 });
+  // These placement fixtures deliberately use short, exact musical lengths.
+  state.setPatternLength(patternId, startTick + durationTicks);
+  return id;
 }
 
 function patternNote(id, pitch, startTick, durationTicks, velocity = 0.7) {
@@ -87,7 +90,7 @@ test("addNotes accepts chords and same-pitch touching as one undoable commit", (
     "note-chord-high",
     "note-touch-low",
   ]);
-  assert.equal(project.getPattern().lengthTicks, 48);
+  assert.equal(project.getPattern().lengthTicks, 384);
   assert.equal(changes.length, 1);
   assert.equal(changes[0].operation, "add-notes");
   assert.deepEqual(changes[0].noteIds, noteIds);
@@ -133,6 +136,7 @@ test("note overlap validation wins before linked-clip growth conflicts", () => {
   ]);
   const blockerPatternId = project.createPattern("Blocker");
   project.addNote(blockerPatternId, patternNote("note-blocker", 72, 0, 24));
+  project.setPatternLength("pattern-1", 24);
   project.addClip("track-1", "pattern-1", 0);
   project.addClip("track-1", blockerPatternId, 48);
 
@@ -478,7 +482,7 @@ test("multi-note duplication rejects out-of-range copies without a partial mutat
   assert.equal(changes, 0);
 });
 
-test("Pattern span grows and shrinks with note content while preflighting every linked clip", () => {
+test("Pattern span retains silence after note edits while preflighting growth of every linked clip", () => {
   const project = createV2ProjectState();
   const crossing = project.addNote("pattern-1", {
     pitch: 60,
@@ -494,7 +498,7 @@ test("Pattern span grows and shrinks with note content while preflighting every 
   });
   project.addClip("track-1", "pattern-1", 0);
   project.addClip("track-1", "pattern-1", 384);
-  assert.equal(project.getPattern().lengthTicks, 324);
+  assert.equal(project.getPattern().lengthTicks, 384);
   const beforeConflict = project.getState();
 
   assert.throws(() => project.updateNote("pattern-1", removed, { startTick: 372 }), (error) => {
@@ -504,15 +508,15 @@ test("Pattern span grows and shrinks with note content while preflighting every 
   assert.equal(project.getState(), beforeConflict);
 
   project.removeNotes("pattern-1", [removed]);
-  assert.equal(project.getPattern().lengthTicks, 300);
+  assert.equal(project.getPattern().lengthTicks, 384);
   project.updateNote("pattern-1", crossing, { durationTicks: 12 });
-  assert.equal(project.getPattern().lengthTicks, 192);
+  assert.equal(project.getPattern().lengthTicks, 384);
   assert.equal(project.getPattern().notes.length, 1);
   assert.equal(project.getPattern().notes[0].durationTicks, 12);
   project.undo();
-  assert.equal(project.getPattern().lengthTicks, 300);
+  assert.equal(project.getPattern().lengthTicks, 384);
   project.undo();
-  assert.equal(project.getPattern().lengthTicks, 324);
+  assert.equal(project.getPattern().lengthTicks, 384);
   assert.equal(project.getPattern().notes.length, 2);
 });
 

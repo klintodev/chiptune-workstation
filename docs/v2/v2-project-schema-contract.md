@@ -1,6 +1,7 @@
 # Klinto Studio V2 Project schema contract
 
-Status: Normative draft for PRD 32 activation  
+Status: Historical schema-7 contract; [schema 8 pattern lengths](./v8-pattern-length.md) supersedes the current writing format.
+
 Project schema: 7  
 Outer document envelope: 1
 

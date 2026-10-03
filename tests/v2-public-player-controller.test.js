@@ -154,7 +154,7 @@ function createHarness() {
   };
 }
 
-test("native V7 validation fails closed before any audio factory is touched", () => {
+test("native V2 validation rejects legacy, future and malformed state before creating audio", () => {
   let audioFactories = 0;
   const options = {
     audioEngineFactory() { audioFactories += 1; return {}; },
@@ -164,10 +164,10 @@ test("native V7 validation fails closed before any audio factory is touched", ()
   assert.equal(audioFactories, 0);
 
   const future = playableProject();
-  future.schemaVersion = 8;
+  future.schemaVersion = 9;
   assert.throws(
     () => createV2PublicPlayerController({ ...options, project: future }),
-    /Unsupported project schema version: 8/,
+    /Unsupported project schema version: 9/,
   );
   assert.equal(audioFactories, 0);
 
@@ -208,7 +208,7 @@ test("V7 public playback composes the shared graph and keeps visitor volume post
   await controller.play();
   assert.equal(harness.calls.engineEnable, 1);
   assert.equal(harness.calls.registryProjects.length, 1);
-  assert.equal(harness.calls.registryProjects[0].schemaVersion, 7);
+  assert.equal(harness.calls.registryProjects[0].schemaVersion, 8);
   assert.equal(harness.schedulerOptions().getProject(), harness.calls.registryProjects[0]);
   assert.equal(harness.schedulerOptions().getSynthRuntime(), harness.synth);
   harness.schedulerOptions().onTrackInput("track-1", { releaseEndTime: 4.75 });
@@ -289,7 +289,7 @@ test("an empty V7 snapshot never enables audio playback", async () => {
 
 test("the browser entry dispatches V7 while retaining the legacy V1 player", async () => {
   const source = await readFile(new URL("../src/player.js", import.meta.url), "utf8");
-  assert.match(source, /record\.document\.project\.schemaVersion === 7/);
+  assert.match(source, /\[7, 8\]\.includes\(record\.document\.project\.schemaVersion\)/);
   assert.match(source, /createV2PublicPlayerController/);
   assert.match(source, /projectState = createProjectState\(record\.document\.project\)/);
   assert.match(source, /master \* visitorVolume/);

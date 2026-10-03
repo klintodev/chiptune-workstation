@@ -424,10 +424,10 @@ export function createCloudProjectService({
           error: "",
           conflictProjectId: "",
         }, "opened");
-        if (remote.project.schemaVersion === 7
+        if (remote.project.schemaVersion === 8
           && Number.isInteger(sourceSchemaVersion)
           && sourceSchemaVersion >= 1
-          && sourceSchemaVersion < 7) {
+          && sourceSchemaVersion < 8) {
           try {
             onProjectUpgrade(Object.freeze({
               fromSchemaVersion: sourceSchemaVersion,

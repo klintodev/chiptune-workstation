@@ -11,7 +11,7 @@ import {
 function createProject({ id = "project-a" } = {}) {
   return {
     id,
-    schemaVersion: 7,
+    schemaVersion: 8,
     patterns: [
       {
         id: "pattern-1",
@@ -84,14 +84,30 @@ test("initial workspace is deeply immutable, safe, and separate from Project JSO
   assert.equal("workspace" in project, false);
 });
 
-test("a short Pattern playhead remains addressable through its complete performance bar", () => {
-  const workspace = createWorkspaceState(createProject());
+test("a short note leaves the playhead addressable through its explicitly chosen Pattern bar", () => {
+  const project = createProject();
+  project.patterns[0].lengthTicks = 384;
+  const workspace = createWorkspaceState(project);
 
   workspace.setPlayback({ patternPlayheadTick: 300 });
   assert.equal(workspace.getState().playback.patternPlayheadTick, 300);
 
   workspace.setPlayback({ patternPlayheadTick: 999 });
   assert.equal(workspace.getState().playback.patternPlayheadTick, 383);
+});
+
+test("Pattern playhead repair uses the exact exclusive musical end, including imported short lengths", () => {
+  for (const lengthTicks of [24, 48, 384, 768]) {
+    const project = createProject();
+    project.patterns[0].lengthTicks = lengthTicks;
+    const workspace = createWorkspaceState(project);
+    workspace.setPlayback({ patternPlayheadTick: lengthTicks - 1 });
+    assert.equal(workspace.getState().playback.patternPlayheadTick, lengthTicks - 1);
+    workspace.setPlayback({ patternPlayheadTick: lengthTicks });
+    assert.equal(workspace.getState().playback.patternPlayheadTick, lengthTicks - 1);
+    workspace.setPlayback({ patternPlayheadTick: 999 });
+    assert.equal(workspace.getState().playback.patternPlayheadTick, lengthTicks - 1);
+  }
 });
 
 test("Pattern identities retain independent selection, cursor, viewport, and audition Track", () => {
@@ -233,7 +249,7 @@ test("clip, Effect, Mixer, and transport state repair by stable identity", () =>
   assert.equal(workspace.getState().device.instanceId, "effect-3");
   assert.equal(workspace.getState().device.slotIndex, 0);
   assert.equal(workspace.getState().mixer.channelId, "master");
-  assert.equal(workspace.getState().playback.patternPlayheadTick, 383);
+  assert.equal(workspace.getState().playback.patternPlayheadTick, 23);
   assert.equal(workspace.getState().playback.patternLoopEnabled, false);
   assert.equal(workspace.getState().playback.songPlayheadTick, 6_144);
 

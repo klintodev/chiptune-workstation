@@ -4,6 +4,7 @@ import {
 } from "../state/project-state.js";
 import {
   PROJECT_SCHEMA_VERSION as V2_PROJECT_SCHEMA_VERSION,
+  canonicalizeV2Project,
   normalizeV2Project,
   normalizeV2ProjectDocument,
 } from "../v2/domain/schema.js";
@@ -24,6 +25,7 @@ function validateTimestamp(value, field) {
 }
 
 function normalizeProject(project) {
+  if (project?.schemaVersion === 7) return canonicalizeV2Project(project, { schemaVersion: 7 });
   if (project?.schemaVersion === V2_PROJECT_SCHEMA_VERSION) return normalizeV2Project(project);
   return clone(createProjectState(project).getState());
 }
@@ -42,9 +44,9 @@ export function normalizeProjectDocumentForSchema(candidate, schemaVersion) {
     return normalizeProjectDocumentToV7(candidate);
   }
   const normalized = normalizeProjectDocument(candidate);
-  if (normalized.project.schemaVersion === V2_PROJECT_SCHEMA_VERSION) {
+  if ([7, V2_PROJECT_SCHEMA_VERSION].includes(normalized.project.schemaVersion)) {
     throw new RangeError(
-      "This V7 project is unavailable in the current Studio version and was not modified.",
+      "This Studio V2 project is unavailable in the current Studio version and was not modified.",
     );
   }
   return normalized;

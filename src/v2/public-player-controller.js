@@ -46,7 +46,7 @@ function buildVisualizationModel(project) {
  * has no persisted visualiser state, so this model never enters Project data.
  */
 export function createV2PublicVisualizationModel(projectCandidate) {
-  return buildVisualizationModel(canonicalizeV2Project(projectCandidate));
+  return buildVisualizationModel(canonicalizeV2Project(projectCandidate, { schemaVersion: projectCandidate?.schemaVersion }));
 }
 
 /** Draw a generic arrangement overview. An incomplete/blocked Canvas is safe. */
@@ -134,7 +134,7 @@ export function createV2PublicPlayerController({
 } = {}) {
   // Native validation is intentionally first: this path must never migrate or
   // partially activate malformed/future public snapshots.
-  const project = canonicalizeV2Project(projectCandidate);
+  const project = canonicalizeV2Project(projectCandidate, { schemaVersion: projectCandidate?.schemaVersion });
   const visualizationModel = buildVisualizationModel(project);
   const arrangementEndTick = visualizationModel.arrangementEndTick;
   const audioEngine = audioEngineFactory();

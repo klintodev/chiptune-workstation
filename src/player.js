@@ -145,7 +145,7 @@ async function play() {
 
 function createPlayer(record) {
   let hasArrangement = false;
-  if (record.document.project.schemaVersion === 7) {
+  if ([7, 8].includes(record.document.project.schemaVersion)) {
     v2Controller = createV2PublicPlayerController({
       canvas: elements.canvas,
       controls: {

@@ -1,4 +1,5 @@
-export const PROJECT_SCHEMA_VERSION = 7;
+export const PROJECT_SCHEMA_VERSION = 8;
+export const DEFAULT_PATTERN_LENGTH_TICKS = 384;
 export const PROJECT_DOCUMENT_FORMAT = "chiptune-workstation";
 export const PROJECT_DOCUMENT_VERSION = 1;
 export const MAX_PROJECT_FILE_BYTES = 2_000_000;
