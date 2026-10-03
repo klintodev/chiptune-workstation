@@ -25,6 +25,15 @@ jobs:
         run: npm ci
       - name: Run checks
         run: npm run check
+      - name: Deploy Firestore rules before the app
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KLINTO_STUDIO }}
+        run: |
+          credential_file="$(mktemp)"
+          trap 'rm -f "$credential_file"' EXIT
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$credential_file"
+          GOOGLE_APPLICATION_CREDENTIALS="$credential_file" npx --yes firebase-tools@15.32.1 deploy --only firestore:rules --project klinto-studio --non-interactive
       - name: Deploy live
         uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0
         with:
@@ -32,3 +41,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KLINTO_STUDIO }}
           channelId: live
           projectId: klinto-studio
+          firebaseToolsVersion: 15.32.1
