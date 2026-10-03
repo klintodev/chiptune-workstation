@@ -39,6 +39,7 @@ function createRoot() {
   for (const id of ["project-delete-cancel", "project-library-close", "project-delete-confirm", "project-library-count", "project-delete-dialog", "project-delete-message", "project-library-dialog", "project-duplicate", "project-library-error", "project-library-save-status", "project-list", "project-name-input", "project-new", "project-library-open", "project-save-status", "project-storage-recovery", "project-recovery-download", "project-storage-message", "project-title", "workstation-status"]) {
     elements.set(`#${id}`, new Element(root));
   }
+  elements.set("#project-backup-download", new Element(root, "button"));
   return root;
 }
 
@@ -59,8 +60,10 @@ async function fixture(t, { beforeOpen = async () => {}, failSave = () => false 
   });
   const root = createRoot();
   const calls = [];
+  const downloads = [];
   const feature = createProjectLibraryFeature({
     root, projectState,
+    downloadProject: (text, title) => downloads.push({ text, title }),
     onBeforeProjectChange: () => calls.push("stop playback"),
     persistence: { ...persistence, async openProject(id) { calls.push(id); await beforeOpen(); return persistence.openProject(id); } },
   });
@@ -75,8 +78,43 @@ async function fixture(t, { beforeOpen = async () => {}, failSave = () => false 
     Object.defineProperty(event, "target", { value: button });
     list.dispatchEvent(event);
   }
-  return { action, calls, documents, persistence, projectState, repository, root };
+  return { action, calls, documents, downloads, persistence, projectState, repository, root };
 }
+
+test("the normal song shelf exports current unsaved music and explicit pattern length", async t => {
+  const f = await fixture(t);
+  f.projectState.addNote("pattern-1", { pitch: 48, startTick: 0, durationTicks: 24, velocity: 0.8 });
+  f.projectState.setPatternLength("pattern-1", 768);
+  f.projectState.addClip("track-1", "pattern-1", 0);
+  f.projectState.renameProject("A portable melody");
+  const before = f.projectState.getState();
+  assert.equal(f.root.querySelector("#project-storage-recovery").hidden, true);
+  f.root.querySelector("#project-backup-download").click();
+  assert.equal(f.downloads.length, 1);
+  assert.equal(f.downloads[0].title, "A portable melody");
+  const exported = JSON.parse(f.downloads[0].text);
+  assert.equal(exported.format, "chiptune-workstation");
+  assert.equal(exported.project.schemaVersion, 8);
+  assert.deepEqual(exported.project, before);
+  assert.equal(f.projectState.getState(), before);
+  assert.equal((await f.repository.get("alpha")).project.patterns[0].notes.length, 0, "export does not depend on autosave completing");
+  await f.persistence.importProject(f.downloads[0].text);
+  assert.notEqual(f.persistence.getActiveDocument().id, "alpha", "import preserves the existing project");
+  assert.deepEqual(f.projectState.getState().patterns, before.patterns);
+  assert.deepEqual(f.projectState.getState().tracks, before.tracks);
+  assert.equal((await f.repository.list()).length, 3);
+});
+
+test("project backup stays usable when browser storage cannot save", async t => {
+  const f = await fixture(t, { failSave: () => true });
+  f.projectState.renameProject("Unsaved but recoverable");
+  await assert.rejects(f.persistence.saveNow(), /Storage is full/);
+  f.root.querySelector("#project-backup-download").click();
+  assert.equal(f.downloads.length, 1);
+  assert.equal(JSON.parse(f.downloads[0].text).project.metadata.title, "Unsaved but recoverable");
+  assert.equal(f.persistence.getState().status, "error");
+  assert.equal(f.root.querySelector("#project-storage-recovery").hidden, false);
+});
 
 test("shelf rename saves current notes before opening another song and focuses its name", async t => {
   const f = await fixture(t);

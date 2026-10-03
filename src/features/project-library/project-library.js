@@ -97,6 +97,7 @@ export function createProjectLibraryFeature({
     saveStatus: queryRequired(root, "#project-save-status"),
     storageRecovery: queryRequired(root, "#project-storage-recovery"),
     recoveryDownload: queryRequired(root, "#project-recovery-download"),
+    backupDownload: queryRequired(root, "#project-backup-download"),
     storageMessage: queryRequired(root, "#project-storage-message"),
     title: queryRequired(root, "#project-title"),
   };
@@ -136,7 +137,7 @@ export function createProjectLibraryFeature({
     } else if (state.status === "error") {
       setTextIfChanged(elements.storageMessage, `Automatic saving failed. Your current edits are still available in this tab.${state.error?.message ? ` ${state.error.message}` : ""}`);
     } else {
-      setTextIfChanged(elements.storageMessage, "Songs save automatically in this browser. Use Export project in the Studio menu to keep a backup.");
+      setTextIfChanged(elements.storageMessage, "Songs save automatically in this browser. Use Export project here to keep a backup with your notes, sounds and arrangement.");
     }
   }
 
@@ -260,6 +261,7 @@ export function createProjectLibraryFeature({
       elements.duplicate,
       elements.name,
       elements.recoveryDownload,
+      elements.backupDownload,
     ]) {
       if ("disabled" in element) element.disabled = value;
       element.setAttribute("aria-disabled", String(value));
@@ -300,7 +302,7 @@ export function createProjectLibraryFeature({
       showError("");
       return true;
     } catch (error) {
-      showError(error.message || "The recovery copy could not be downloaded.");
+      showError(error.message || "The project file could not be downloaded.");
       return false;
     }
   }
@@ -355,6 +357,7 @@ export function createProjectLibraryFeature({
     await persistence.duplicateProject();
   }, { closeAfter: true }), { signal: lifecycle.signal });
   elements.recoveryDownload.addEventListener("click", downloadActiveProject, { signal: lifecycle.signal });
+  elements.backupDownload.addEventListener("click", downloadActiveProject, { signal: lifecycle.signal });
   elements.list.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button || busy) return;

@@ -1025,6 +1025,25 @@ export function createPlaylistSurface({
     return true;
   }
 
+  function moveSelectionToSongStart() {
+    const ids = selectedClipIds();
+    if (ids.length === 0) return false;
+    const firstTick = Math.min(...ids.map((id) => findClip(project(), id).clip.startTick));
+    if (firstTick === 0) return false;
+    try {
+      moveSelected(-firstTick, 0, ids);
+      scroller.scrollLeft = 0;
+      announce(ids.length === 1
+        ? "Clip moved to song start, bar 1."
+        : `${ids.length} clips moved together to song start, keeping their spacing.`);
+      return true;
+    } catch (error) {
+      announce(`Cannot move to song start. ${error.message}`);
+      render();
+      return false;
+    }
+  }
+
   function removeClip(clipId) {
     if (!clipId) return false;
     const state = project();
@@ -1734,6 +1753,15 @@ export function createPlaylistSurface({
       }
       return;
     }
+    const firstSelectedTick = Math.min(...selection.map((id) => findClip(state, id).clip.startTick));
+    const moveToStart = createElement("button", {
+      disabled: firstSelectedTick === 0,
+      textContent: "Move to song start",
+      title: "Move the selection to bar 1, keeping its Tracks and spacing",
+      type: "button",
+      onClick: moveSelectionToSongStart,
+    });
+    inspector.append(moveToStart);
     if (selection.length > 1) {
       inspector.append(
         createElement("strong", { textContent: `${selection.length} Playlist clips selected` }),

@@ -37,10 +37,11 @@ export function createV2HelpDialog({ root = document } = {}) {
       createElement("p", { textContent: "Space toggles playback throughout Studio except while typing in a text field. Escape closes the active device window and returns focus to its launcher." }),
       createElement("p", { textContent: "In Pattern mode, playback continues through the end of the 4/4 bar containing the final stored note content, including the space after the last note. A note ending exactly on a bar line does not add another bar, while an empty Pattern performs one silent bar. Loop repeats that complete performance span, and normal Instrument release or Effect tails may ring through its trailing space. Playlist clips and Song timing still use the Pattern's exact content-derived length." }),
       createElement("p", { textContent: "Click the Playlist ruler to set the Song start position. Stop once returns playback there; press Stop again, or double-click it while playing, to return to the beginning." }),
+      createElement("p", { textContent: "Add to Playlist places a Pattern at or after the insertion cursor, then advances that cursor for the next clip. Use the transport's Return to start before adding a new part at bar 1. To align a part already placed later, select its clip and choose Move to song start in Playlist selection. Multiple selected clips move together, keeping their Tracks and spacing; a collision leaves the whole selection unchanged. Undo restores the move. Home in the Playlist focuses Track actions." }),
     ]),
     createElement("section", {}, [
       createElement("h3", { textContent: "Projects and sound" }),
-      createElement("p", { textContent: "Projects autosave locally. Use Projects in the Studio menu to create, duplicate or recover a project, and use Share for publishing. Audio setup appears automatically when playback needs it." }),
+      createElement("p", { textContent: "Songs autosave locally. Open Song shelf to create, duplicate or recover a project. Export project downloads a backup of the current song, including unsaved edits; Export WAV creates audio, and Share publishes a page. Audio setup appears automatically when playback needs it." }),
     ]),
   ]);
   dialog.append(panel);

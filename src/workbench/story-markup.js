@@ -25,7 +25,7 @@ export function projectLibraryMarkup({ open = true } = {}) {
         <div id="project-list" class="project-list" aria-label="Saved projects"></div>
         <section class="project-share-render">
           <div><span class="panel-context">Share or render</span><p>Create a public snapshot or render the arrangement locally.</p></div>
-          <div id="project-share-render-actions"></div>
+          <div id="project-share-render-actions"><button id="project-backup-download" type="button">Export project</button></div>
         </section>
         <p id="project-storage-message" class="project-storage-message" role="status"></p>
         <div id="project-storage-recovery" class="project-storage-recovery" hidden>
