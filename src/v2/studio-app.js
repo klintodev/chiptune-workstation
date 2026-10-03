@@ -35,7 +35,7 @@ import { createV2HelpDialog } from "./ui/help-dialog.js";
 import { createMixerSurface } from "./ui/mixer.js";
 import { createPianoRollSurface } from "./ui/piano-roll.js";
 import { createPlaylistSurface } from "./ui/playlist.js";
-import { createStudioShell, isGlobalTransportShortcut } from "./ui/studio-shell.js";
+import { createStudioShell, isGlobalTransportShortcut, isModalKeyboardEvent } from "./ui/studio-shell.js";
 import { createSurfaceHost } from "./ui/surface-host.js";
 import { createV2ThemeController } from "./ui/theme-controller.js";
 
@@ -1022,7 +1022,7 @@ export async function createV2StudioApp({ document: documentLike = document } = 
     if (!event.repeat) toggleTransport();
   }, { capture: true, signal: lifecycle.signal });
   documentLike.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
+    if (event.key !== "Escape" || isModalKeyboardEvent(event)) return;
     const state = workspaceState.getState();
     if (state.device) {
       if (!surfaceHost.getSnapshot().device) {

@@ -190,7 +190,7 @@ function createPlayer(record) {
     remixUrl = buildRemixStudioUrl(record);
     elements.remixSection.hidden = false;
   }
-  document.title = `${record.title} - Klinto Studio`;
+  document.title = `${record.title} - Piptune`;
   document.querySelector('meta[name="description"]').content = `Listen to ${record.title} by ${record.creatorName}.`;
   if (!hasArrangement) showError("This published snapshot does not contain an arranged pattern yet.");
   else {

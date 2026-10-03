@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <title>Piptune — small sounds, good company</title>
+  <rect width="1200" height="630" fill="#172c25"/>
+  <rect x="24" y="24" width="1152" height="582" rx="36" fill="#203a30" stroke="#779b7e" stroke-width="2"/>
+  <path d="M80 470h430" stroke="#779b7e" stroke-width="2"/>
+  <text x="80" y="164" fill="#b1c2a9" font-family="monospace" font-size="20" letter-spacing="4">YOUR LITTLE CHIPTUNE STUDIO</text>
+  <text x="76" y="295" fill="#d7ebb8" font-family="Arial, sans-serif" font-size="116" font-weight="900" letter-spacing="-7">Piptune</text>
+  <text x="82" y="358" fill="#f0edda" font-family="monospace" font-size="27">Small sounds. Good company.</text>
+  <text x="82" y="407" fill="#b1c2a9" font-family="monospace" font-size="22">Make a melody. Keep it close.</text>
+  <text x="82" y="514" fill="#b5d78d" font-family="monospace" font-size="19">PLAY · ARRANGE · SAVE · SHARE</text>
+  <image href="piptune-studio.svg" x="577" y="121" width="550" height="390"/>
+</svg>

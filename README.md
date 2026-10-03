@@ -1,6 +1,10 @@
-# Chiptune Workstation
+# Piptune
 
 A browser chiptune workstation built with the Web Audio API and native ES modules. The app has no runtime framework; esbuild is used only to prepare production assets.
+
+Piptune is the new identity of this existing workstation: a headphone frog, a cosy green studio, and a local song shelf. Open **Song shelf** beside the transport to resume a song, rename it, start a new one, or duplicate the current song. Renaming another song first saves and opens it; names save automatically. Existing projects, browser storage keys, project files, and cloud identifiers are unchanged by the branding update.
+
+The original vector artwork lives in `assets/brand/piptune-frog.svg`, `piptune-studio.svg`, and `piptune-social.svg`. Matching PNG icons and the social preview are browser-rendered versions. Dark and light colours share the existing theme preference.
 
 The current product includes a playable keyboard, reusable patterns, a multi-track clip arrangement, per-note expression, mixer controls, transport and looping, bounded undo/redo, local project persistence, JSON recovery, WAV export, optional accounts and cloud backup, public sharing, and a composition-projected visualiser.
 

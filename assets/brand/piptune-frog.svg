@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <title>Piptune's headphone frog</title>
+  <rect x="4" y="4" width="248" height="248" rx="76" fill="#172c25"/>
+  <path d="M48 134v-15a80 80 0 0 1 160 0v15" stroke="#efbd8e" stroke-width="17" stroke-linecap="round"/>
+  <path d="M128 76c-11-33-62-32-70 4-5 19-1 28-9 46-18 44 9 82 79 82s97-38 79-82c-8-18-4-27-9-46-8-36-59-37-70-4Z" fill="#a9cf86" stroke="#172c25" stroke-width="6" stroke-linejoin="round"/>
+  <ellipse cx="86" cy="92" rx="22" ry="24" fill="#f7f1d7"/>
+  <ellipse cx="170" cy="92" rx="22" ry="24" fill="#f7f1d7"/>
+  <ellipse cx="91" cy="96" rx="8" ry="12" fill="#172c25"/>
+  <ellipse cx="165" cy="96" rx="8" ry="12" fill="#172c25"/>
+  <circle cx="94" cy="91" r="3" fill="#fffdf0"/>
+  <circle cx="168" cy="91" r="3" fill="#fffdf0"/>
+  <ellipse cx="72" cy="143" rx="14" ry="8" fill="#e4a780"/>
+  <ellipse cx="184" cy="143" rx="14" ry="8" fill="#e4a780"/>
+  <path d="M98 147q30 28 60 0" stroke="#284939" stroke-width="6" stroke-linecap="round"/>
+  <rect x="31" y="113" width="27" height="57" rx="12" fill="#efbd8e" stroke="#172c25" stroke-width="6"/>
+  <rect x="198" y="113" width="27" height="57" rx="12" fill="#efbd8e" stroke="#172c25" stroke-width="6"/>
+  <path d="M40 128v23m176-23v23" stroke="#fff0d6" stroke-width="4" stroke-linecap="round"/>
+  <path d="M119 184h18" stroke="#d7e5ad" stroke-width="5" stroke-linecap="round"/>
+</svg>

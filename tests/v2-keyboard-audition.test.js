@@ -25,6 +25,28 @@ function keyEvent(type, code, values = {}) {
   return event;
 }
 
+test("V2 audition can stop repeatedly and dispose before audio is enabled", () => {
+  const documentLike = new EventTarget();
+  documentLike.querySelectorAll = () => [];
+  const audition = createV2KeyboardAudition({
+    audioEngine: {
+      getCurrentTime() { throw new Error("Audio has not been enabled."); },
+      isReady: () => false,
+    },
+    documentLike,
+    getProject: () => ({ tracks: [] }),
+    getSynthRuntime: () => null,
+    getTrackId: () => null,
+    keyupTarget: documentLike,
+  });
+
+  assert.equal(audition.stopAll(), false);
+  assert.equal(audition.stopAll(), false);
+  assert.equal(audition.getActiveVoiceCount(), 0);
+  assert.equal(audition.dispose(), true);
+  assert.equal(audition.dispose(), false);
+});
+
 test("V2 computer keys audition the selected Track through the production synth route", () => {
   const documentLike = new EventTarget();
   documentLike.querySelectorAll = () => [];

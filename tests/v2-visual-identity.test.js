@@ -6,7 +6,7 @@ import { createV2ThemeController } from "../src/v2/ui/theme-controller.js";
 
 const root = new URL("../", import.meta.url);
 
-test("V2 reuses the established Klinto palette, typography, and framed shell", async () => {
+test("V2 shares the Piptune palette and preserves the workspace typography and frame", async () => {
   const css = await readFile(new URL("src/v2/styles/studio.css", root), "utf8");
 
   assert.match(css, /--v2-bg:\s*var\(--bg-0\)/);

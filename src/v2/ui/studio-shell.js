@@ -5,6 +5,13 @@ const MAX_SONG_TICKS = 6_144;
 const RANGE_EDIT_KEYS = new Set(["ArrowDown", "ArrowLeft", "ArrowRight", "ArrowUp", "End", "Home", "PageDown", "PageUp"]);
 const TEXT_ENTRY_INPUT_TYPES = new Set(["email", "password", "search", "tel", "text", "url"]);
 
+export function isModalKeyboardEvent(event) {
+  // Disabling a dialog's controls during a save can temporarily move focus to
+  // the body. The dialog still owns Escape and Space during that transition.
+  return Boolean(event?.target?.closest?.("dialog[open]")
+    || event?.target?.ownerDocument?.querySelector?.("dialog[open]"));
+}
+
 function isNativeHistoryTarget(target) {
   if (!target) return false;
   if (target.isContentEditable) return true;
@@ -13,7 +20,7 @@ function isNativeHistoryTarget(target) {
 }
 
 export function getGlobalHistoryAction(event) {
-  if (!event || event.defaultPrevented || event.altKey || isNativeHistoryTarget(event.target)) return null;
+  if (!event || event.defaultPrevented || event.altKey || isNativeHistoryTarget(event.target) || isModalKeyboardEvent(event)) return null;
   if (!event.ctrlKey && !event.metaKey) return null;
   const key = String(event.key ?? "").toLowerCase();
   if (key === "z") return event.shiftKey ? "redo" : "undo";
@@ -23,6 +30,7 @@ export function getGlobalHistoryAction(event) {
 
 export function isGlobalTransportShortcut(event) {
   if (!event || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return false;
+  if (isModalKeyboardEvent(event)) return false;
   if (event.code !== "Space" && event.key !== " " && event.key !== "Spacebar") return false;
 
   const target = event.target;
@@ -49,7 +57,7 @@ export function createStudioShell({
   let transportFrame = null;
   const root = createElement("header", {
     className: "v2-global-shell global-bar",
-    "aria-label": "Klinto Studio controls",
+    "aria-label": "Piptune controls",
   });
   const projectTitle = createElement("output", { id: "project-title", textContent: projectState.getState().metadata.title });
   const saveStatus = createElement("output", { id: "project-save-status", textContent: "Saved", dataset: { state: "saved" } });
@@ -58,6 +66,8 @@ export function createStudioShell({
     id: "project-library-open",
     type: "button",
     "aria-haspopup": "dialog",
+    "aria-label": "Open song shelf",
+    "aria-describedby": "project-title project-save-status",
   }, [
     createElement("span", {
       className: "project-summary-icon",
@@ -65,7 +75,7 @@ export function createStudioShell({
       textContent: "\u25b8",
     }),
     createElement("span", { className: "project-summary-copy" }, [
-      createElement("span", { textContent: "Project" }),
+      createElement("span", { textContent: "Song shelf" }),
       projectTitle,
     ]),
     createElement("span", { className: "project-save-pill" }, [
@@ -75,9 +85,9 @@ export function createStudioShell({
   ]);
 
   const brand = createElement("div", { className: "v2-brand studio-badge" }, [
-    createElement("span", { className: "v2-brand-mark studio-mark", "aria-hidden": "true" }),
-    createElement("h1", { className: "v2-brand-name", textContent: "Klinto Studio" }),
-    createElement("span", { className: "v2-beta-badge studio-beta", textContent: "V2 Beta" }),
+    createElement("img", { className: "v2-brand-mark studio-mark", src: "/assets/brand/piptune-frog.svg", alt: "", width: 36, height: 36 }),
+    createElement("h1", { className: "v2-brand-name", textContent: "Piptune" }),
+    createElement("span", { className: "v2-beta-badge studio-beta", textContent: "Beta" }),
   ]);
   const projectCluster = createElement("div", {
     className: "v2-project-cluster project-cluster",
@@ -234,7 +244,7 @@ export function createStudioShell({
     createElement("summary", { "aria-label": "Open Studio menu", textContent: "Menu" }),
     createElement("div", { className: "v2-secondary-menu-panel" }, [
       createElement("button", {
-        textContent: "Projects",
+        textContent: "Song shelf",
         type: "button",
         onClick: () => {
           if (typeof onOpenProjectLibrary === "function") onOpenProjectLibrary();

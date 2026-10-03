@@ -1,0 +1,120 @@
+/* Piptune's identity sits around the instruments, leaving their geometry intact. */
+body::before { opacity: 0.28; }
+.v2-workspace { border-radius: 14px; }
+.v2-workspace::after { box-shadow: inset 0 0 32px var(--v2-shadow-soft); }
+.studio-badge > .studio-mark,
+.v2-brand-mark.studio-mark {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 0;
+  border-radius: 11px;
+  background: none;
+  box-shadow: none;
+}
+.v2-brand.studio-badge { padding: 3px 9px 3px 3px; gap: 9px; border-radius: 12px; }
+.studio-badge h1, .v2-brand-name { letter-spacing: -0.04em; text-transform: none; font-size: 0.85rem; }
+.v2-project-summary.project-summary { border-radius: 8px; }
+.v2-transport-play, .arrangement-transport .transport-play { box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 14%, transparent); }
+
+.audio-setup { width: 100%; height: 100dvh; max-height: none; padding: 16px; overflow-y: auto; }
+.audio-setup-card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  width: min(780px, 100%);
+  margin: auto;
+  gap: 18px 30px;
+  padding: 30px;
+  border-radius: 24px;
+  border-color: var(--line-strong);
+  background: radial-gradient(ellipse at 0 0, var(--surface-soft), var(--panel) 70%);
+}
+.piptune-welcome-art { grid-column: 1; grid-row: 1 / 4; align-self: center; width: 100%; height: auto; }
+.audio-setup-card > div:first-of-type { align-self: end; padding-top: 12px; }
+.audio-setup-card .eyebrow { margin-bottom: 12px; color: var(--muted); font-size: 0.57rem; line-height: 1.7; }
+.audio-setup-card #setup-title { margin: 0; color: var(--accent-bright); font-size: clamp(2rem, 5vw, 2.8rem); letter-spacing: -0.06em; }
+.piptune-tagline { margin: 12px 0 10px; color: var(--ink); font-size: 1.35rem; }
+.audio-setup-card .lede { margin: 0; color: var(--muted); font-size: 1.08rem; line-height: 1.4; }
+.audio-setup-card .audio-setup-actions { grid-column: 2; display: grid; gap: 8px; margin: 0; }
+.audio-setup-actions > button { min-height: 44px; border-radius: 8px; }
+.audio-setup-card .audio-diagnostics { grid-column: 2; min-width: 0; margin: 0; }
+.audio-setup-card .error-panel { grid-column: 1 / -1; }
+
+.project-dialog { width: min(820px, calc(100vw - 28px)); max-height: calc(100dvh - 28px); overflow-y: auto; border-radius: 18px; }
+.project-dialog-panel { gap: 16px; padding: 24px; border-radius: 18px; background: var(--panel); }
+.song-shelf-header { gap: 14px; padding-bottom: 6px; }
+.song-shelf-header > div { flex: 1; min-width: 0; }
+.song-shelf-header h2 { margin-top: 8px; color: var(--accent-bright); font-size: clamp(1.1rem, 3vw, 1.5rem); line-height: 1.3; }
+.song-shelf-header p { margin: 9px 0 0; color: var(--muted); font-size: 1.12rem; }
+.song-shelf-header > img { flex: none; border-radius: 16px; }
+#project-library-close { width: 36px; height: 36px; min-width: 36px; min-height: 36px; border-radius: 50%; }
+.project-library-current { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-1); }
+.project-title-field input { width: 100%; min-width: 0; min-height: 40px; border-radius: 6px; }
+.project-dialog-actions button { min-height: 42px; border-radius: 8px; font-size: 0.6rem; }
+#project-new { background: var(--accent); color: var(--bg-0); border-color: var(--accent); }
+#project-new:hover:not(:disabled) { background: var(--accent-bright); }
+.project-library-heading { align-items: center; gap: 8px; font-size: 0.56rem; }
+.project-library-heading output { font-size: 1rem; }
+.project-list { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: max-content; align-content: start; align-items: stretch; gap: 12px; padding: 4px; max-height: min(390px, 42dvh); scrollbar-gutter: stable; }
+.project-list-row { grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 0; padding: 0; overflow: hidden; border-radius: 12px; background: var(--bg-1); }
+.project-list-row::before { display: none; }
+.project-list-row.active { border-color: var(--accent); background: var(--bg-1); }
+.project-list-open { gap: 0; width: 100%; padding: 0 12px 10px; border-radius: 0; }
+.project-list-open:hover:not(:disabled) { background: var(--surface); }
+.project-list-open strong { width: 100%; margin-top: 5px; font-size: 1.2rem; font-weight: 400; }
+.project-list-open > span:not(.song-cover):not(.song-card-state) { margin-top: 5px; font-size: 0.86rem; line-height: 1.3; }
+.project-list-open .song-card-state { margin-top: 10px; color: var(--accent); font: 0.48rem/1.5 "Silkscreen", monospace; text-transform: uppercase; }
+.song-cover {
+  --cover-bg: #567b5d;
+  --tape: #d4dea6;
+  display: grid;
+  place-items: center;
+  width: calc(100% + 24px);
+  height: 105px;
+  margin-left: -12px;
+  background: radial-gradient(circle at 90% 20%, #ffffff18 0 32px, transparent 33px), var(--cover-bg);
+}
+.song-cover[data-cover="1"] { --cover-bg: #97764d; --tape: #f0d4a0; }
+.song-cover[data-cover="2"] { --cover-bg: #4d7470; --tape: #b4d9c4; }
+.song-cover[data-cover="3"] { --cover-bg: #795c60; --tape: #e9bdae; }
+.song-cassette { position: relative; display: grid; place-items: start center; width: 116px; height: 72px; border: 3px solid #24382b; border-radius: 10px; padding-top: 8px; background: var(--tape); box-shadow: 3px 4px 0 #14291f45; }
+.song-cassette > span { color: #24382b; font: 0.5rem "Silkscreen", monospace; letter-spacing: 0.07em; }
+.song-cassette::before { position: absolute; inset: 28px 13px 15px; border: 2px solid #24382b; border-radius: 12px; background: radial-gradient(circle at 12px 50%, #f7f1d7 3px, #24382b 4px 7px, transparent 8px), radial-gradient(circle at calc(100% - 12px) 50%, #f7f1d7 3px, #24382b 4px 7px, transparent 8px), #45604b; content: ""; }
+.song-cassette::after { position: absolute; bottom: 0; width: 46px; height: 9px; border: 2px solid #24382b; border-bottom: 0; border-radius: 6px 6px 0 0; content: ""; }
+.song-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border-top: 1px solid var(--line); }
+.project-list-rename { min-height: 36px; padding: 4px 9px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; font-size: 1rem; }
+.project-list-delete { width: 36px; height: 36px; min-width: 36px; min-height: 36px; border: 0; border-radius: 6px; background: transparent; }
+.project-list-row.unavailable { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 12px; }
+.project-list-row.unavailable .project-list-open { padding: 0; }
+.project-list-row.unavailable .project-list-open strong { white-space: normal; }
+.project-list-row.unavailable .project-list-open span { overflow-wrap: anywhere; }
+.project-list-recover { width: 44px; height: 44px; }
+.project-list-open:focus-visible { outline-offset: -3px; }
+.project-share-render { border-style: solid; border-color: var(--line); border-radius: 10px; }
+.project-storage-message { font-size: 1rem; line-height: 1.4; }
+
+@media (max-width: 700px) {
+  .audio-setup-card { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 24px; text-align: center; }
+  .piptune-welcome-art { grid-column: 1; grid-row: auto; width: min(250px, 100%); justify-self: center; }
+  .audio-setup-card > div:first-of-type { padding-top: 0; }
+  .audio-setup-card .audio-setup-actions, .audio-setup-card .audio-diagnostics { grid-column: 1; }
+  .audio-setup-card .eyebrow { margin-bottom: 8px; }
+  .audio-setup-card .audio-diagnostics { text-align: left; }
+  .project-dialog-panel { padding: 16px; gap: 12px; }
+  .song-shelf-header > img { width: 40px; height: 40px; border-radius: 12px; }
+  .song-shelf-header { gap: 8px; }
+  .project-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .song-cover { height: 86px; }
+  .song-cassette { transform: scale(0.86); }
+  .project-list-open { padding-inline: 9px; }
+  .song-cover { width: calc(100% + 18px); margin-left: -9px; }
+  .project-list-open strong { font-size: 1.1rem; }
+  .project-library-current { grid-template-columns: minmax(0, 1fr) auto; padding: 9px; }
+  .project-library-current-status > span { display: none; }
+  #project-library-save-status { min-width: 0; padding: 8px 6px; font-size: 0.46rem; }
+  .project-list-rename, .project-list-delete { min-height: 44px; }
+}
+@media (max-height: 620px) {
+  .piptune-welcome-art { max-height: 110px; width: auto; }
+  .audio-setup-card { gap: 12px; padding: 18px; }
+}

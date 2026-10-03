@@ -1,6 +1,5 @@
 :root {
-  /* V2 is a new workspace, not a new brand. Keep it on the established
-     Klinto palette so the existing light-theme tokens continue to apply. */
+  /* Shared Piptune colours keep the workspace and its dialogs in sync. */
   --v2-bg: var(--bg-0);
   --v2-panel: var(--panel);
   --v2-panel-raised: var(--panel-raised);

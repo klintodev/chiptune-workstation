@@ -4,17 +4,17 @@ const STATE_CONTENT = Object.freeze({
   idle: {
     title: "Not started",
     action: "Start making music",
-    description: "Create, arrange, visualise and share chiptune tracks in your browser\u2014no installation required.",
+    description: "Make a melody, build a loop, and keep your songs close. It all starts right here in your browser.",
   },
   running: {
     title: "Ready",
     action: "Audio enabled",
-    description: "The audio clock is running. Instruments connect through the shared master signal path.",
+    description: "Sound is ready. Your next little melody is waiting.",
   },
   suspended: {
     title: "Paused by browser",
     action: "Resume audio",
-    description: "The browser suspended the audio context. Resume it here without creating a second context.",
+    description: "Your browser paused the sound. Resume it here to keep making music.",
   },
   closed: {
     title: "Closed",

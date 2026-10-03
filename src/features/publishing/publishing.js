@@ -71,7 +71,7 @@ export function createPublishingFeature({
         <h2 id="publishing-derivative-title">Publish this remix?</h2>
         <p>This project retains source attribution:</p>
         <div class="publishing-derivative-source"><strong data-derivative-title></strong><span data-derivative-meta></span></div>
-        <p>Klinto Studio remix permission does not guarantee rights to external samples, trademarks, or material the source creator did not own.</p>
+        <p>Piptune remix permission does not guarantee rights to external samples, trademarks, or material the source creator did not own.</p>
         <div><button type="button" data-derivative-cancel>Review project</button><button class="safe-action" type="button" data-derivative-confirm>Confirm and publish</button></div>
       </div>
     </dialog>`;

@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Listen to a chiptune shared from Klinto Studio." />
-    <title>Shared chiptune - Klinto Studio</title>
+    <meta name="description" content="Listen to a chiptune shared from Piptune." />
+    <title>Shared chiptune - Piptune</title>
     <style id="critical-startup">
       :root { color-scheme: dark; background: #171220; }
       html, body { width: 100%; min-width: 320px; min-height: 100%; margin: 0; background: #171220; }
@@ -12,11 +12,13 @@
       body > * { visibility: hidden; animation: critical-reveal 0s 3s forwards; }
       @keyframes critical-reveal { to { visibility: visible; } }
     </style>
+    <link rel="icon" href="/assets/brand/piptune-frog.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#172c25" />
     <link rel="stylesheet" href="./player.css" />
   </head>
   <body>
     <main class="player-shell">
-      <header><a href="./">Klinto Studio</a><span>Published snapshot</span></header>
+      <header><a class="player-brand" href="./"><img src="/assets/brand/piptune-frog.svg" alt="" width="40" height="40" />Piptune</a><span>Published snapshot</span></header>
       <section class="player-card" aria-labelledby="player-title">
         <div class="player-heading"><div><span class="eyebrow">Shared chiptune</span><h1 id="player-title">Loading...</h1><p>by <strong id="player-creator">...</strong></p></div><span id="player-revision"></span></div>
         <div class="player-visual"><canvas id="player-canvas" aria-label="Audio reactive visualiser"></canvas></div>
@@ -29,11 +31,11 @@
         <div class="player-progress"><span id="player-position">Step 001</span><span id="player-status" role="status">Loading publication...</span></div>
         <div id="player-remix-section" class="player-remix" hidden>
           <div><strong>Make your own version</strong><span>Import this snapshot into your browser as a separate local project.</span></div>
-          <button id="player-remix" type="button">Remix in Klinto Studio</button>
+          <button id="player-remix" type="button">Remix in Piptune</button>
         </div>
         <p id="player-error" class="player-error" role="alert" hidden></p>
       </section>
-      <footer>This is a read-only published snapshot. <a href="./">Create your own in Klinto Studio.</a></footer>
+      <footer>This is a read-only published snapshot. <a href="./">Create your own in Piptune.</a></footer>
     </main>
     <dialog id="player-remix-dialog" class="player-remix-dialog" aria-labelledby="player-remix-title">
       <div>

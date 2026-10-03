@@ -110,7 +110,7 @@ export function createRemixImportFeature({
         action.textContent = "Continue in studio";
       } else {
         dialog.querySelector("h2").textContent = "Local remix saved, but not opened";
-        message.textContent = `Your local remix was created successfully, but Klinto Studio could not switch to it. It remains available in the project library as “${imported.document.project.metadata.title}”. ${result.error?.message ?? ""}`.trim();
+        message.textContent = `Your local remix was created successfully, but Piptune could not switch to it. It remains available in the project library as “${imported.document.project.metadata.title}”. ${result.error?.message ?? ""}`.trim();
         message.classList.add("error");
         action.textContent = "Return to studio";
       }

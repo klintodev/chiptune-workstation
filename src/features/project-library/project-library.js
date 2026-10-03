@@ -35,9 +35,6 @@ export function getProjectLibraryRowModel(summary, activeId = null) {
     ? summary.title
     : "Unavailable project";
   const updatedAt = formatUpdatedAt(summary.updatedAt);
-  const revision = Number.isInteger(summary.revision) && summary.revision >= 0
-    ? `revision ${summary.revision}`
-    : "revision unavailable";
   const reason = typeof summary.reason === "string" && summary.reason.trim()
     ? summary.reason.trim()
     : "This record cannot be opened safely.";
@@ -50,7 +47,7 @@ export function getProjectLibraryRowModel(summary, activeId = null) {
     isActive: !unavailable && id !== null && id === activeId,
     meta: unavailable
       ? `Unavailable \u00b7 ${updatedAt} \u00b7 ${reason.slice(0, 160)}`
-      : `${updatedAt} \u00b7 ${revision}`,
+      : `Edited ${updatedAt}`,
     reason,
     recoveryKey,
     title,
@@ -123,7 +120,7 @@ export function createProjectLibraryFeature({
     elements.librarySaveStatus.value = STATUS_LABELS[state.status] ?? state.status;
     elements.librarySaveStatus.dataset.state = state.status;
     elements.open.dataset.saveState = state.status;
-    elements.open.title = `${project.metadata.title} \u00b7 ${STATUS_LABELS[state.status] ?? state.status}`;
+    elements.open.title = `Open song shelf \u00b7 ${project.metadata.title} \u00b7 ${STATUS_LABELS[state.status] ?? state.status}`;
     if (state.status !== previousPersistenceStatus) {
       previousPersistenceStatus = state.status;
       if (state.status === "saved") announceStatus(root, "Saved");
@@ -139,7 +136,7 @@ export function createProjectLibraryFeature({
     } else if (state.status === "error") {
       setTextIfChanged(elements.storageMessage, `Automatic saving failed. Your current edits are still available in this tab.${state.error?.message ? ` ${state.error.message}` : ""}`);
     } else {
-      setTextIfChanged(elements.storageMessage, "Projects are saved automatically in this browser.");
+      setTextIfChanged(elements.storageMessage, "Songs save automatically in this browser. Use Export project in the Studio menu to keep a backup.");
     }
   }
 
@@ -150,6 +147,7 @@ export function createProjectLibraryFeature({
     row.classList.toggle("active", model.isActive);
     row.classList.toggle("unavailable", model.availability === "unavailable");
     row.dataset.availability = model.availability;
+    row.dataset.projectId = model.id ?? "";
 
     const title = root.createElement("strong");
     title.textContent = model.title;
@@ -164,7 +162,34 @@ export function createProjectLibraryFeature({
       open.dataset.projectId = model.id;
       open.dataset.summaryKey = summaryKey;
       open.setAttribute("aria-current", model.isActive ? "true" : "false");
-      open.append(title, meta);
+      open.setAttribute("aria-label", `Open ${model.title}${model.isActive ? ", current song" : ""}`);
+      const art = root.createElement("span");
+      art.className = "song-cover";
+      art.setAttribute("aria-hidden", "true");
+      // Stable artwork belongs to the song ID, so renaming never changes its cover.
+      const seed = Array.from(model.id).reduce((value, character) => ((value * 31) + character.codePointAt(0)) >>> 0, 0);
+      art.dataset.cover = String(seed % 4);
+      const cassette = root.createElement("span");
+      cassette.className = "song-cassette";
+      const label = root.createElement("span");
+      label.textContent = "PIP / " + String((seed % 90) + 10);
+      cassette.append(label);
+      art.append(cassette);
+      const state = root.createElement("span");
+      state.className = "song-card-state";
+      state.textContent = model.isActive ? "Current song" : "Open song \u2197";
+      open.append(art, state, title, meta);
+
+      const actions = root.createElement("div");
+      actions.className = "song-card-actions";
+      const rename = root.createElement("button");
+      rename.type = "button";
+      rename.className = "project-list-rename";
+      rename.dataset.action = "rename-project";
+      rename.dataset.projectId = model.id;
+      rename.dataset.summaryKey = summaryKey;
+      rename.setAttribute("aria-label", `Rename ${model.title}`);
+      rename.textContent = "Rename";
 
       const remove = root.createElement("button");
       remove.type = "button";
@@ -175,7 +200,8 @@ export function createProjectLibraryFeature({
       remove.setAttribute("aria-label", `Delete ${model.title}`);
       remove.title = `Delete ${model.title}`;
       remove.textContent = "\u00d7";
-      row.append(open, remove);
+      actions.append(rename, remove);
+      row.append(open, actions);
       return row;
     }
 
@@ -208,10 +234,16 @@ export function createProjectLibraryFeature({
       const activeId = persistence.getActiveDocument().id;
       const entries = projects.map((summary, index) => [`${generation}:${index}`, summary]);
       projectSummaries = new Map(entries);
+      const focused = elements.list.contains(root.activeElement) ? root.activeElement?.dataset : null;
       elements.list.replaceChildren(...entries.map(([summaryKey, summary]) => (
         createProjectRow(summary, activeId, summaryKey)
       )));
-      elements.count.value = `${projects.length} project${projects.length === 1 ? "" : "s"}`;
+      for (const button of elements.list.querySelectorAll("button")) {
+        if (busy) button.disabled = true;
+        if (focused?.projectId && button.dataset.projectId === focused.projectId
+          && button.dataset.action === focused.action) button.focus({ preventScroll: true });
+      }
+      elements.count.value = `${projects.length} song${projects.length === 1 ? "" : "s"}`;
       showError("");
     } catch (error) {
       if (generation !== renderGeneration) return;
@@ -221,6 +253,7 @@ export function createProjectLibraryFeature({
 
   function setBusy(value) {
     busy = value;
+    elements.list.setAttribute("aria-busy", String(value));
     for (const element of [
       elements.close,
       elements.create,
@@ -337,19 +370,28 @@ export function createProjectLibraryFeature({
       return;
     }
 
-    if (button.dataset.action === "open-project") {
+    if (["open-project", "rename-project"].includes(button.dataset.action)) {
       if (!summary || summary.availability === "unavailable") {
         showError("This project is unavailable for editing. Download its raw recovery copy instead.");
         return;
       }
+      const rename = button.dataset.action === "rename-project";
+      const focusName = () => {
+        if (!elements.dialog.open) return;
+        elements.name.focus();
+        elements.name.select();
+      };
       if (projectId === persistence.getActiveDocument().id) {
-        elements.dialog.close();
+        if (rename) focusName();
+        else elements.dialog.close();
         return;
       }
       void run(async () => {
         onBeforeProjectChange();
         await persistence.openProject(projectId);
-      }, { closeAfter: true });
+      }, { closeAfter: !rename }).then((completed) => {
+        if (completed && rename) focusName();
+      });
       return;
     }
 
@@ -358,10 +400,11 @@ export function createProjectLibraryFeature({
         showError("Unavailable records are preserved for recovery and cannot be deleted here.");
         return;
       }
-      void persistence.listProjects().then((projects) => {
+      void run(async () => {
+        const projects = await persistence.listProjects();
         const current = projects.find(({ id }) => id === projectId);
-        if (current && current.availability !== "unavailable") requestDelete(current);
-      }).catch((error) => showError(error.message));
+        if (elements.dialog.open && current && current.availability !== "unavailable") requestDelete(current);
+      });
     }
   }, { signal: lifecycle.signal });
   elements.cancelDelete.addEventListener("click", () => closeDeleteDialog(), { signal: lifecycle.signal });

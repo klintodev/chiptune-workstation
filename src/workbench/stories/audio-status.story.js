@@ -35,7 +35,7 @@ function mountAudioStatus({ canvas, scenario }) {
       <div class="audio-setup-card">
         <div>
           <p class="eyebrow">Audio lifecycle</p>
-          <h2 id="setup-title">Klinto Studio</h2>
+          <h2 id="setup-title">Piptune</h2>
           <p id="status-description" class="lede"></p>
         </div>
         <div class="audio-setup-actions">

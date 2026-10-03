@@ -23,31 +23,35 @@ function contrast(first, second) {
 
 test("the workstation exposes launch-ready search and sharing metadata", async () => {
   const html = await readFile(new URL("index.html", root), "utf8");
-  assert.match(html, /<title>Klinto Studio — Make Chiptunes in Your Browser<\/title>/);
+  assert.match(html, /<title>Piptune — Make Chiptunes in Your Browser<\/title>/);
   assert.match(html, /rel="canonical" href="https:\/\/studio\.klinto\.dev\/"/);
-  assert.match(html, /property="og:image" content="https:\/\/studio\.klinto\.dev\/assets\/brand\/social-preview\.png"/);
+  assert.match(html, /property="og:image" content="https:\/\/studio\.klinto\.dev\/assets\/brand\/piptune-social\.png"/);
   assert.match(html, /name="twitter:card" content="summary_large_image"/);
-  assert.match(html, /<h1>Klinto Studio<\/h1>/);
+  assert.match(html, /<h1>Piptune<\/h1>/);
   assert.match(html, /<span class="studio-beta">Beta<\/span>/);
   assert.match(html, /aria-label="Master output volume"/);
 });
 
 test("the social preview has the recommended 1200 by 630 dimensions", async () => {
-  const image = await readFile(new URL("assets/brand/social-preview.png", root));
+  const image = await readFile(new URL("assets/brand/piptune-social.png", root));
   assert.equal(image.subarray(1, 4).toString("ascii"), "PNG");
   assert.deepEqual(pngDimensions(image), { width: 1200, height: 630 });
-  for (const [file, size] of [["apple-touch-icon.png", 180], ["icon-192.png", 192], ["icon-512.png", 512]]) {
+  for (const [file, size] of [["piptune-touch.png", 180], ["piptune-icon-192.png", 192], ["piptune-icon-512.png", 512]]) {
     const icon = await readFile(new URL(`assets/brand/${file}`, root));
     assert.deepEqual(pngDimensions(icon), { width: size, height: size });
   }
 });
 
-test("light-theme accent and muted text colours meet normal-text contrast", async () => {
+test("Piptune text colours meet normal-text contrast across both themes", async () => {
   const css = await readFile(new URL("src/features/theme/theme.css", root), "utf8");
-  const lightTheme = css.match(/:root\[data-theme="light"\]\s*{([^}]+)}/)[1];
-  const token = (name) => lightTheme.match(new RegExp(`--${name}:\\s*(#[\\da-f]{6})`, "i"))[1];
-  assert.ok(contrast(token("accent"), token("panel")) >= 4.5);
-  assert.ok(contrast(token("muted"), token("panel")) >= 4.5);
+  for (const theme of [css.match(/:root\s*{([^}]+)}/)[1], css.match(/:root\[data-theme="light"\]\s*{([^}]+)}/)[1]]) {
+    const token = (name) => theme.match(new RegExp(`--${name}:\\s*(#[\\da-f]{6})`, "i"))[1];
+    for (const foreground of ["ink", "accent", "muted"]) {
+      for (const background of ["bg-0", "panel", "panel-raised"]) {
+        assert.ok(contrast(token(foreground), token(background)) >= 4.5, `${foreground} on ${background}`);
+      }
+    }
+  }
 });
 
 test("the light theme removes scanlines and the project library keeps recovery separate from project actions", async () => {

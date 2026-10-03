@@ -5,23 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Create, arrange, visualise and share chiptune tracks in your browser—no installation required." />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#211b28" />
+    <meta name="theme-color" content="#172c25" />
     <link rel="canonical" href="https://studio.klinto.dev/" />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Klinto Studio" />
-    <meta property="og:title" content="Klinto Studio — Make Chiptunes in Your Browser" />
+    <meta property="og:site_name" content="Piptune" />
+    <meta property="og:title" content="Piptune — Make Chiptunes in Your Browser" />
     <meta property="og:description" content="Create, arrange, visualise and share chiptune tracks in your browser—no installation required." />
     <meta property="og:url" content="https://studio.klinto.dev/" />
-    <meta property="og:image" content="https://studio.klinto.dev/assets/brand/social-preview.png" />
+    <meta property="og:image" content="https://studio.klinto.dev/assets/brand/piptune-social.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Klinto Studio chiptune sequencer and keyboard" />
+    <meta property="og:image:alt" content="Piptune headphone frog making music in a cosy green studio" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Klinto Studio — Make Chiptunes in Your Browser" />
+    <meta name="twitter:title" content="Piptune — Make Chiptunes in Your Browser" />
     <meta name="twitter:description" content="Create, arrange, visualise and share chiptune tracks in your browser—no installation required." />
-    <meta name="twitter:image" content="https://studio.klinto.dev/assets/brand/social-preview.png" />
-    <meta name="twitter:image:alt" content="Klinto Studio chiptune sequencer and keyboard" />
-    <title>Klinto Studio — Make Chiptunes in Your Browser</title>
+    <meta name="twitter:image" content="https://studio.klinto.dev/assets/brand/piptune-social.png" />
+    <meta name="twitter:image:alt" content="Piptune headphone frog making music in a cosy green studio" />
+    <title>Piptune — Make Chiptunes in Your Browser</title>
     <style id="critical-startup">
       :root { color-scheme: dark; background: #211b28; }
       html, body { width: 100%; min-width: 320px; min-height: 100%; margin: 0; background: #211b28; }
@@ -29,9 +29,9 @@
       body > * { visibility: hidden; animation: critical-reveal 0s 3s forwards; }
       @keyframes critical-reveal { to { visibility: visible; } }
     </style>
-    <link rel="icon" href="/assets/brand/klinto-mark.svg" type="image/svg+xml" />
-    <link rel="icon" href="/assets/brand/favicon-32.png" sizes="32x32" type="image/png" />
-    <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png" />
+    <link rel="icon" href="/assets/brand/piptune-frog.svg" type="image/svg+xml" />
+    <link rel="icon" href="/assets/brand/piptune-favicon.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/assets/brand/piptune-touch.png" />
     <link rel="manifest" href="/assets/brand/site.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -39,10 +39,10 @@
     <main class="shell">
       <header class="global-bar">
         <div class="project-cluster">
-          <div class="studio-badge"><span class="studio-mark" aria-hidden="true"></span><h1>Klinto Studio</h1><span class="studio-beta">Beta</span></div>
-          <button id="project-library-open" class="project-summary" type="button" aria-haspopup="dialog">
+          <div class="studio-badge"><img class="studio-mark" src="/assets/brand/piptune-frog.svg" alt="" width="36" height="36" /><h1>Piptune</h1><span class="studio-beta">Beta</span></div>
+          <button id="project-library-open" class="project-summary" type="button" aria-haspopup="dialog" aria-label="Open song shelf" aria-describedby="project-title project-save-status">
             <span class="project-summary-icon" aria-hidden="true">&#9656;</span>
-            <span class="project-summary-copy"><span>Project</span><output id="project-title">Untitled chiptune</output></span>
+            <span class="project-summary-copy"><span>Song shelf</span><output id="project-title">Untitled chiptune</output></span>
             <span class="project-save-pill"><span aria-hidden="true"></span><output id="project-save-status">Saved</output></span>
           </button>
         </div>
@@ -73,7 +73,8 @@
 
       <dialog id="audio-setup" class="audio-setup" aria-labelledby="setup-title" aria-describedby="status-description" open>
         <div class="audio-setup-card">
-          <div><p class="eyebrow">Browser chiptune workstation</p><h2 id="setup-title">Klinto Studio</h2><p id="status-description" class="lede">Create, arrange, visualise and share chiptune tracks in your browser—no installation required.</p></div>
+          <img class="piptune-welcome-art" src="/assets/brand/piptune-studio.svg" alt="A happy frog in headphones, making music beside a plant and a cup of tea" width="480" height="340" />
+          <div><p class="eyebrow">Your little chiptune studio</p><h2 id="setup-title">Piptune</h2><p class="piptune-tagline">Small sounds. Good company.</p><p id="status-description" class="lede">Create, arrange, visualise and share chiptune tracks in your browser—no installation required.</p></div>
           <div class="audio-setup-actions"><button id="audio-action" class="primary-action" type="button"><span>Start making music</span><span aria-hidden="true">&#8599;</span></button><button id="audio-setup-close" type="button">Continue without sound</button></div>
           <div id="error-panel" class="error-panel" role="alert" hidden><strong>Audio could not start</strong><p id="error-message"></p></div>
           <details class="audio-diagnostics"><summary>Audio diagnostics</summary><div class="meters" aria-label="Audio engine information"><div><span>Context</span><strong id="context-state">&mdash;</strong></div><div><span>Sample rate</span><strong id="sample-rate">&mdash;</strong></div><div><span>Audio time</span><strong id="audio-time">&mdash;</strong></div></div></details>
@@ -205,17 +206,17 @@
 
     <dialog id="project-library-dialog" class="project-dialog" aria-labelledby="project-library-title">
       <div class="project-dialog-panel">
-        <header><div><span class="panel-context">Local library</span><h2 id="project-library-title">Projects</h2></div><button id="project-library-close" type="button" aria-label="Close project library">&times;</button></header>
+        <header class="song-shelf-header"><div><span class="panel-context">Piptune / local collection</span><h2 id="project-library-title">Your song shelf</h2><p>Keep your little works in progress close.</p></div><img src="/assets/brand/piptune-frog.svg" alt="" width="56" height="56" /><button id="project-library-close" type="button" aria-label="Close song shelf">&times;</button></header>
         <div class="project-library-current">
-          <label class="project-title-field"><span>Project name</span><input id="project-name-input" type="text" maxlength="100" /></label>
+          <label class="project-title-field"><span>Current song name</span><input id="project-name-input" type="text" maxlength="100" /></label>
           <div class="project-library-current-status"><span>Status</span><output id="project-library-save-status">Saved</output></div>
         </div>
         <div class="project-dialog-actions">
-          <button id="project-new" type="button">New</button>
-          <button id="project-duplicate" type="button">Duplicate</button>
+          <button id="project-new" type="button">+ New song</button>
+          <button id="project-duplicate" type="button">Duplicate song</button>
         </div>
-        <div class="project-library-heading"><span>Saved in this browser</span><output id="project-library-count">0 projects</output></div>
-        <div id="project-list" class="project-list" aria-label="Saved projects"></div>
+        <div class="project-library-heading"><span>Saved in this browser</span><output id="project-library-count">0 songs</output></div>
+        <div id="project-list" class="project-list" aria-label="Saved songs"></div>
         <div class="project-share-render">
           <div><span class="panel-context">Share &amp; render</span><p>Publish a read-only page or bounce a WAV.</p></div>
           <div id="project-share-render-actions"></div>

@@ -289,6 +289,8 @@ export function createV2KeyboardAudition({
     const hadActiveVoices = activeVoices.some(({ inputMarked }) => !inputMarked);
     inputController.stopAll();
     stopPreview();
+    // Switching songs before audio is enabled has no voices or audio clock.
+    if (activeVoices.length === 0) return hadActiveVoices;
     const now = audioEngine.getCurrentTime();
     for (const record of [...activeVoices]) {
       if (!record.inputMarked) record.wrapper.retire(now);

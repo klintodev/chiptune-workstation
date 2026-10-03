@@ -10,7 +10,7 @@ export function createV2HelpDialog({ root = document } = {}) {
     "aria-label": "Close help",
     textContent: "Close",
   });
-  const title = createElement("h2", { id: "v2-help-title", textContent: "Klinto Studio V2 help" });
+  const title = createElement("h2", { id: "v2-help-title", textContent: "Piptune V2 help" });
   const panel = createElement("div", { className: "project-dialog-panel" }, [
     createElement("header", {}, [
       createElement("div", {}, [
