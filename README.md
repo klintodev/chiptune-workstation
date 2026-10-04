@@ -8,6 +8,12 @@ The original vector artwork lives in `assets/brand/piptune-frog.svg`, `piptune-s
 
 The current product includes a playable keyboard, reusable patterns, a multi-track clip arrangement, per-note expression, mixer controls, transport and looping, bounded undo/redo, local project persistence, JSON recovery, WAV export, optional accounts and cloud backup, public sharing, and a composition-projected visualiser.
 
+## Move songs between browsers or domains
+
+To move songs to another browser or Piptune domain, open **Song shelf** at the old address, open each song you want to keep, and choose **Export project**. At the new address, use **Song shelf → Import project** for each `.chipwork.json` file. Reload and check the imported notes and arrangement before clearing any old browser data. Browser storage is separate for each origin; signing in alone does not transfer locally saved songs.
+
+Import validates the file before switching projects, saves pending edits to the current song, and creates a separate copy when the project ID already exists. Files are limited to 2 MB. Exported project files retain notes, sounds, explicit pattern lengths and arrangement timing; WAV files contain only rendered audio and cannot be imported as projects.
+
 ## Run locally
 
 Serve the repository over HTTP from its root:

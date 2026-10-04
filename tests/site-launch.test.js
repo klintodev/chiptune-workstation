@@ -60,7 +60,8 @@ test("the light theme removes scanlines and the project library keeps recovery s
     readFile(new URL("index.html", root), "utf8"),
   ]);
   assert.match(baseCss, /:root\[data-theme="light"\]\s+body::before\s*{\s*display:\s*none;/);
-  assert.doesNotMatch(html, /id="project-import"/);
+  assert.match(html, /id="project-share-render-actions"[\s\S]*id="project-import"[\s\S]*id="project-backup-download"/);
+  assert.match(html, /id="project-import-file"[^>]*type="file"[^>]*hidden/);
   assert.doesNotMatch(html, /id="project-export"/);
   assert.match(html, /class="project-dialog-actions"[\s\S]*id="project-new"[\s\S]*id="project-duplicate"/);
   assert.match(html, /id="project-storage-recovery"[\s\S]*id="project-recovery-download"/);

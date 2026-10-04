@@ -2,6 +2,7 @@ import {
   downloadProjectFile,
   downloadRawProjectFile,
 } from "../../persistence/project-download.js";
+import { MAX_PROJECT_FILE_BYTES } from "../../persistence/project-document.js";
 import { queryRequired } from "../../shared/query-required.js";
 import { announceStatus, setTextIfChanged } from "../../shared/status-announcer.js";
 
@@ -89,6 +90,8 @@ export function createProjectLibraryFeature({
     dialog: queryRequired(root, "#project-library-dialog"),
     duplicate: queryRequired(root, "#project-duplicate"),
     error: queryRequired(root, "#project-library-error"),
+    importButton: queryRequired(root, "#project-import"),
+    importFile: queryRequired(root, "#project-import-file"),
     librarySaveStatus: queryRequired(root, "#project-library-save-status"),
     list: queryRequired(root, "#project-list"),
     name: queryRequired(root, "#project-name-input"),
@@ -262,6 +265,8 @@ export function createProjectLibraryFeature({
       elements.name,
       elements.recoveryDownload,
       elements.backupDownload,
+      elements.importButton,
+      elements.importFile,
     ]) {
       if ("disabled" in element) element.disabled = value;
       element.setAttribute("aria-disabled", String(value));
@@ -358,6 +363,23 @@ export function createProjectLibraryFeature({
   }, { closeAfter: true }), { signal: lifecycle.signal });
   elements.recoveryDownload.addEventListener("click", downloadActiveProject, { signal: lifecycle.signal });
   elements.backupDownload.addEventListener("click", downloadActiveProject, { signal: lifecycle.signal });
+  elements.importButton.addEventListener("click", () => {
+    if (!busy) elements.importFile.click();
+  }, { signal: lifecycle.signal });
+  elements.importFile.addEventListener("change", () => {
+    const file = elements.importFile.files?.[0];
+    // Reset even after an error so the same file can be chosen again.
+    elements.importFile.value = "";
+    if (!file || busy) return;
+    void run(async () => {
+      if (file.size > MAX_PROJECT_FILE_BYTES) throw new RangeError("Project files must be 2 MB or smaller.");
+      const text = await file.text();
+      onBeforeProjectChange();
+      await persistence.importProject(text);
+    }).then((completed) => {
+      if (completed) announceStatus(root, `Imported ${projectState.getState().metadata.title}. Existing songs are kept.`);
+    });
+  }, { signal: lifecycle.signal });
   elements.list.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button || busy) return;

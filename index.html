@@ -218,9 +218,10 @@
         <div class="project-library-heading"><span>Saved in this browser</span><output id="project-library-count">0 songs</output></div>
         <div id="project-list" class="project-list" aria-label="Saved songs"></div>
         <div class="project-share-render">
-          <div><span class="panel-context">Backup, share &amp; render</span><p>Keep a project file, publish a page or bounce a WAV.</p></div>
-          <div id="project-share-render-actions"><button id="project-backup-download" type="button">Export project</button></div>
+          <div><span class="panel-context">Backup, share &amp; render</span><p>Move a song between browsers, publish a page or bounce a WAV.</p></div>
+          <div id="project-share-render-actions"><button id="project-import" type="button">Import project</button><button id="project-backup-download" type="button">Export project</button></div>
         </div>
+        <input id="project-import-file" type="file" accept=".chipwork.json,.json,application/json" aria-label="Import project file" hidden />
         <p id="project-storage-message" class="project-storage-message" role="status"></p>
         <div id="project-storage-recovery" class="project-storage-recovery" hidden>
           <p><strong>Keep a recovery copy.</strong> Download this project now to preserve your work.</p>

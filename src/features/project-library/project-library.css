@@ -93,7 +93,7 @@
 .project-share-render { display: flex; align-items: center; gap: 10px; padding: 10px 11px; border: 1px dashed var(--line-strong); border-radius: 4px; background: var(--bg-1); }
 .project-share-render > div:first-child { min-width: 0; flex: 1; }
 .project-share-render p { margin: 2px 0 0; color: var(--muted); font-size: 0.86rem; }
-#project-share-render-actions { display: flex; flex: 0 0 auto; gap: 7px; }
+#project-share-render-actions { display: grid; grid-template-columns: 1fr 1fr; flex: 0 0 auto; gap: 7px; }
 #project-share-render-actions button { min-height: 34px; padding: 5px 11px; }
 .project-library-error { padding: 8px; border: 1px solid var(--danger); color: var(--danger); }
 .project-delete-panel p { color: var(--muted); }

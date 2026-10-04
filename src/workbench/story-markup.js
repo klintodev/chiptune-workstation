@@ -25,8 +25,9 @@ export function projectLibraryMarkup({ open = true } = {}) {
         <div id="project-list" class="project-list" aria-label="Saved projects"></div>
         <section class="project-share-render">
           <div><span class="panel-context">Share or render</span><p>Create a public snapshot or render the arrangement locally.</p></div>
-          <div id="project-share-render-actions"><button id="project-backup-download" type="button">Export project</button></div>
+          <div id="project-share-render-actions"><button id="project-import" type="button">Import project</button><button id="project-backup-download" type="button">Export project</button></div>
         </section>
+        <input id="project-import-file" type="file" accept=".chipwork.json,.json,application/json" aria-label="Import project file" hidden />
         <p id="project-storage-message" class="project-storage-message" role="status"></p>
         <div id="project-storage-recovery" class="project-storage-recovery" hidden>
           <strong>Storage needs attention</strong>

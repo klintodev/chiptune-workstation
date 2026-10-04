@@ -41,7 +41,7 @@ export function createV2HelpDialog({ root = document } = {}) {
     ]),
     createElement("section", {}, [
       createElement("h3", { textContent: "Projects and sound" }),
-      createElement("p", { textContent: "Songs autosave locally. Open Song shelf to create, duplicate or recover a project. Export project downloads a backup of the current song, including unsaved edits; Export WAV creates audio, and Share publishes a page. Audio setup appears automatically when playback needs it." }),
+      createElement("p", { textContent: "Songs autosave locally. Open Song shelf to create, duplicate or recover a project. Export project downloads a backup of the current song, including unsaved edits. Import project opens that file in another browser or on another Piptune domain, keeping existing songs. Export WAV creates audio, and Share publishes a page. Audio setup appears automatically when playback needs it." }),
     ]),
   ]);
   dialog.append(panel);

@@ -40,11 +40,99 @@ function createRoot() {
     elements.set(`#${id}`, new Element(root));
   }
   elements.set("#project-backup-download", new Element(root, "button"));
+  elements.set("#project-import", new Element(root, "button"));
+  elements.set("#project-import-file", new Element(root, "input"));
   return root;
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
+
+function chooseFile(root, file) {
+  const input = root.querySelector("#project-import-file");
+  input.files = file ? [file] : [];
+  input.value = file ? "song.chipwork.json" : "";
+  input.dispatchEvent(new Event("change"));
+  assert.equal(input.value, "", "the same file can be selected again");
+}
+
+test("song shelf import opens the picker, preserves pending edits and copies colliding IDs", async t => {
+  const f = await fixture(t);
+  const source = structuredClone(f.documents[1]);
+  source.project.patterns[0].lengthTicks = 768;
+  source.project.patterns[0].notes = [{ id: "imported-note", pitch: 60, startTick: 0, durationTicks: 24, velocity: 0.8 }];
+  const file = new File([JSON.stringify(source)], "song.chipwork.json", { type: "application/json" });
+  let pickers = 0;
+  f.root.querySelector("#project-import-file").addEventListener("click", () => pickers++);
+  f.root.querySelector("#project-import").click();
+  assert.equal(pickers, 1);
+  f.projectState.renameProject("Pending edits kept");
+  await settle();
+  chooseFile(f.root, file);
+  assert.equal(f.root.querySelector("#project-import").disabled, true);
+  await settle();
+  assert.notEqual(f.persistence.getActiveDocument().id, "beta");
+  assert.deepEqual(f.projectState.getState().patterns, source.project.patterns);
+  assert.deepEqual(await f.repository.get("beta"), f.documents[1]);
+  assert.equal((await f.repository.get("alpha")).project.metadata.title, "Pending edits kept");
+  assert.equal((await f.repository.list()).length, 3);
+  assert.equal(f.root.querySelector("#project-library-dialog").open, true);
+  assert.equal(f.root.querySelector("#project-import").disabled, false);
+  chooseFile(f.root, file);
+  await settle();
+  assert.equal((await f.repository.list()).length, 4);
+});
+
+test("import rejects oversized, unreadable, malformed and future files without changing songs", async t => {
+  const f = await fixture(t);
+  const future = structuredClone(f.documents[1]);
+  future.project.schemaVersion = 999;
+  const before = f.projectState.getState();
+  for (const file of [
+    { size: 2_000_001, text() { assert.fail("oversized files must not be read"); } },
+    { size: 1, async text() { throw new Error("File could not be read"); } },
+    new File(["not json"], "bad.json"),
+    new File([JSON.stringify(future)], "future.json"),
+  ]) {
+    chooseFile(f.root, file);
+    await settle();
+    assert.equal(f.persistence.getActiveDocument().id, "alpha");
+    assert.equal(f.projectState.getState(), before);
+    assert.equal((await f.repository.list()).length, 2);
+    assert.equal(f.root.querySelector("#project-library-error").hidden, false);
+    assert.equal(f.root.querySelector("#project-import").disabled, false);
+  }
+});
+
+test("cancelled and repeated file choices do not import twice or reopen a dismissed shelf", async t => {
+  const f = await fixture(t);
+  chooseFile(f.root, null);
+  assert.deepEqual(f.calls, []);
+  const gate = deferred();
+  const file = { size: 100, text: () => gate.promise };
+  chooseFile(f.root, file);
+  chooseFile(f.root, file);
+  f.root.querySelector("#project-library-dialog").dispatchEvent(new Event("cancel", { cancelable: true }));
+  gate.resolve(JSON.stringify(f.documents[1]));
+  await settle();
+  assert.deepEqual(f.calls, ["stop playback"]);
+  assert.equal((await f.repository.list()).length, 3);
+  assert.equal(f.root.querySelector("#project-library-dialog").open, false);
+});
+
+test("import keeps unsaved music recoverable when saving the current song fails", async t => {
+  const f = await fixture(t, { failSave: () => true });
+  f.projectState.renameProject("Do not lose this");
+  await settle();
+  chooseFile(f.root, new File([JSON.stringify(f.documents[1])], "song.chipwork.json"));
+  await settle();
+  assert.equal(f.persistence.getActiveDocument().id, "alpha");
+  assert.equal(f.projectState.getState().metadata.title, "Do not lose this");
+  assert.equal((await f.repository.list()).length, 2);
+  assert.match(f.root.querySelector("#project-library-error").textContent, /Storage is full/);
+  f.root.querySelector("#project-backup-download").click();
+  assert.equal(JSON.parse(f.downloads[0].text).project.metadata.title, "Do not lose this");
+});
 
 async function fixture(t, { beforeOpen = async () => {}, failSave = () => false } = {}) {
   const documents = ["Alpha", "Beta"].map(title => {
